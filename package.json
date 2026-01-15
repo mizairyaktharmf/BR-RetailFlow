@@ -1,0 +1,29 @@
+{
+  "name": "br-retailflow",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Ice Cream Inventory & Analytics Solution for Baskin Robbins UAE",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "turbo dev",
+    "build": "turbo build",
+    "start": "turbo start",
+    "lint": "turbo lint",
+    "clean": "turbo clean && rm -rf node_modules",
+    "dev:steward": "turbo dev --filter=steward-app",
+    "dev:admin": "turbo dev --filter=admin-dashboard",
+    "dev:api": "cd apps/api && python -m uvicorn main:app --reload --port 8000",
+    "db:migrate": "cd apps/api && alembic upgrade head",
+    "db:seed": "cd apps/api && python scripts/seed.py"
+  },
+  "devDependencies": {
+    "turbo": "^2.0.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "packageManager": "npm@10.0.0"
+}
