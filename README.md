@@ -2,7 +2,7 @@
 
 **Ice Cream Inventory & Analytics Solution for Baskin Robbins UAE**
 
-A comprehensive inventory tracking and analytics system designed to help Baskin Robbins (Galadari franchise) in UAE track flavor movement across all branches, enabling data-driven ordering decisions.
+A comprehensive inventory tracking, sales reporting, and analytics system designed to help Baskin Robbins (Galadari franchise) in UAE track flavor movement across all branches, enabling data-driven ordering decisions.
 
 ---
 
@@ -15,6 +15,8 @@ A comprehensive inventory tracking and analytics system designed to help Baskin 
 - [Project Structure](#project-structure)
 - [User Roles & Permissions](#user-roles--permissions)
 - [Features](#features)
+- [Steward App Pages](#steward-app-pages)
+- [Sales Reporting Windows](#sales-reporting-windows)
 - [Database Schema](#database-schema)
 - [API Documentation](#api-documentation)
 - [Installation](#installation)
@@ -26,20 +28,22 @@ A comprehensive inventory tracking and analytics system designed to help Baskin 
 
 ## Problem Statement
 
-Baskin Robbins UAE faces a critical inventory management challenge:
+Baskin Robbins UAE faces critical inventory and sales tracking challenges:
 
 - **POS Limitation**: Current POS system only records transaction types (kid's scoop, value scoop) - NOT the specific flavor sold
 - **Poor Visibility**: Management cannot identify which flavors are fast-moving vs slow-moving
 - **Inefficient Ordering**: Results in over-ordering slow flavors and under-ordering popular ones
-- **Financial Impact**: Leads to wastage and stockouts across 1000+ branches
+- **Manual Sales Tracking**: Currently using WhatsApp groups for sales updates - inefficient and hard to analyze
+- **No Budget Tracking**: No easy way to compare actual sales vs budget targets
+- **No Year Comparison**: Cannot easily compare performance with previous year
 
 ---
 
 ## Solution Overview
 
-BR-RetailFlow solves this through daily inventory tracking:
+BR-RetailFlow solves these problems through:
 
-### How It Works
+### 1. Daily Inventory Tracking
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
@@ -55,6 +59,7 @@ BR-RetailFlow solves this through daily inventory tracking:
 │  ──────────                                                      │
 │  • Record any new tub receipts from warehouse                   │
 │  • Each tub = 10 inches (standard size)                         │
+│  • Submit sales reports at designated windows                    │
 │                                                                  │
 │  END OF DAY (Closing)                                           │
 │  ─────────────────────                                          │
@@ -65,7 +70,11 @@ BR-RetailFlow solves this through daily inventory tracking:
 └─────────────────────────────────────────────────────────────────┘
 ```
 
-### Key Calculation
+### 2. Time-Window Sales Reporting (Replaces WhatsApp)
+
+Instead of sending sales to WhatsApp groups, stewards now submit sales through the app at specific time windows with photo proof.
+
+### 3. Key Calculations
 
 ```
 Daily Consumption = Opening Stock + Tubs Received - Closing Stock
@@ -93,7 +102,9 @@ Example:
 │  │                  │         │                  │              │
 │  │  • Offline-first │         │  • Analytics     │              │
 │  │  • Daily entry   │         │  • Reports       │              │
-│  │  • Simple UI     │         │  • Management    │              │
+│  │  • Sales reports │         │  • Budget vs     │              │
+│  │  • Photo upload  │         │    Actual        │              │
+│  │  • Simple UI     │         │  • YoY Compare   │              │
 │  └────────┬─────────┘         └────────┬─────────┘              │
 │           │                            │                         │
 │           │         ┌──────────────────┘                         │
@@ -105,7 +116,7 @@ Example:
 │  │  • REST API                             │                    │
 │  │  • JWT Authentication                   │                    │
 │  │  • Role-based Access Control            │                    │
-│  │  • Data Validation                      │                    │
+│  │  • File Upload (Photos)                 │                    │
 │  └─────────────────┬───────────────────────┘                    │
 │                    │                                             │
 │                    ▼                                             │
@@ -115,7 +126,8 @@ Example:
 │  │  • Users & Roles                        │                    │
 │  │  • Branches & Hierarchy                 │                    │
 │  │  • Inventory Records                    │                    │
-│  │  • Flavor Master Data                   │                    │
+│  │  • Sales Reports                        │                    │
+│  │  • Budget Targets                       │                    │
 │  └─────────────────────────────────────────┘                    │
 │                                                                  │
 ├─────────────────────────────────────────────────────────────────┤
@@ -133,9 +145,10 @@ Example:
 | Layer | Technology | Purpose |
 |-------|------------|---------|
 | **Frontend** | Next.js 14 (JavaScript) | Web applications |
+| **UI Framework** | Tailwind CSS + shadcn/ui | Styling & Components |
 | **Backend** | FastAPI (Python) | REST API |
 | **Database** | PostgreSQL | Primary data store |
-| **Cache** | Redis (optional) | Session management |
+| **Offline Storage** | IndexedDB (idb) | Offline capability |
 | **Monorepo** | Turborepo | Build system |
 | **Deployment** | AWS EC2 + Vercel | Hosting |
 
@@ -147,43 +160,43 @@ Example:
 BR-RetailFlow/
 ├── apps/
 │   ├── steward-app/          # Mobile-first PWA for stewards
-│   │   ├── components/       # React components
-│   │   ├── pages/            # Next.js pages
+│   │   ├── app/              # Next.js App Router pages
+│   │   │   ├── login/        # Login page
+│   │   │   ├── dashboard/    # Main dashboard
+│   │   │   ├── inventory/    # Inventory management
+│   │   │   ├── sales/        # Sales reporting
+│   │   │   └── receive/      # Receive from warehouse
+│   │   ├── components/ui/    # shadcn/ui components
 │   │   ├── hooks/            # Custom React hooks
 │   │   ├── services/         # API services
 │   │   ├── store/            # Offline storage (IndexedDB)
-│   │   └── styles/           # CSS modules
+│   │   └── lib/              # Utilities
 │   │
-│   ├── admin-dashboard/      # Admin web application
-│   │   ├── components/       # React components
-│   │   ├── pages/            # Next.js pages
-│   │   ├── hooks/            # Custom React hooks
-│   │   ├── services/         # API services
-│   │   └── styles/           # CSS modules
+│   ├── admin-dashboard/      # Admin web application (TODO)
 │   │
 │   └── api/                  # FastAPI backend
 │       ├── routers/          # API route handlers
+│       │   ├── auth.py       # Authentication
+│       │   ├── users.py      # User management
+│       │   ├── branches.py   # Branch management
+│       │   ├── flavors.py    # Flavor management
+│       │   ├── inventory.py  # Inventory endpoints
+│       │   └── analytics.py  # Analytics endpoints
 │       ├── models/           # SQLAlchemy models
+│       │   ├── user.py       # User model
+│       │   ├── location.py   # Territory/Area/Branch
+│       │   ├── inventory.py  # Inventory models
+│       │   └── sales.py      # Sales models
 │       ├── schemas/          # Pydantic schemas
 │       ├── services/         # Business logic
 │       ├── utils/            # Utility functions
-│       ├── scripts/          # DB scripts (seed, migrate)
-│       ├── main.py           # Application entry point
-│       └── requirements.txt  # Python dependencies
+│       └── scripts/          # DB scripts (seed)
 │
 ├── packages/
 │   ├── ui/                   # Shared UI components
-│   │   └── components/       # Reusable React components
-│   │
 │   └── shared/               # Shared utilities
-│       ├── utils/            # Helper functions
-│       └── constants/        # Shared constants
 │
 ├── docs/                     # Documentation
-│   ├── API.md                # API documentation
-│   ├── DATABASE.md           # Database schema details
-│   └── DEPLOYMENT.md         # Deployment guide
-│
 ├── package.json              # Root package.json
 ├── turbo.json                # Turborepo config
 └── README.md                 # This file
@@ -210,42 +223,49 @@ Supreme Admin (Office/HQ)
 | Feature | Staff | Admin | Super Admin | Supreme Admin |
 |---------|-------|-------|-------------|---------------|
 | Enter daily inventory | Own branch | ❌ | ❌ | ❌ |
+| Submit sales reports | Own branch | ❌ | ❌ | ❌ |
+| Receive warehouse stock | Own branch | ❌ | ❌ | ❌ |
 | View own branch data | ✅ | ✅ | ✅ | ✅ |
 | View area branches | ❌ | ✅ | ✅ | ✅ |
 | View territory data | ❌ | ❌ | ✅ | ✅ |
 | View all UAE data | ❌ | ❌ | ❌ | ✅ |
+| View sales photos | ❌ | ✅ | ✅ | ✅ |
 | Manage staff | ❌ | ✅ | ✅ | ✅ |
-| Manage admins | ❌ | ❌ | ✅ | ✅ |
-| Manage super admins | ❌ | ❌ | ❌ | ✅ |
+| Set budget targets | ❌ | ❌ | ✅ | ✅ |
 | System settings | ❌ | ❌ | ❌ | ✅ |
-| Export reports | ❌ | ✅ | ✅ | ✅ |
-| Approve corrections | ❌ | ✅ | ✅ | ✅ |
 
 ---
 
 ## Features
 
 ### Phase 1: Foundation ✅
-- [x] Project structure (Monorepo)
-- [ ] Database schema
-- [ ] Authentication system
-- [ ] Basic API endpoints
-- [ ] Role-based access control
+- [x] Project structure (Monorepo with Turborepo)
+- [x] Database models (Users, Locations, Inventory, Sales)
+- [x] Authentication system (JWT)
+- [x] API endpoints
+- [x] Role-based access control
 
-### Phase 2: Steward App 🔄
-- [ ] Login screen
-- [ ] Daily inventory form (Opening)
-- [ ] Tub receipt entry
-- [ ] Closing inventory form
-- [ ] Offline storage (IndexedDB)
-- [ ] Auto-sync when online
+### Phase 2: Steward App ✅
+- [x] Login screen with branch credentials
+- [x] Dashboard with quick actions
+- [x] Opening inventory form
+- [x] Closing inventory form
+- [x] Tub receipt entry (warehouse receiving)
+- [x] Sales reporting with time windows
+- [x] Photo upload for sales proof
+- [x] Offline storage (IndexedDB)
+- [x] Scoop count tracking
+- [x] Product count tracking (sundaes, shakes, cakes)
 
 ### Phase 3: Admin Dashboard 📋
 - [ ] Login with role detection
 - [ ] Role-based dashboard views
-- [ ] Branch management
+- [ ] View sales photos from branches
+- [ ] Branch performance comparison
+- [ ] Budget vs Actual tracking
+- [ ] Year-over-Year comparison
 - [ ] User management
-- [ ] Basic reports
+- [ ] Branch management
 
 ### Phase 4: Analytics 📊
 - [ ] Flavor consumption calculation
@@ -254,13 +274,82 @@ Supreme Admin (Office/HQ)
 - [ ] Area/Territory rollups
 - [ ] Top moving flavors report
 - [ ] Slow moving flavors alert
+- [ ] Cup usage analytics
 
 ### Phase 5: Advanced Features 🚀
 - [ ] Ordering recommendations
 - [ ] Wastage tracking
 - [ ] Export to Excel/PDF
-- [ ] Notifications
-- [ ] Arabic language support (future)
+- [ ] Push notifications
+- [ ] Arabic language support
+
+---
+
+## Steward App Pages
+
+### 1. Login Page (`/login`)
+- Branch ID and password authentication
+- Role validation (only staff can access)
+- Remember me functionality
+- Clear help information
+
+### 2. Dashboard (`/dashboard`)
+- Welcome message with branch info
+- Current date and time
+- Online/offline status indicator
+- Pending sync count
+- Sales window status (open/closed)
+- Quick action cards:
+  - Ice Cream Inventory
+  - Receive from Warehouse
+  - Submit Sales Report
+  - Daily Summary
+- Sales windows schedule
+
+### 3. Inventory Page (`/inventory`)
+- **Opening Tab**: Record morning inventory levels
+- **Closing Tab**: Record end-of-day levels
+- Search flavors functionality
+- Grouped by category (Classic, Premium, Fruit, etc.)
+- Measurement in inches (0-10 per tub)
+- Auto-calculation of consumption
+
+### 4. Sales Report Page (`/sales`)
+- Time-window restricted submission
+- Current window status display
+- POS photo capture/upload (required)
+- Sales figures entry:
+  - Total sales (AED)
+  - Transaction count
+  - Scoop counts (kids, single, double, triple)
+  - Other products (sundaes, shakes, cakes, take-home)
+- Notes field
+
+### 5. Receive Page (`/receive`)
+- Search and add flavors
+- Quantity adjustment (+/-)
+- Running total display
+- Delivery reference number
+- Submission confirmation
+
+---
+
+## Sales Reporting Windows
+
+Sales reports can ONLY be submitted during designated time windows:
+
+| Window | Time | Purpose |
+|--------|------|---------|
+| **3 PM** | 3:00 PM - 4:00 PM | Afternoon check |
+| **7 PM** | 7:00 PM - 8:00 PM | Evening check |
+| **9 PM** | 9:00 PM - 10:00 PM | Night check |
+| **Closing** | 10:00 PM onwards | End of day |
+
+**Why time windows?**
+- Ensures regular reporting throughout the day
+- Replaces WhatsApp group updates
+- Provides consistent data points for analytics
+- Photo proof prevents data manipulation
 
 ---
 
@@ -278,12 +367,12 @@ Supreme Admin (Office/HQ)
 └─────────────┘                                │
                                                │
 ┌─────────────┐     ┌─────────────┐            │
-│   FLAVOR    │────<│  INVENTORY  │────────────┘
+│   FLAVOR    │────<│  INVENTORY  │────────────┤
+└─────────────┘     └─────────────┘            │
+                                               │
+┌─────────────┐     ┌─────────────┐            │
+│   BUDGET    │────<│DAILY_SALES  │────────────┘
 └─────────────┘     └─────────────┘
-                           │
-                    ┌──────┴──────┐
-                    │ DAILY_ENTRY │
-                    └─────────────┘
 ```
 
 ### Core Tables
@@ -291,12 +380,17 @@ Supreme Admin (Office/HQ)
 | Table | Description |
 |-------|-------------|
 | `users` | All system users with roles |
-| `territories` | Territory divisions |
-| `areas` | Areas within territories |
+| `territories` | Territory divisions (Dubai, Abu Dhabi, etc.) |
+| `areas` | Areas within territories (Karama, Deira, etc.) |
 | `branches` | Individual store branches |
 | `flavors` | Master list of ice cream flavors |
 | `daily_inventory` | Daily opening/closing records |
 | `tub_receipts` | Incoming tub records |
+| `daily_sales` | Sales reports with photo URLs |
+| `cup_usage` | Cup usage tracking |
+| `promotions` | Active promotions |
+| `promotion_usage` | Promotion redemption tracking |
+| `branch_budgets` | Monthly budget targets |
 
 ---
 
@@ -315,15 +409,17 @@ All endpoints (except login) require JWT Bearer token.
 |--------|----------|-------------|
 | POST | `/auth/login` | User login |
 | POST | `/auth/refresh` | Refresh token |
+| GET | `/auth/me` | Get current user |
 | GET | `/branches` | List branches (role-filtered) |
 | GET | `/flavors` | List all flavors |
-| POST | `/inventory/opening` | Submit opening inventory |
-| POST | `/inventory/closing` | Submit closing inventory |
-| POST | `/inventory/receipt` | Record tub receipt |
+| POST | `/inventory/daily/bulk` | Submit inventory (bulk) |
+| GET | `/inventory/daily/opening` | Get opening inventory |
+| GET | `/inventory/summary/{branch}/{date}` | Get daily summary |
+| POST | `/inventory/receipts/bulk` | Submit tub receipts |
+| POST | `/sales/daily` | Submit sales report |
+| POST | `/sales/upload-photo` | Upload POS photo |
 | GET | `/analytics/consumption` | Get consumption data |
-| GET | `/reports/trending` | Get trending flavors |
-
-See [docs/API.md](docs/API.md) for complete API documentation.
+| GET | `/analytics/trending` | Get trending flavors |
 
 ---
 
@@ -358,28 +454,35 @@ See [docs/API.md](docs/API.md) for complete API documentation.
 
 4. **Configure environment variables**
    ```bash
-   cp .env.example .env
+   cp apps/api/.env.example apps/api/.env
    # Edit .env with your database credentials
    ```
 
-5. **Run database migrations**
+5. **Seed initial data**
    ```bash
-   npm run db:migrate
+   cd apps/api
+   python scripts/seed.py
    ```
 
-6. **Seed initial data**
-   ```bash
-   npm run db:seed
-   ```
-
-7. **Start development servers**
+6. **Start development servers**
    ```bash
    # Terminal 1: Start API
    npm run dev:api
 
-   # Terminal 2: Start frontend apps
-   npm run dev
+   # Terminal 2: Start Steward App
+   npm run dev:steward
    ```
+
+### Test Accounts
+
+After seeding, use these credentials:
+
+| Role | Username | Password |
+|------|----------|----------|
+| Supreme Admin | supreme_admin | admin123 |
+| Territory Manager | tm_dubai | admin123 |
+| Area Manager | am_karama | admin123 |
+| Steward | steward_karama | staff123 |
 
 ---
 
@@ -388,7 +491,7 @@ See [docs/API.md](docs/API.md) for complete API documentation.
 ### Backend (AWS EC2)
 
 1. Launch EC2 instance (t2.micro - Free Tier)
-2. Install Python, PostgreSQL
+2. Install Python 3.10+, PostgreSQL
 3. Clone repository
 4. Setup environment variables
 5. Run with Gunicorn + Nginx
@@ -396,31 +499,47 @@ See [docs/API.md](docs/API.md) for complete API documentation.
 ### Frontend (Vercel)
 
 1. Connect GitHub repository
-2. Configure build settings
-3. Set environment variables
+2. Set root directory to `apps/steward-app`
+3. Configure environment variables:
+   ```
+   API_URL=https://your-ec2-ip:8000/api/v1
+   ```
 4. Deploy
-
-See [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) for detailed instructions.
 
 ---
 
 ## Development Progress
 
-### Current Status: Phase 1 - Foundation
+### Current Status: Phase 2 Complete - Steward App
 
 | Task | Status | Date |
 |------|--------|------|
 | Project structure | ✅ Complete | 2024-01-16 |
 | README documentation | ✅ Complete | 2024-01-16 |
-| Backend setup | 🔄 In Progress | - |
-| Frontend setup | 📋 Pending | - |
-| Database schema | 📋 Pending | - |
+| Backend API setup | ✅ Complete | 2024-01-16 |
+| Database models | ✅ Complete | 2024-01-16 |
+| Steward App - Login | ✅ Complete | 2024-01-16 |
+| Steward App - Dashboard | ✅ Complete | 2024-01-16 |
+| Steward App - Inventory | ✅ Complete | 2024-01-16 |
+| Steward App - Sales | ✅ Complete | 2024-01-16 |
+| Steward App - Receive | ✅ Complete | 2024-01-16 |
+| Admin Dashboard | 📋 Pending | - |
+| Analytics Features | 📋 Pending | - |
 
 ### Changelog
+
+#### v0.2.0 (2024-01-16)
+- Complete Steward App with all pages
+- Sales reporting with time windows
+- Photo upload for sales proof
+- Offline storage support
+- Opening/Closing inventory
+- Warehouse receiving
 
 #### v0.1.0 (2024-01-16)
 - Initial project setup
 - Monorepo structure with Turborepo
+- FastAPI backend with all models
 - Basic documentation
 
 ---
@@ -428,8 +547,9 @@ See [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) for detailed instructions.
 ## Contributing
 
 1. Create feature branch from `main`
-2. Make changes
-3. Submit pull request
+2. Make changes following the code style
+3. Test thoroughly
+4. Submit pull request
 
 ---
 
