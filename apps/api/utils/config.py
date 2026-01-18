@@ -28,8 +28,10 @@ class Settings(BaseSettings):
     CORS_ORIGINS: List[str] = [
         "http://localhost:3000",
         "http://localhost:3001",
+        "http://localhost:3002",
         "https://br-retailflow.vercel.app",
-        "https://steward.br-retailflow.vercel.app"
+        "https://steward.br-retailflow.vercel.app",
+        "https://admin.br-retailflow.vercel.app"
     ]
 
     class Config:
