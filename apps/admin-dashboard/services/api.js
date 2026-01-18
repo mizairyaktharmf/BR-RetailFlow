@@ -1,9 +1,9 @@
 /**
- * API Service
- * Handles all HTTP requests to the backend
+ * API Service for Admin Dashboard
+ * Connects to live API at http://13.60.96.55:8000
  */
 
-const API_URL = process.env.API_URL || 'http://localhost:8000/api/v1'
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://13.60.96.55:8000/api/v1'
 
 class ApiService {
   constructor() {
@@ -11,59 +11,54 @@ class ApiService {
     this.token = null
   }
 
-  /**
-   * Set authentication token
-   */
-  setToken(token) {
-    this.token = token
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('br_token', token)
-    }
-  }
-
-  /**
-   * Get stored token
-   */
+  // Get auth token from localStorage
   getToken() {
     if (this.token) return this.token
     if (typeof window !== 'undefined') {
-      this.token = localStorage.getItem('br_token')
+      this.token = localStorage.getItem('admin_token')
     }
     return this.token
   }
 
-  /**
-   * Clear authentication
-   */
-  clearToken() {
-    this.token = null
+  // Set auth token
+  setToken(token) {
+    this.token = token
     if (typeof window !== 'undefined') {
-      localStorage.removeItem('br_token')
-      localStorage.removeItem('br_user')
+      localStorage.setItem('admin_token', token)
     }
   }
 
-  /**
-   * Make HTTP request
-   */
-  async request(endpoint, options = {}) {
-    const url = `${this.baseUrl}${endpoint}`
-    const token = this.getToken()
+  // Remove auth token
+  clearToken() {
+    this.token = null
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem('admin_token')
+      localStorage.removeItem('admin_user')
+    }
+  }
 
+  // Get headers with auth
+  getHeaders() {
     const headers = {
       'Content-Type': 'application/json',
-      ...options.headers,
     }
-
+    const token = this.getToken()
     if (token) {
       headers['Authorization'] = `Bearer ${token}`
     }
+    return headers
+  }
+
+  // Generic fetch wrapper
+  async request(endpoint, options = {}) {
+    const url = `${this.baseUrl}${endpoint}`
+    const config = {
+      headers: this.getHeaders(),
+      ...options,
+    }
 
     try {
-      const response = await fetch(url, {
-        ...options,
-        headers,
-      })
+      const response = await fetch(url, config)
 
       if (response.status === 401) {
         this.clearToken()
@@ -73,69 +68,215 @@ class ApiService {
         throw new Error('Unauthorized')
       }
 
-      const data = await response.json()
-
       if (!response.ok) {
-        throw new Error(data.detail || 'Something went wrong')
+        const error = await response.json().catch(() => ({}))
+        throw new Error(error.detail || `HTTP error! status: ${response.status}`)
       }
 
-      return data
+      return await response.json()
     } catch (error) {
       console.error('API Error:', error)
       throw error
     }
   }
 
-  // ============== AUTH ==============
-
+  // ============ AUTH ============
   async login(username, password) {
-    const data = await this.request('/auth/login', {
+    const response = await this.request('/auth/login', {
       method: 'POST',
       body: JSON.stringify({ username, password }),
     })
-    this.setToken(data.access_token)
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('br_user', JSON.stringify(data.user))
+    if (response.access_token) {
+      this.setToken(response.access_token)
+      localStorage.setItem('admin_user', JSON.stringify(response.user))
     }
-    return data
+    return response
   }
 
   async logout() {
     try {
       await this.request('/auth/logout', { method: 'POST' })
-    } finally {
-      this.clearToken()
+    } catch (error) {
+      // Ignore logout errors
     }
+    this.clearToken()
   }
 
   async getCurrentUser() {
     return this.request('/auth/me')
   }
 
-  // ============== FLAVORS ==============
-
+  // ============ FLAVORS ============
   async getFlavors() {
     return this.request('/flavors')
   }
 
-  // ============== INVENTORY ==============
-
-  async getOpeningInventory(branchId, date) {
-    return this.request(`/inventory/daily/opening?branch_id=${branchId}&date=${date}`)
+  async getFlavor(id) {
+    return this.request(`/flavors/${id}`)
   }
 
-  async getDailyInventory(branchId, dateFrom, dateTo) {
-    return this.request(`/inventory/daily?branch_id=${branchId}&date_from=${dateFrom}&date_to=${dateTo}`)
-  }
-
-  async submitOpeningInventory(data) {
-    return this.request('/inventory/daily/bulk', {
+  async createFlavor(data) {
+    return this.request('/flavors', {
       method: 'POST',
-      body: JSON.stringify({
-        ...data,
-        entry_type: 'opening',
-      }),
+      body: JSON.stringify(data),
     })
+  }
+
+  async updateFlavor(id, data) {
+    return this.request(`/flavors/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    })
+  }
+
+  async deleteFlavor(id) {
+    return this.request(`/flavors/${id}`, {
+      method: 'DELETE',
+    })
+  }
+
+  // ============ TERRITORIES ============
+  async getTerritories() {
+    return this.request('/territories')
+  }
+
+  async getTerritory(id) {
+    return this.request(`/territories/${id}`)
+  }
+
+  async createTerritory(data) {
+    return this.request('/territories', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    })
+  }
+
+  async updateTerritory(id, data) {
+    return this.request(`/territories/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    })
+  }
+
+  async deleteTerritory(id) {
+    return this.request(`/territories/${id}`, {
+      method: 'DELETE',
+    })
+  }
+
+  // ============ AREAS ============
+  async getAreas(territoryId = null) {
+    const endpoint = territoryId ? `/areas?territory_id=${territoryId}` : '/areas'
+    return this.request(endpoint)
+  }
+
+  async getArea(id) {
+    return this.request(`/areas/${id}`)
+  }
+
+  async createArea(data) {
+    return this.request('/areas', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    })
+  }
+
+  async updateArea(id, data) {
+    return this.request(`/areas/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    })
+  }
+
+  async deleteArea(id) {
+    return this.request(`/areas/${id}`, {
+      method: 'DELETE',
+    })
+  }
+
+  // ============ BRANCHES ============
+  async getBranches(filters = {}) {
+    const params = new URLSearchParams()
+    if (filters.territory_id) params.append('territory_id', filters.territory_id)
+    if (filters.area_id) params.append('area_id', filters.area_id)
+    const query = params.toString() ? `?${params.toString()}` : ''
+    return this.request(`/branches${query}`)
+  }
+
+  async getBranch(id) {
+    return this.request(`/branches/${id}`)
+  }
+
+  async createBranch(data) {
+    return this.request('/branches', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    })
+  }
+
+  async updateBranch(id, data) {
+    return this.request(`/branches/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    })
+  }
+
+  async deleteBranch(id) {
+    return this.request(`/branches/${id}`, {
+      method: 'DELETE',
+    })
+  }
+
+  // ============ USERS ============
+  async getUsers(filters = {}) {
+    const params = new URLSearchParams()
+    if (filters.role) params.append('role', filters.role)
+    if (filters.branch_id) params.append('branch_id', filters.branch_id)
+    if (filters.territory_id) params.append('territory_id', filters.territory_id)
+    if (filters.area_id) params.append('area_id', filters.area_id)
+    const query = params.toString() ? `?${params.toString()}` : ''
+    return this.request(`/users${query}`)
+  }
+
+  async getUser(id) {
+    return this.request(`/users/${id}`)
+  }
+
+  async createUser(data) {
+    return this.request('/users', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    })
+  }
+
+  async updateUser(id, data) {
+    return this.request(`/users/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    })
+  }
+
+  async deleteUser(id) {
+    return this.request(`/users/${id}`, {
+      method: 'DELETE',
+    })
+  }
+
+  async resetUserPassword(id) {
+    return this.request(`/users/${id}/reset-password`, {
+      method: 'POST',
+    })
+  }
+
+  // ============ INVENTORY ============
+  async getInventory(filters = {}) {
+    const params = new URLSearchParams()
+    if (filters.branch_id) params.append('branch_id', filters.branch_id)
+    if (filters.date) params.append('date', filters.date)
+    if (filters.start_date) params.append('start_date', filters.start_date)
+    if (filters.end_date) params.append('end_date', filters.end_date)
+    const query = params.toString() ? `?${params.toString()}` : ''
+    return this.request(`/inventory${query}`)
   }
 
   async submitClosingInventory(data) {
@@ -148,89 +289,34 @@ class ApiService {
     })
   }
 
-  async getDailySummary(branchId, date) {
-    return this.request(`/inventory/summary/${branchId}/${date}`)
+  // ============ REPORTS ============
+  async getDashboardStats(filters = {}) {
+    const params = new URLSearchParams()
+    if (filters.territory_id) params.append('territory_id', filters.territory_id)
+    if (filters.area_id) params.append('area_id', filters.area_id)
+    const query = params.toString() ? `?${params.toString()}` : ''
+    return this.request(`/reports/dashboard${query}`)
   }
 
-  // ============== TUB RECEIPTS ==============
-
-  async getTubReceipts(branchId, dateFrom, dateTo) {
-    return this.request(`/inventory/receipts?branch_id=${branchId}&date_from=${dateFrom}&date_to=${dateTo}`)
+  async getConsumptionReport(filters = {}) {
+    const params = new URLSearchParams()
+    if (filters.branch_id) params.append('branch_id', filters.branch_id)
+    if (filters.territory_id) params.append('territory_id', filters.territory_id)
+    if (filters.area_id) params.append('area_id', filters.area_id)
+    if (filters.start_date) params.append('start_date', filters.start_date)
+    if (filters.end_date) params.append('end_date', filters.end_date)
+    const query = params.toString() ? `?${params.toString()}` : ''
+    return this.request(`/reports/consumption${query}`)
   }
 
-  async submitTubReceipt(data) {
-    return this.request('/inventory/receipts', {
-      method: 'POST',
-      body: JSON.stringify(data),
-    })
-  }
-
-  async submitBulkTubReceipts(data) {
-    return this.request('/inventory/receipts/bulk', {
-      method: 'POST',
-      body: JSON.stringify(data),
-    })
-  }
-
-  // ============== SALES ==============
-
-  async submitSales(data) {
-    return this.request('/sales/daily', {
-      method: 'POST',
-      body: JSON.stringify(data),
-    })
-  }
-
-  async getDailySales(branchId, date) {
-    return this.request(`/sales/daily?branch_id=${branchId}&date=${date}`)
-  }
-
-  async uploadSalesPhoto(file) {
-    const formData = new FormData()
-    formData.append('file', file)
-
-    const token = this.getToken()
-    const response = await fetch(`${this.baseUrl}/sales/upload-photo`, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${token}`,
-      },
-      body: formData,
-    })
-
-    if (!response.ok) {
-      throw new Error('Failed to upload photo')
-    }
-
-    return response.json()
-  }
-
-  // ============== CUP USAGE ==============
-
-  async submitCupUsage(data) {
-    return this.request('/cups/usage', {
-      method: 'POST',
-      body: JSON.stringify(data),
-    })
-  }
-
-  async getCupUsage(branchId, date) {
-    return this.request(`/cups/usage?branch_id=${branchId}&date=${date}`)
-  }
-
-  // ============== PROMOTIONS ==============
-
-  async getActivePromotions() {
-    return this.request('/promotions/active')
-  }
-
-  async submitPromotionUsage(data) {
-    return this.request('/promotions/usage', {
-      method: 'POST',
-      body: JSON.stringify(data),
-    })
+  async getBranchReport(branchId, filters = {}) {
+    const params = new URLSearchParams()
+    if (filters.start_date) params.append('start_date', filters.start_date)
+    if (filters.end_date) params.append('end_date', filters.end_date)
+    const query = params.toString() ? `?${params.toString()}` : ''
+    return this.request(`/reports/branch/${branchId}${query}`)
   }
 }
 
-export const api = new ApiService()
+const api = new ApiService()
 export default api
