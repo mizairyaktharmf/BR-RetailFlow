@@ -2,8 +2,8 @@ import './globals.css'
 import { Toaster } from '@/components/ui/toaster'
 
 export const metadata = {
-  title: 'BR-RetailFlow | Steward App',
-  description: 'Baskin Robbins Ice Cream Inventory & Sales Management System for Branch Stewards',
+  title: 'BR-RetailFlow | Flavor Expert App',
+  description: 'Baskin Robbins Ice Cream Inventory & Sales Management System for Flavor Experts',
   manifest: '/manifest.json',
   themeColor: '#FF69B4',
   viewport: 'width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no',

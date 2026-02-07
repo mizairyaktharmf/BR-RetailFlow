@@ -9,7 +9,7 @@ Usage:
     python bulk_import.py --sample  # Generate sample Excel template
 
 Excel Format:
-    Territory | Area | Branch Name | Branch Code | Address | Phone | Steward Name | Steward Email
+    Territory | Area | Branch Name | Branch Code | Address | Phone | Flavor Expert Name | Flavor Expert Email
     Dubai     | Karama | Karama Center | KRM-01 | Shop 12, Mall | +971-4-123-4567 | Ahmed Hassan | ahmed@email.com
 """
 
@@ -65,8 +65,8 @@ def create_sample_template(output_file="sample_branches.xlsx"):
         'Branch Code': ['KRM-01', 'KRM-02', 'DRA-01', 'KHL-01', 'WHD-01', 'MJZ-01'],
         'Address': ['Shop 12, Karama Shopping Complex', 'Ground Floor, Karama Mall', 'Food Court, DCC', 'Level 1, Khalidiya Mall', 'Ground Floor, Al Wahda', 'Shop 5, Al Majaz'],
         'Phone': ['+971-4-123-4567', '+971-4-123-4568', '+971-4-234-5670', '+971-2-456-7890', '+971-2-456-7891', '+971-6-567-8901'],
-        'Steward Name': ['Ahmed Hassan', 'Fatima Ali', 'Omar Khan', 'Sara Mohammed', 'Khalid Ibrahim', 'Layla Ahmed'],
-        'Steward Email': ['ahmed@example.com', 'fatima@example.com', 'omar@example.com', 'sara@example.com', 'khalid@example.com', 'layla@example.com'],
+        'Flavor Expert Name': ['Ahmed Hassan', 'Fatima Ali', 'Omar Khan', 'Sara Mohammed', 'Khalid Ibrahim', 'Layla Ahmed'],
+        'Flavor Expert Email': ['ahmed@example.com', 'fatima@example.com', 'omar@example.com', 'sara@example.com', 'khalid@example.com', 'layla@example.com'],
     }
 
     df = pd.DataFrame(sample_data)
@@ -108,8 +108,8 @@ def import_from_file(file_path, dry_run=True):
         branch_code = str(row.get('Branch Code', '')).strip()
         address = str(row.get('Address', '')).strip()
         phone = str(row.get('Phone', '')).strip()
-        steward_name = str(row.get('Steward Name', '')).strip()
-        steward_email = str(row.get('Steward Email', '')).strip()
+        expert_name = str(row.get('Flavor Expert Name', '')).strip()
+        expert_email = str(row.get('Flavor Expert Email', '')).strip()
 
         if not territory_name or not area_name or not branch_name:
             print(f"   ⚠️  Row {idx + 2}: Missing required fields (Territory, Area, Branch Name)")
@@ -149,13 +149,13 @@ def import_from_file(file_path, dry_run=True):
             'phone': phone if phone != 'nan' else '',
         })
 
-        # Steward
-        if steward_name and steward_name != 'nan':
+        # Flavor Expert
+        if expert_name and expert_name != 'nan':
             users.append({
                 'username': branch_id,  # Branch ID is the login
                 'password': password,
-                'full_name': steward_name,
-                'email': steward_email if steward_email != 'nan' else f"{branch_id.lower()}@br-retailflow.com",
+                'full_name': expert_name,
+                'email': expert_email if expert_email != 'nan' else f"{branch_id.lower()}@br-retailflow.com",
                 'role': 'staff',
                 'branch_id': branch_id,
                 'branch_name': branch_name,
@@ -176,7 +176,7 @@ def import_from_file(file_path, dry_run=True):
         print(f"   - {a['name']} ({a['code']}) → {a['territory']}")
 
     print(f"\n🏪 Branches: {len(branches)}")
-    print(f"\n👤 Stewards: {len(users)}")
+    print(f"\n👤 Flavor Experts: {len(users)}")
 
     if dry_run:
         print("\n" + "=" * 60)
@@ -189,7 +189,7 @@ def import_from_file(file_path, dry_run=True):
         creds_df = pd.DataFrame([{
             'Branch ID (Login)': u['username'],
             'Password': u['password'],
-            'Steward Name': u['full_name'],
+            'Flavor Expert Name': u['full_name'],
             'Branch Name': u['branch_name'],
             'Area': u['area'],
             'Territory': u['territory'],

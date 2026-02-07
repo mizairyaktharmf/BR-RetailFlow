@@ -10,8 +10,11 @@ import {
   TrendingUp,
   Package,
   AlertCircle,
-  CheckCircle2
+  CheckCircle2,
+  Cake
 } from 'lucide-react'
+import { useRouter } from 'next/navigation'
+import api from '@/services/api'
 
 const roleLabels = {
   supreme_admin: 'HQ',
@@ -20,9 +23,11 @@ const roleLabels = {
 }
 
 export default function DashboardPage() {
+  const router = useRouter()
   const [user, setUser] = useState(null)
   const [stats, setStats] = useState(null)
   const [isDemo, setIsDemo] = useState(false)
+  const [cakeAlerts, setCakeAlerts] = useState({ alerts: [], total_count: 0, critical_count: 0, warning_count: 0 })
 
   useEffect(() => {
     const storedUser = localStorage.getItem('br_admin_user')
@@ -65,6 +70,17 @@ export default function DashboardPage() {
         })
       }
     }
+
+    // Load cake low-stock alerts
+    const loadCakeAlerts = async () => {
+      try {
+        const data = await api.getCakeLowStockAlerts()
+        setCakeAlerts(data)
+      } catch (err) {
+        // Silently fail - alerts are not critical for dashboard load
+      }
+    }
+    loadCakeAlerts()
   }, [])
 
   if (!user) return null
@@ -159,6 +175,35 @@ export default function DashboardPage() {
         </Card>
       </div>
 
+      {/* Cake Alerts Banner */}
+      {cakeAlerts.total_count > 0 && (
+        <div
+          className="p-4 rounded-lg bg-red-500/10 border border-red-500/30 cursor-pointer hover:bg-red-500/20 transition-colors"
+          onClick={() => router.push('/dashboard/cake-alerts')}
+        >
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-lg bg-red-500/20 flex items-center justify-center flex-shrink-0">
+              <Cake className="w-5 h-5 text-red-400" />
+            </div>
+            <div className="flex-1">
+              <p className="text-sm font-medium text-red-300">
+                Low Cake Stock Alert — {cakeAlerts.total_count} item{cakeAlerts.total_count > 1 ? 's' : ''}
+                {cakeAlerts.critical_count > 0 && (
+                  <span className="ml-2 px-1.5 py-0.5 rounded text-[10px] bg-red-500/30 text-red-200">
+                    {cakeAlerts.critical_count} critical
+                  </span>
+                )}
+              </p>
+              <p className="text-xs text-red-400/70 mt-0.5">
+                {cakeAlerts.alerts.slice(0, 3).map(a => `${a.cake_name}: ${a.current_quantity} pcs (${a.branch_name})`).join(' | ')}
+                {cakeAlerts.total_count > 3 && ` +${cakeAlerts.total_count - 3} more`}
+              </p>
+            </div>
+            <span className="text-xs text-red-400">View All →</span>
+          </div>
+        </div>
+      )}
+
       {/* Activity Section */}
       <div className="grid lg:grid-cols-2 gap-6">
         {/* Today's Activity */}
@@ -206,7 +251,7 @@ export default function DashboardPage() {
                   <Users className="w-4 h-4 text-purple-400" />
                 </div>
                 <div>
-                  <p className="text-sm font-medium text-white">Active Stewards</p>
+                  <p className="text-sm font-medium text-white">Active Flavor Experts</p>
                   <p className="text-xs text-slate-400">Logged in today</p>
                 </div>
               </div>
@@ -277,7 +322,25 @@ export default function DashboardPage() {
               </div>
               <div>
                 <p className="text-sm font-medium text-white">Manage Users</p>
-                <p className="text-xs text-slate-400">Add stewards and set credentials</p>
+                <p className="text-xs text-slate-400">Add flavor experts and set credentials</p>
+              </div>
+            </a>
+
+            <a
+              href="/dashboard/cake-alerts"
+              className="flex items-center gap-3 p-3 rounded-lg bg-slate-700/30 hover:bg-slate-700/50 transition-colors cursor-pointer"
+            >
+              <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${cakeAlerts.total_count > 0 ? 'bg-red-500/20' : 'bg-orange-500/20'}`}>
+                <Cake className={`w-4 h-4 ${cakeAlerts.total_count > 0 ? 'text-red-400' : 'text-orange-400'}`} />
+              </div>
+              <div>
+                <p className="text-sm font-medium text-white">Cake Alerts</p>
+                <p className="text-xs text-slate-400">
+                  {cakeAlerts.total_count > 0
+                    ? `${cakeAlerts.total_count} low stock alert${cakeAlerts.total_count > 1 ? 's' : ''}`
+                    : 'Monitor cake stock levels'
+                  }
+                </p>
               </div>
             </a>
           </CardContent>

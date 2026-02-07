@@ -316,6 +316,41 @@ class ApiService {
     const query = params.toString() ? `?${params.toString()}` : ''
     return this.request(`/reports/branch/${branchId}${query}`)
   }
+
+  // ============ CAKE INVENTORY ============
+  async getCakeProducts() {
+    return this.request('/cake/cake-products')
+  }
+
+  async createCakeProduct(data) {
+    return this.request('/cake/cake-products', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    })
+  }
+
+  async updateCakeProduct(id, data) {
+    return this.request(`/cake/cake-products/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    })
+  }
+
+  async getCakeStock(branchId) {
+    return this.request(`/cake/cake-stock/${branchId}`)
+  }
+
+  async getCakeStockLogs(branchId, dateFrom, dateTo) {
+    return this.request(`/cake/cake-stock/logs/${branchId}?date_from=${dateFrom}&date_to=${dateTo}`)
+  }
+
+  async getCakeLowStockAlerts() {
+    return this.request('/cake/cake-stock/alerts')
+  }
+
+  async getCakeAlertConfigs(branchId) {
+    return this.request(`/cake/cake-stock/alerts/config/${branchId}`)
+  }
 }
 
 const api = new ApiService()

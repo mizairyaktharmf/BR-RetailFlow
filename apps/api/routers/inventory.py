@@ -1,7 +1,7 @@
 """
 Inventory router
 Handles daily inventory entries and tub receipts
-Core functionality for stewards
+Core functionality for flavor experts
 """
 
 from fastapi import APIRouter, Depends, HTTPException, status, Query
@@ -145,7 +145,7 @@ async def bulk_create_daily_inventory(
 ):
     """
     Bulk create daily inventory entries (opening or closing)
-    This is the main endpoint stewards will use
+    This is the main endpoint flavor experts will use
     """
     # Staff can only enter for their branch
     if data.branch_id != current_user.branch_id:

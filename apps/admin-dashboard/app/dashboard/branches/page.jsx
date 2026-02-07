@@ -447,7 +447,7 @@ export default function BranchesPage() {
                 <div className="p-2 rounded-lg bg-slate-700/30">
                   <div className="flex items-center gap-1.5 text-green-400">
                     <Users className="w-3 h-3" />
-                    <span className="text-xs text-slate-400">Stewards</span>
+                    <span className="text-xs text-slate-400">Flavor Experts</span>
                   </div>
                   <p className="text-sm font-semibold text-white mt-1">{branch.users_count}</p>
                 </div>

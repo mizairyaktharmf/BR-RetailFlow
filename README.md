@@ -15,7 +15,7 @@ A comprehensive inventory tracking, sales reporting, and analytics system design
 - [Project Structure](#project-structure)
 - [User Roles & Permissions](#user-roles--permissions)
 - [Features](#features)
-- [Steward App Pages](#steward-app-pages)
+- [Flavor Expert App Pages](#flavor-expert-app-pages)
 - [Sales Reporting Windows](#sales-reporting-windows)
 - [Database Schema](#database-schema)
 - [API Documentation](#api-documentation)
@@ -53,7 +53,7 @@ BR-RetailFlow solves these problems through:
 │  MORNING (Opening)                                               │
 │  ─────────────────                                               │
 │  • System auto-loads previous day's closing as today's opening  │
-│  • Steward verifies/adjusts if needed                           │
+│  • Flavor Expert verifies/adjusts if needed                      │
 │                                                                  │
 │  DURING DAY                                                      │
 │  ──────────                                                      │
@@ -63,7 +63,7 @@ BR-RetailFlow solves these problems through:
 │                                                                  │
 │  END OF DAY (Closing)                                           │
 │  ─────────────────────                                          │
-│  • Steward measures remaining inches in each tub                │
+│  • Flavor Expert measures remaining inches in each tub           │
 │  • Enters closing inventory                                      │
 │  • System calculates: Consumed = Opening + Received - Closing   │
 │                                                                  │
@@ -72,7 +72,7 @@ BR-RetailFlow solves these problems through:
 
 ### 2. Time-Window Sales Reporting (Replaces WhatsApp)
 
-Instead of sending sales to WhatsApp groups, stewards now submit sales through the app at specific time windows with photo proof.
+Instead of sending sales to WhatsApp groups, flavor experts now submit sales through the app at specific time windows with photo proof.
 
 ### 3. Key Calculations
 
@@ -97,7 +97,7 @@ Example:
 ├─────────────────────────────────────────────────────────────────┤
 │                                                                  │
 │  ┌──────────────────┐         ┌──────────────────┐              │
-│  │   STEWARD APP    │         │  ADMIN DASHBOARD │              │
+│  │ FLAVOR EXPERT APP│         │  ADMIN DASHBOARD │              │
 │  │  (Mobile PWA)    │         │   (Web App)      │              │
 │  │                  │         │                  │              │
 │  │  • Offline-first │         │  • Analytics     │              │
@@ -159,7 +159,7 @@ Example:
 ```
 BR-RetailFlow/
 ├── apps/
-│   ├── steward-app/          # Mobile-first PWA for stewards
+│   ├── flavor-expert-app/    # Mobile-first PWA for flavor experts
 │   │   ├── app/              # Next.js App Router pages
 │   │   │   ├── login/        # Login page
 │   │   │   ├── dashboard/    # Main dashboard
@@ -215,7 +215,7 @@ Supreme Admin (Office/HQ)
             │
             └── Admin (Area Manager)
                     │
-                    └── Staff (Branch Steward)
+                    └── Staff (Flavor Expert)
 ```
 
 ### Permission Matrix
@@ -245,7 +245,7 @@ Supreme Admin (Office/HQ)
 - [x] API endpoints
 - [x] Role-based access control
 
-### Phase 2: Steward App ✅
+### Phase 2: Flavor Expert App ✅
 - [x] Login screen with branch credentials
 - [x] Dashboard with quick actions
 - [x] Opening inventory form
@@ -285,7 +285,7 @@ Supreme Admin (Office/HQ)
 
 ---
 
-## Steward App Pages
+## Flavor Expert App Pages
 
 ### 1. Login Page (`/login`)
 - Branch ID and password authentication
@@ -469,8 +469,8 @@ All endpoints (except login) require JWT Bearer token.
    # Terminal 1: Start API
    npm run dev:api
 
-   # Terminal 2: Start Steward App
-   npm run dev:steward
+   # Terminal 2: Start Flavor Expert App
+   npm run dev:flavor-expert
    ```
 
 ### Test Accounts
@@ -482,7 +482,7 @@ After seeding, use these credentials:
 | Supreme Admin | supreme_admin | admin123 |
 | Territory Manager | tm_dubai | admin123 |
 | Area Manager | am_karama | admin123 |
-| Steward | steward_karama | staff123 |
+| Flavor Expert | fe_karama | staff123 |
 
 ---
 
@@ -499,7 +499,7 @@ After seeding, use these credentials:
 ### Frontend (Vercel)
 
 1. Connect GitHub repository
-2. Set root directory to `apps/steward-app`
+2. Set root directory to `apps/flavor-expert-app` (Flavor Expert App)
 3. Configure environment variables:
    ```
    API_URL=https://your-ec2-ip:8000/api/v1
@@ -510,7 +510,7 @@ After seeding, use these credentials:
 
 ## Development Progress
 
-### Current Status: Phase 2 Complete - Steward App
+### Current Status: Phase 2 Complete - Flavor Expert App
 
 | Task | Status | Date |
 |------|--------|------|
@@ -518,18 +518,18 @@ After seeding, use these credentials:
 | README documentation | ✅ Complete | 2024-01-16 |
 | Backend API setup | ✅ Complete | 2024-01-16 |
 | Database models | ✅ Complete | 2024-01-16 |
-| Steward App - Login | ✅ Complete | 2024-01-16 |
-| Steward App - Dashboard | ✅ Complete | 2024-01-16 |
-| Steward App - Inventory | ✅ Complete | 2024-01-16 |
-| Steward App - Sales | ✅ Complete | 2024-01-16 |
-| Steward App - Receive | ✅ Complete | 2024-01-16 |
+| Flavor Expert App - Login | ✅ Complete | 2024-01-16 |
+| Flavor Expert App - Dashboard | ✅ Complete | 2024-01-16 |
+| Flavor Expert App - Inventory | ✅ Complete | 2024-01-16 |
+| Flavor Expert App - Sales | ✅ Complete | 2024-01-16 |
+| Flavor Expert App - Receive | ✅ Complete | 2024-01-16 |
 | Admin Dashboard | 📋 Pending | - |
 | Analytics Features | 📋 Pending | - |
 
 ### Changelog
 
 #### v0.2.0 (2024-01-16)
-- Complete Steward App with all pages
+- Complete Flavor Expert App with all pages
 - Sales reporting with time windows
 - Photo upload for sales proof
 - Offline storage support

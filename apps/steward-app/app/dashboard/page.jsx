@@ -14,7 +14,10 @@ import {
   WifiOff,
   Camera,
   ClipboardList,
-  AlertCircle
+  AlertCircle,
+  Cake,
+  PackagePlus,
+  Bell
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -32,6 +35,7 @@ export default function DashboardPage() {
   const [currentWindow, setCurrentWindow] = useState(null)
   const [nextWindow, setNextWindow] = useState(null)
   const [todayDate, setTodayDate] = useState('')
+  const [cakeAlerts, setCakeAlerts] = useState([])
 
   useEffect(() => {
     // Check authentication
@@ -64,6 +68,17 @@ export default function DashboardPage() {
       setPendingSync(pending)
     }
     checkPending()
+
+    // Load cake low-stock alerts
+    const loadCakeAlerts = async () => {
+      try {
+        const alertData = await api.getCakeLowStockAlerts()
+        setCakeAlerts(alertData.alerts || [])
+      } catch (err) {
+        // Silently fail - alerts are not critical
+      }
+    }
+    loadCakeAlerts()
 
     return () => {
       window.removeEventListener('online', () => setIsOnline(true))
@@ -114,6 +129,25 @@ export default function DashboardPage() {
       href: '/summary',
       color: 'bg-purple-500',
       info: 'See consumption, sales, and inventory at a glance'
+    },
+    {
+      title: 'Cake Stock',
+      description: cakeAlerts.length > 0
+        ? `${cakeAlerts.length} low stock alert${cakeAlerts.length > 1 ? 's' : ''}!`
+        : 'View and record cake sales',
+      icon: Cake,
+      href: '/cake-stock',
+      color: cakeAlerts.length > 0 ? 'bg-red-500' : 'bg-orange-500',
+      info: 'Track cake inventory and record sales in real-time',
+      highlight: cakeAlerts.length > 0
+    },
+    {
+      title: 'Receive Cakes',
+      description: 'Record cakes from warehouse',
+      icon: PackagePlus,
+      href: '/cake-receive',
+      color: 'bg-emerald-500',
+      info: 'Log incoming cake deliveries from warehouse'
     },
   ]
 
@@ -184,6 +218,20 @@ export default function DashboardPage() {
           <AlertTitle>Pending Sync</AlertTitle>
           <AlertDescription>
             {pendingSync.total} items waiting to sync with server.
+          </AlertDescription>
+        </Alert>
+      )}
+
+      {/* Cake Low Stock Alerts */}
+      {cakeAlerts.length > 0 && (
+        <Alert className="mx-4 mt-4 border-red-500 bg-red-50 cursor-pointer" onClick={() => router.push('/cake-stock')}>
+          <AlertCircle className="h-4 w-4 text-red-600" />
+          <AlertTitle className="text-red-800">
+            Low Cake Stock! ({cakeAlerts.length} item{cakeAlerts.length > 1 ? 's' : ''})
+          </AlertTitle>
+          <AlertDescription className="text-red-700">
+            {cakeAlerts.slice(0, 3).map(a => `${a.cake_name}: ${a.current_quantity} pcs`).join(' | ')}
+            {cakeAlerts.length > 3 && ` +${cakeAlerts.length - 3} more`}
           </AlertDescription>
         </Alert>
       )}

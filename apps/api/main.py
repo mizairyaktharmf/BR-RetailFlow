@@ -7,7 +7,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 
-from routers import auth, users, branches, flavors, inventory, analytics
+from routers import auth, users, branches, flavors, inventory, analytics, cake
 from utils.database import engine, Base
 from utils.config import settings
 
@@ -44,6 +44,7 @@ app.include_router(branches.router, prefix="/api/v1/branches", tags=["Branches"]
 app.include_router(flavors.router, prefix="/api/v1/flavors", tags=["Flavors"])
 app.include_router(inventory.router, prefix="/api/v1/inventory", tags=["Inventory"])
 app.include_router(analytics.router, prefix="/api/v1/analytics", tags=["Analytics"])
+app.include_router(cake.router, prefix="/api/v1/cake", tags=["Cake Inventory"])
 
 
 @app.get("/")

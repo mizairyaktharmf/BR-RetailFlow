@@ -7,7 +7,7 @@
 ## Step 1: Prepare Your Data (Excel)
 
 ### Create your branches Excel file with columns:
-| Territory | Area | Branch Name | Branch Code | Address | Phone | Steward Name | Steward Email |
+| Territory | Area | Branch Name | Branch Code | Address | Phone | Flavor Expert Name | Flavor Expert Email |
 |-----------|------|-------------|-------------|---------|-------|--------------|---------------|
 | Dubai | Karama | Karama Center | KRM-01 | Shop 12, Mall | +971-4-123-4567 | Ahmed Hassan | ahmed@email.com |
 | Dubai | Karama | Karama Mall | KRM-02 | Ground Floor | +971-4-123-4568 | Fatima Ali | fatima@email.com |
@@ -108,9 +108,9 @@ sudo certbot --nginx -d api.your-domain.com
 
 ## Step 4: Frontend Deployment (Vercel - FREE)
 
-### Deploy Steward App:
+### Deploy Flavor Expert App:
 ```bash
-cd apps/steward-app
+cd apps/flavor-expert-app
 
 # Update API URL
 echo "NEXT_PUBLIC_API_URL=https://api.your-domain.com/api/v1" > .env.production
@@ -167,8 +167,8 @@ npx vercel --prod
 
 ### Start local development:
 ```bash
-# Steward App
-cd apps/steward-app && npm run dev  # http://localhost:3001
+# Flavor Expert App
+cd apps/flavor-expert-app && npm run dev  # http://localhost:3001
 
 # Admin Dashboard
 cd apps/admin-dashboard && npm run dev  # http://localhost:3002

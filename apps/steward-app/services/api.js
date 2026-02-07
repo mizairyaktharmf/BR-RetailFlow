@@ -230,6 +230,62 @@ class ApiService {
       body: JSON.stringify(data),
     })
   }
+  // ============== CAKE INVENTORY ==============
+
+  async getCakeProducts() {
+    return this.request('/cake/cake-products')
+  }
+
+  async getCakeStock(branchId) {
+    return this.request(`/cake/cake-stock/${branchId}`)
+  }
+
+  async initCakeStock(data) {
+    return this.request('/cake/cake-stock/init', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    })
+  }
+
+  async recordCakeSale(data) {
+    return this.request('/cake/cake-stock/sale', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    })
+  }
+
+  async receiveCakes(data) {
+    return this.request('/cake/cake-stock/receive', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    })
+  }
+
+  async adjustCakeStock(data) {
+    return this.request('/cake/cake-stock/adjust', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    })
+  }
+
+  async getCakeStockLogs(branchId, dateFrom, dateTo) {
+    return this.request(`/cake/cake-stock/logs/${branchId}?date_from=${dateFrom}&date_to=${dateTo}`)
+  }
+
+  async getCakeLowStockAlerts() {
+    return this.request('/cake/cake-stock/alerts')
+  }
+
+  async getCakeAlertConfigs(branchId) {
+    return this.request(`/cake/cake-stock/alerts/config/${branchId}`)
+  }
+
+  async updateCakeAlertConfigBulk(data) {
+    return this.request('/cake/cake-stock/alerts/config/bulk', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    })
+  }
 }
 
 export const api = new ApiService()

@@ -104,12 +104,12 @@ def seed_database():
             is_verified=True
         )
 
-        # Staff (Steward - Karama Centre)
+        # Staff (Flavor Expert - Karama Centre)
         staff_karama = User(
-            email="steward.karama@br-retailflow.com",
-            username="steward_karama",
+            email="fe.karama@br-retailflow.com",
+            username="fe_karama",
             hashed_password=get_password_hash("staff123"),
-            full_name="Karama Centre Steward",
+            full_name="Karama Centre Flavor Expert",
             role=UserRole.STAFF,
             branch_id=branches[0].id,
             area_id=karama.id,
@@ -182,7 +182,7 @@ def seed_database():
         print("Supreme Admin: supreme_admin / admin123")
         print("Territory Manager (Dubai): tm_dubai / admin123")
         print("Area Manager (Karama): am_karama / admin123")
-        print("Steward (Karama Centre): steward_karama / staff123")
+        print("Flavor Expert (Karama Centre): fe_karama / staff123")
         print("-"*50)
         print(f"\nCreated:")
         print(f"  - 3 Territories")

@@ -29,9 +29,9 @@ export default function LoginPage() {
     try {
       const response = await api.login(credentials.branchId, credentials.password)
 
-      // Check if user is a steward (staff role)
+      // Check if user is a flavor expert (staff role)
       if (response.user.role !== 'staff') {
-        setError('This app is only for branch stewards. Please use the admin dashboard.')
+        setError('This app is only for Flavor Experts. Please use the admin dashboard.')
         api.clearToken()
         setLoading(false)
         return
@@ -53,8 +53,8 @@ export default function LoginPage() {
     const demoUser = {
       id: 1,
       email: 'demo@br-retailflow.com',
-      username: 'demo_steward',
-      full_name: 'Demo Steward',
+      username: 'demo_flavor_expert',
+      full_name: 'Demo Flavor Expert',
       role: 'staff',
       branch_id: 1,
       area_id: 1,

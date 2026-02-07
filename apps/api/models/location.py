@@ -69,7 +69,7 @@ class Branch(Base):
     """
     Branch model - Lowest level of hierarchy
     Individual store location
-    Staff (Stewards) belong to branches
+    Flavor Experts belong to branches
     """
     __tablename__ = "branches"
 
@@ -92,6 +92,9 @@ class Branch(Base):
     staff = relationship("User", back_populates="branch")
     daily_inventory = relationship("DailyInventory", back_populates="branch", cascade="all, delete-orphan")
     tub_receipts = relationship("TubReceipt", back_populates="branch", cascade="all, delete-orphan")
+    cake_stocks = relationship("CakeStock", back_populates="branch", cascade="all, delete-orphan")
+    cake_stock_logs = relationship("CakeStockLog", back_populates="branch", cascade="all, delete-orphan")
+    cake_alert_configs = relationship("CakeAlertConfig", back_populates="branch", cascade="all, delete-orphan")
 
     def __repr__(self):
         return f"<Branch {self.name}>"

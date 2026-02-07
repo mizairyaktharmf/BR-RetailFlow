@@ -5,7 +5,7 @@
 
 import { openDB } from 'idb'
 
-const DB_NAME = 'br-retailflow-steward'
+const DB_NAME = 'br-retailflow-flavor-expert'
 const DB_VERSION = 1
 
 // Store names

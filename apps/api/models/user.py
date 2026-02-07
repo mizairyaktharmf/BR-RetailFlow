@@ -15,7 +15,7 @@ class UserRole(str, enum.Enum):
     SUPREME_ADMIN = "supreme_admin"  # Office/HQ - sees everything
     SUPER_ADMIN = "super_admin"      # Territory Manager
     ADMIN = "admin"                   # Area Manager
-    STAFF = "staff"                   # Branch Steward
+    STAFF = "staff"                   # Flavor Expert
 
 
 class User(Base):

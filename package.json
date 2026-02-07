@@ -13,7 +13,7 @@
     "start": "turbo start",
     "lint": "turbo lint",
     "clean": "turbo clean && rm -rf node_modules",
-    "dev:steward": "turbo dev --filter=steward-app",
+    "dev:flavor-expert": "turbo dev --filter=flavor-expert-app",
     "dev:admin": "turbo dev --filter=admin-dashboard",
     "dev:api": "cd apps/api && python -m uvicorn main:app --reload --port 8000",
     "db:migrate": "cd apps/api && alembic upgrade head",

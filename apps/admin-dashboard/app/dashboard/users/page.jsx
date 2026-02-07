@@ -37,11 +37,11 @@ const demoUsers = [
   { id: 3, username: 'tm_abudhabi', full_name: 'Abu Dhabi Territory Manager', email: 'tm.abudhabi@br-retailflow.com', role: 'super_admin', role_label: 'TM', territory_id: 2, territory_name: 'Abu Dhabi', area_id: null, area_name: null, branch_id: null, branch_name: null, is_active: true, last_login: '2024-01-14T18:00:00' },
   { id: 4, username: 'am_karama', full_name: 'Karama Area Manager', email: 'am.karama@br-retailflow.com', role: 'admin', role_label: 'AM', territory_id: 1, territory_name: 'Dubai', area_id: 1, area_name: 'Karama', branch_id: null, branch_name: null, is_active: true, last_login: '2024-01-15T08:00:00' },
   { id: 5, username: 'am_deira', full_name: 'Deira Area Manager', email: 'am.deira@br-retailflow.com', role: 'admin', role_label: 'AM', territory_id: 1, territory_name: 'Dubai', area_id: 2, area_name: 'Deira', branch_id: null, branch_name: null, is_active: true, last_login: '2024-01-15T07:45:00' },
-  { id: 6, username: 'BR001', full_name: 'Ahmed Hassan', email: 'ahmed@br-retailflow.com', role: 'staff', role_label: 'Steward', territory_id: 1, territory_name: 'Dubai', area_id: 1, area_name: 'Karama', branch_id: 1, branch_name: 'Karama Center', is_active: true, last_login: '2024-01-15T06:00:00' },
-  { id: 7, username: 'BR002', full_name: 'Fatima Ali', email: 'fatima@br-retailflow.com', role: 'staff', role_label: 'Steward', territory_id: 1, territory_name: 'Dubai', area_id: 1, area_name: 'Karama', branch_id: 2, branch_name: 'Karama Mall', is_active: true, last_login: '2024-01-15T06:15:00' },
-  { id: 8, username: 'BR003', full_name: 'Omar Khan', email: 'omar@br-retailflow.com', role: 'staff', role_label: 'Steward', territory_id: 1, territory_name: 'Dubai', area_id: 1, area_name: 'Karama', branch_id: 3, branch_name: 'BurJuman', is_active: true, last_login: '2024-01-14T22:00:00' },
-  { id: 9, username: 'BR004', full_name: 'Sara Mohammed', email: 'sara@br-retailflow.com', role: 'staff', role_label: 'Steward', territory_id: 1, territory_name: 'Dubai', area_id: 2, area_name: 'Deira', branch_id: 4, branch_name: 'Deira City Centre', is_active: true, last_login: '2024-01-15T06:30:00' },
-  { id: 10, username: 'BR005', full_name: 'Khalid Ibrahim', email: 'khalid@br-retailflow.com', role: 'staff', role_label: 'Steward', territory_id: 1, territory_name: 'Dubai', area_id: 2, area_name: 'Deira', branch_id: 5, branch_name: 'Al Ghurair', is_active: false, last_login: '2024-01-10T19:00:00' },
+  { id: 6, username: 'BR001', full_name: 'Ahmed Hassan', email: 'ahmed@br-retailflow.com', role: 'staff', role_label: 'Flavor Expert', territory_id: 1, territory_name: 'Dubai', area_id: 1, area_name: 'Karama', branch_id: 1, branch_name: 'Karama Center', is_active: true, last_login: '2024-01-15T06:00:00' },
+  { id: 7, username: 'BR002', full_name: 'Fatima Ali', email: 'fatima@br-retailflow.com', role: 'staff', role_label: 'Flavor Expert', territory_id: 1, territory_name: 'Dubai', area_id: 1, area_name: 'Karama', branch_id: 2, branch_name: 'Karama Mall', is_active: true, last_login: '2024-01-15T06:15:00' },
+  { id: 8, username: 'BR003', full_name: 'Omar Khan', email: 'omar@br-retailflow.com', role: 'staff', role_label: 'Flavor Expert', territory_id: 1, territory_name: 'Dubai', area_id: 1, area_name: 'Karama', branch_id: 3, branch_name: 'BurJuman', is_active: true, last_login: '2024-01-14T22:00:00' },
+  { id: 9, username: 'BR004', full_name: 'Sara Mohammed', email: 'sara@br-retailflow.com', role: 'staff', role_label: 'Flavor Expert', territory_id: 1, territory_name: 'Dubai', area_id: 2, area_name: 'Deira', branch_id: 4, branch_name: 'Deira City Centre', is_active: true, last_login: '2024-01-15T06:30:00' },
+  { id: 10, username: 'BR005', full_name: 'Khalid Ibrahim', email: 'khalid@br-retailflow.com', role: 'staff', role_label: 'Flavor Expert', territory_id: 1, territory_name: 'Dubai', area_id: 2, area_name: 'Deira', branch_id: 5, branch_name: 'Al Ghurair', is_active: false, last_login: '2024-01-10T19:00:00' },
 ]
 
 const demoBranches = [
@@ -72,7 +72,7 @@ const demoTerritories = [
 const roleOptions = [
   { value: 'super_admin', label: 'Territory Manager (TM)', color: 'bg-blue-500/20 text-blue-300' },
   { value: 'admin', label: 'Area Manager (AM)', color: 'bg-cyan-500/20 text-cyan-300' },
-  { value: 'staff', label: 'Steward', color: 'bg-green-500/20 text-green-300' },
+  { value: 'staff', label: 'Flavor Expert', color: 'bg-green-500/20 text-green-300' },
 ]
 
 const roleColors = {
@@ -136,7 +136,7 @@ export default function UsersPage() {
           setAreas(demoAreas.filter(a => a.territory_id === userData.territory_id))
           setTerritories(demoTerritories.filter(t => t.id === userData.territory_id))
         } else {
-          // AM sees only their area's users (stewards)
+          // AM sees only their area's users (flavor experts)
           setUsers(demoUsers.filter(u => u.area_id === userData.area_id && u.role === 'staff'))
           setBranches(demoBranches.filter(b => b.area_id === userData.area_id))
           setAreas(demoAreas.filter(a => a.id === userData.area_id))
@@ -260,7 +260,7 @@ export default function UsersPage() {
     }
 
     if (formData.role === 'staff' && !formData.branch_id) {
-      setError('Please select a branch for Steward')
+      setError('Please select a branch for Flavor Expert')
       return
     }
 
@@ -282,7 +282,7 @@ export default function UsersPage() {
                 full_name: formData.full_name,
                 email: formData.email,
                 role: formData.role,
-                role_label: formData.role === 'super_admin' ? 'TM' : formData.role === 'admin' ? 'AM' : 'Steward',
+                role_label: formData.role === 'super_admin' ? 'TM' : formData.role === 'admin' ? 'AM' : 'Flavor Expert',
                 territory_id: formData.territory_id ? parseInt(formData.territory_id) : null,
                 territory_name: territory?.name || null,
                 area_id: formData.area_id ? parseInt(formData.area_id) : null,
@@ -301,7 +301,7 @@ export default function UsersPage() {
           full_name: formData.full_name,
           email: formData.email || `${formData.username.toLowerCase()}@br-retailflow.com`,
           role: formData.role,
-          role_label: formData.role === 'super_admin' ? 'TM' : formData.role === 'admin' ? 'AM' : 'Steward',
+          role_label: formData.role === 'super_admin' ? 'TM' : formData.role === 'admin' ? 'AM' : 'Flavor Expert',
           territory_id: formData.territory_id ? parseInt(formData.territory_id) : null,
           territory_name: territory?.name || null,
           area_id: formData.area_id ? parseInt(formData.area_id) : null,
@@ -391,7 +391,7 @@ export default function UsersPage() {
             Users
           </h1>
           <p className="text-slate-400 text-sm mt-1">
-            Manage users and set credentials for stewards
+            Manage users and set credentials for flavor experts
           </p>
         </div>
         <Button

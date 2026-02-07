@@ -14,7 +14,8 @@ import {
   ChevronRight,
   Shield,
   Menu,
-  X
+  X,
+  Cake
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 
@@ -24,6 +25,7 @@ const navigation = [
   { name: 'Areas', href: '/dashboard/areas', icon: MapPin, roles: ['supreme_admin', 'super_admin'] },
   { name: 'Branches', href: '/dashboard/branches', icon: Building2, roles: ['supreme_admin', 'super_admin', 'admin'] },
   { name: 'Users', href: '/dashboard/users', icon: Users, roles: ['supreme_admin', 'super_admin', 'admin'] },
+  { name: 'Cake Alerts', href: '/dashboard/cake-alerts', icon: Cake, roles: ['supreme_admin', 'super_admin', 'admin'] },
 ]
 
 const roleLabels = {
