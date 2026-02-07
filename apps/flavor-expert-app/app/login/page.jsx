@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { IceCream, Loader2, Eye, EyeOff, Store, Lock, Sparkles, Play } from 'lucide-react'
+import { IceCream, Loader2, Eye, EyeOff, Store, Lock, Sparkles } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -13,7 +13,6 @@ import api from '@/services/api'
 export default function LoginPage() {
   const router = useRouter()
   const [loading, setLoading] = useState(false)
-  const [demoLoading, setDemoLoading] = useState(false)
   const [error, setError] = useState('')
   const [showPassword, setShowPassword] = useState(false)
   const [credentials, setCredentials] = useState({
@@ -44,34 +43,6 @@ export default function LoginPage() {
     } finally {
       setLoading(false)
     }
-  }
-
-  const handleDemoLogin = () => {
-    setDemoLoading(true)
-
-    // Create demo user data
-    const demoUser = {
-      id: 1,
-      email: 'demo@br-retailflow.com',
-      username: 'demo_flavor_expert',
-      full_name: 'Demo Flavor Expert',
-      role: 'staff',
-      branch_id: 1,
-      area_id: 1,
-      territory_id: 1,
-      is_active: true,
-      is_verified: true,
-    }
-
-    // Store demo user in localStorage
-    localStorage.setItem('br_user', JSON.stringify(demoUser))
-    localStorage.setItem('br_token', 'demo_token_for_testing')
-    localStorage.setItem('br_demo_mode', 'true')
-
-    // Simulate loading
-    setTimeout(() => {
-      router.push('/dashboard')
-    }, 1000)
   }
 
   return (
@@ -177,39 +148,20 @@ export default function LoginPage() {
                 </div>
               </div>
 
-              {/* Buttons Row */}
-              <div className="flex gap-3">
-                <Button
-                  type="submit"
-                  className="flex-1 h-12 text-base font-semibold bg-gradient-to-r from-cyan-500 via-purple-500 to-pink-500 hover:from-cyan-400 hover:via-purple-400 hover:to-pink-400 border-0 shadow-lg shadow-purple-500/25 transition-all duration-300"
-                  disabled={loading}
-                >
-                  {loading ? (
-                    <>
-                      <Loader2 className="w-5 h-5 mr-2 animate-spin" />
-                      Signing in...
-                    </>
-                  ) : (
-                    'Sign In'
-                  )}
-                </Button>
-
-                <Button
-                  type="button"
-                  onClick={handleDemoLogin}
-                  disabled={demoLoading}
-                  className="h-12 px-6 font-semibold bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 border-0 shadow-lg shadow-emerald-500/25 transition-all duration-300"
-                >
-                  {demoLoading ? (
-                    <Loader2 className="w-5 h-5 animate-spin" />
-                  ) : (
-                    <>
-                      <Play className="w-5 h-5 mr-1" />
-                      Demo
-                    </>
-                  )}
-                </Button>
-              </div>
+              <Button
+                type="submit"
+                className="w-full h-12 text-base font-semibold bg-gradient-to-r from-cyan-500 via-purple-500 to-pink-500 hover:from-cyan-400 hover:via-purple-400 hover:to-pink-400 border-0 shadow-lg shadow-purple-500/25 transition-all duration-300"
+                disabled={loading}
+              >
+                {loading ? (
+                  <>
+                    <Loader2 className="w-5 h-5 mr-2 animate-spin" />
+                    Signing in...
+                  </>
+                ) : (
+                  'Sign In'
+                )}
+              </Button>
             </form>
 
             {/* Help text */}

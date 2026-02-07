@@ -16,7 +16,7 @@ class Settings(BaseSettings):
     DEBUG: bool = False
 
     # Database
-    DATABASE_URL: str = "postgresql://postgres:password@localhost:5432/br_retailflow"
+    DATABASE_URL: str = "postgresql://bruser:Mm99090401@br-retailflow-db.cp424kwuw8hu.eu-north-1.rds.amazonaws.com:5432/postgres?sslmode=require"
 
     # JWT Authentication
     SECRET_KEY: str = "your-secret-key-change-in-production"

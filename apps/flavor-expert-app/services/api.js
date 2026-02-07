@@ -1,9 +1,10 @@
 /**
  * API Service
  * Handles all HTTP requests to the backend
+ * Connected to EC2 API
  */
 
-const API_URL = process.env.API_URL || 'http://localhost:8000/api/v1'
+const API_URL = process.env.API_URL || 'http://16.171.137.58:8000/api/v1'
 
 class ApiService {
   constructor() {
