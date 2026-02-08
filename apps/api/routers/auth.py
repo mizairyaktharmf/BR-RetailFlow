@@ -5,7 +5,9 @@ Handles login, logout, token refresh
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
-from datetime import datetime
+from datetime import datetime, timedelta
+import random
+import string
 
 from utils.database import get_db
 from utils.security import (
@@ -50,6 +52,13 @@ async def login(credentials: UserLogin, db: Session = Depends(get_db)):
             detail="User account is disabled"
         )
 
+    # Check if user is verified
+    if not user.is_verified:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Please verify your account first. Check your email for verification code."
+        )
+
     # Update last login
     user.last_login = datetime.utcnow()
     db.commit()
@@ -65,10 +74,10 @@ async def login(credentials: UserLogin, db: Session = Depends(get_db)):
     )
 
 
-@router.post("/register", response_model=TokenResponse, status_code=status.HTTP_201_CREATED)
+@router.post("/register", status_code=status.HTTP_201_CREATED)
 async def register(user_data: UserCreate, db: Session = Depends(get_db)):
     """
-    Register a new admin user (PUBLIC endpoint for initial setup)
+    Register a new admin user - generates verification code
     """
     # Check if username or email already exists
     existing = db.query(User).filter(
@@ -80,7 +89,13 @@ async def register(user_data: UserCreate, db: Session = Depends(get_db)):
             detail="Username or email already registered"
         )
 
-    # Create user
+    # Generate 6-digit verification code
+    verification_code = ''.join(random.choices(string.digits, k=6))
+
+    # Code expires in 30 minutes
+    code_expires = datetime.utcnow() + timedelta(minutes=30)
+
+    # Create user (NOT verified yet)
     user = User(
         email=user_data.email,
         username=user_data.username,
@@ -89,12 +104,70 @@ async def register(user_data: UserCreate, db: Session = Depends(get_db)):
         phone=user_data.phone,
         role=user_data.role or UserRole.SUPREME_ADMIN,
         is_active=True,
+        is_verified=False,  # NOT verified yet
+        verification_code=verification_code,
+        verification_code_expires=code_expires,
         branch_id=user_data.branch_id,
         area_id=user_data.area_id,
         territory_id=user_data.territory_id
     )
 
     db.add(user)
+    db.commit()
+    db.refresh(user)
+
+    # Return verification code (in production, send via email)
+    return {
+        "message": "Registration successful. Please verify your account.",
+        "user_id": user.id,
+        "email": user.email,
+        "verification_code": verification_code,  # In production, send via email
+        "expires_in_minutes": 30
+    }
+
+
+@router.post("/verify", response_model=TokenResponse)
+async def verify_account(
+    email: str,
+    verification_code: str,
+    db: Session = Depends(get_db)
+):
+    """
+    Verify user account with verification code and return tokens
+    """
+    # Find user by email
+    user = db.query(User).filter(User.email == email).first()
+
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User not found"
+        )
+
+    if user.is_verified:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Account already verified"
+        )
+
+    # Check if code expired
+    if user.verification_code_expires and datetime.utcnow() > user.verification_code_expires:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Verification code expired. Please request a new one."
+        )
+
+    # Verify code
+    if user.verification_code != verification_code:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid verification code"
+        )
+
+    # Mark user as verified
+    user.is_verified = True
+    user.verification_code = None
+    user.verification_code_expires = None
     db.commit()
     db.refresh(user)
 

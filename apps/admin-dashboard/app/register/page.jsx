@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { Shield, Loader2, Eye, EyeOff, User, Mail, Phone, Lock, Award } from 'lucide-react'
+import { Shield, Loader2, Eye, EyeOff, User, Mail, Phone, Lock, Award, ArrowRight, ArrowLeft } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -16,6 +16,8 @@ export default function RegisterPage() {
   const [error, setError] = useState('')
   const [success, setSuccess] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
+  const [verificationCode, setVerificationCode] = useState('')
+  const [step, setStep] = useState(1) // 1 or 2
   const [formData, setFormData] = useState({
     email: '',
     username: '',
@@ -25,6 +27,24 @@ export default function RegisterPage() {
     phone: '',
     role: 'supreme_admin'
   })
+
+  const handleNext = (e) => {
+    e.preventDefault()
+    setError('')
+
+    // Validate step 1 fields
+    if (!formData.full_name || !formData.email || !formData.username) {
+      setError('Please fill in all required fields')
+      return
+    }
+
+    setStep(2)
+  }
+
+  const handleBack = () => {
+    setError('')
+    setStep(1)
+  }
 
   const handleRegister = async (e) => {
     e.preventDefault()
@@ -60,10 +80,14 @@ export default function RegisterPage() {
         throw new Error(data.detail || 'Registration failed')
       }
 
+      // Store verification code and show to user
+      setVerificationCode(data.verification_code)
       setSuccess(true)
+
+      // Redirect to verify page after 3 seconds
       setTimeout(() => {
-        router.push('/login')
-      }, 2000)
+        router.push(`/verify?email=${encodeURIComponent(formData.email)}`)
+      }, 3000)
     } catch (err) {
       setError(err.message || 'Registration failed. Please try again.')
     } finally {
@@ -98,25 +122,38 @@ export default function RegisterPage() {
           <CardHeader className="pb-3 text-center">
             <CardTitle className="text-xl text-white">Register New Admin</CardTitle>
             <CardDescription className="text-slate-400 text-sm">
-              Create a new administrator account
+              Step {step} of 2: {step === 1 ? 'Basic Information' : 'Account Setup'}
             </CardDescription>
+            {/* Progress bar */}
+            <div className="flex gap-2 mt-3">
+              <div className={`h-1 flex-1 rounded-full ${step >= 1 ? 'bg-gradient-to-r from-pink-500 to-purple-500' : 'bg-slate-600'}`}></div>
+              <div className={`h-1 flex-1 rounded-full ${step >= 2 ? 'bg-gradient-to-r from-purple-500 to-indigo-500' : 'bg-slate-600'}`}></div>
+            </div>
           </CardHeader>
           <CardContent>
-            <form onSubmit={handleRegister} className="space-y-4">
+            <form onSubmit={step === 1 ? handleNext : handleRegister} className="space-y-4">
               {error && (
                 <Alert variant="destructive" className="bg-red-500/10 border-red-500/50 py-2">
                   <AlertDescription className="text-red-300 text-sm">{error}</AlertDescription>
                 </Alert>
               )}
 
-              {success && (
-                <Alert className="bg-green-500/10 border-green-500/50 py-2">
-                  <AlertDescription className="text-green-300 text-sm">
-                    Account created successfully! Redirecting to login...
+              {success && verificationCode && (
+                <Alert className="bg-green-500/10 border-green-500/50 p-4">
+                  <AlertDescription className="text-green-300 text-sm space-y-2">
+                    <p className="font-semibold">Account created successfully!</p>
+                    <div className="bg-slate-900/50 rounded-lg p-3 border border-green-500/30">
+                      <p className="text-xs text-slate-400 mb-1">Your verification code:</p>
+                      <p className="text-2xl font-bold text-white tracking-widest text-center">{verificationCode}</p>
+                    </div>
+                    <p className="text-xs">Save this code! Redirecting to verification page...</p>
                   </AlertDescription>
                 </Alert>
               )}
 
+              {/* STEP 1: Basic Information */}
+              {step === 1 && (
+                <>
               <div className="space-y-2">
                 <Label htmlFor="full_name" className="text-slate-300 text-sm">Full Name</Label>
                 <div className="relative">
@@ -169,7 +206,7 @@ export default function RegisterPage() {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="phone" className="text-slate-300 text-sm">Phone</Label>
+                <Label htmlFor="phone" className="text-slate-300 text-sm">Phone (Optional)</Label>
                 <div className="relative">
                   <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
                   <Input
@@ -184,6 +221,19 @@ export default function RegisterPage() {
                 </div>
               </div>
 
+              <Button
+                type="submit"
+                className="w-full h-10 text-sm font-semibold bg-gradient-to-r from-pink-600 via-purple-600 to-indigo-600 hover:from-pink-500 hover:via-purple-500 hover:to-indigo-500 shadow-lg shadow-purple-500/25"
+              >
+                Next Step
+                <ArrowRight className="w-4 h-4 ml-2" />
+              </Button>
+                </>
+              )}
+
+              {/* STEP 2: Account Setup */}
+              {step === 2 && (
+                <>
               <div className="space-y-2">
                 <Label htmlFor="role" className="text-slate-300 text-sm flex items-center gap-2">
                   <Award className="w-4 h-4" />
@@ -243,20 +293,32 @@ export default function RegisterPage() {
                 </div>
               </div>
 
-              <Button
-                type="submit"
-                className="w-full h-10 text-sm font-semibold bg-gradient-to-r from-pink-600 via-purple-600 to-indigo-600 hover:from-pink-500 hover:via-purple-500 hover:to-indigo-500 shadow-lg shadow-purple-500/25"
-                disabled={loading}
-              >
-                {loading ? (
-                  <>
-                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                    Creating Account...
-                  </>
-                ) : (
-                  'Create Account'
-                )}
-              </Button>
+              <div className="flex gap-3">
+                <Button
+                  type="button"
+                  onClick={handleBack}
+                  className="h-10 text-sm font-semibold bg-slate-700 hover:bg-slate-600 border border-slate-600"
+                >
+                  <ArrowLeft className="w-4 h-4 mr-2" />
+                  Back
+                </Button>
+                <Button
+                  type="submit"
+                  className="flex-1 h-10 text-sm font-semibold bg-gradient-to-r from-pink-600 via-purple-600 to-indigo-600 hover:from-pink-500 hover:via-purple-500 hover:to-indigo-500 shadow-lg shadow-purple-500/25"
+                  disabled={loading}
+                >
+                  {loading ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      Creating Account...
+                    </>
+                  ) : (
+                    'Create Account'
+                  )}
+                </Button>
+              </div>
+                </>
+              )}
 
               <div className="text-center mt-4">
                 <Link href="/login" className="text-sm text-slate-400 hover:text-white transition-colors">

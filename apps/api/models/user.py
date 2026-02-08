@@ -34,6 +34,10 @@ class User(Base):
     is_active = Column(Boolean, default=True)
     is_verified = Column(Boolean, default=False)
 
+    # Email verification
+    verification_code = Column(String(6), nullable=True)
+    verification_code_expires = Column(DateTime(timezone=True), nullable=True)
+
     # Relationships - which entity this user manages/belongs to
     branch_id = Column(Integer, ForeignKey("branches.id"), nullable=True)
     area_id = Column(Integer, ForeignKey("areas.id"), nullable=True)
