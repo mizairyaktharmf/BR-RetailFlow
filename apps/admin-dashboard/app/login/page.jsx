@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
+import Link from 'next/link'
 import { Loader2, Eye, EyeOff, Shield, Lock, User } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -141,6 +142,12 @@ export default function AdminLoginPage() {
                   'Sign In'
                 )}
               </Button>
+
+              <div className="text-center mt-4">
+                <Link href="/register" className="text-sm text-slate-400 hover:text-white transition-colors">
+                  Need an account? Register here
+                </Link>
+              </div>
             </form>
           </CardContent>
         </Card>

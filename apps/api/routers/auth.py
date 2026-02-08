@@ -13,10 +13,11 @@ from utils.security import (
     create_access_token,
     create_refresh_token,
     decode_token,
-    get_current_user
+    get_current_user,
+    get_password_hash
 )
-from models.user import User
-from schemas.user import UserLogin, TokenResponse, UserResponse
+from models.user import User, UserRole
+from schemas.user import UserLogin, TokenResponse, UserResponse, UserCreate
 
 router = APIRouter()
 
@@ -52,6 +53,50 @@ async def login(credentials: UserLogin, db: Session = Depends(get_db)):
     # Update last login
     user.last_login = datetime.utcnow()
     db.commit()
+
+    # Create tokens
+    access_token = create_access_token(data={"sub": str(user.id)})
+    refresh_token = create_refresh_token(data={"sub": str(user.id)})
+
+    return TokenResponse(
+        access_token=access_token,
+        refresh_token=refresh_token,
+        user=UserResponse.model_validate(user)
+    )
+
+
+@router.post("/register", response_model=TokenResponse, status_code=status.HTTP_201_CREATED)
+async def register(user_data: UserCreate, db: Session = Depends(get_db)):
+    """
+    Register a new admin user (PUBLIC endpoint for initial setup)
+    """
+    # Check if username or email already exists
+    existing = db.query(User).filter(
+        (User.username == user_data.username) | (User.email == user_data.email)
+    ).first()
+    if existing:
+        raise HTTPException(
+            status_code=400,
+            detail="Username or email already registered"
+        )
+
+    # Create user
+    user = User(
+        email=user_data.email,
+        username=user_data.username,
+        hashed_password=get_password_hash(user_data.password),
+        full_name=user_data.full_name,
+        phone=user_data.phone,
+        role=user_data.role or UserRole.SUPREME_ADMIN,
+        is_active=True,
+        branch_id=user_data.branch_id,
+        area_id=user_data.area_id,
+        territory_id=user_data.territory_id
+    )
+
+    db.add(user)
+    db.commit()
+    db.refresh(user)
 
     # Create tokens
     access_token = create_access_token(data={"sub": str(user.id)})

@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { Shield, Loader2, Eye, EyeOff, User, Mail, Phone, Lock } from 'lucide-react'
+import { Shield, Loader2, Eye, EyeOff, User, Mail, Phone, Lock, Award } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -182,6 +182,24 @@ export default function RegisterPage() {
                     className="h-10 pl-10 bg-slate-700/50 border-slate-600 text-white placeholder:text-slate-500 focus:border-pink-500"
                   />
                 </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="role" className="text-slate-300 text-sm flex items-center gap-2">
+                  <Award className="w-4 h-4" />
+                  Account Level
+                </Label>
+                <select
+                  id="role"
+                  value={formData.role}
+                  onChange={(e) => setFormData({ ...formData, role: e.target.value })}
+                  disabled={loading}
+                  className="h-10 w-full px-3 bg-slate-700/50 border border-slate-600 rounded-md text-white focus:border-pink-500 focus:outline-none focus:ring-1 focus:ring-pink-500"
+                >
+                  <option value="supreme_admin" className="bg-slate-800">🏢 Supreme Admin (HQ) - Full System Access</option>
+                  <option value="super_admin" className="bg-slate-800">🗺️ Super Admin (TM) - Territory Manager</option>
+                  <option value="admin" className="bg-slate-800">📍 Admin (AM) - Area Manager</option>
+                </select>
               </div>
 
               <div className="space-y-2">
