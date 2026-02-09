@@ -9,6 +9,7 @@ import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import Link from 'next/link'
+import api from '@/services/api'
 
 export default function RegisterPage() {
   const router = useRouter()
@@ -59,11 +60,8 @@ export default function RegisterPage() {
     }
 
     try {
-      const response = await fetch('http://16.171.137.58:8000/api/v1/auth/register', {
+      const data = await api.request('/auth/register', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
         body: JSON.stringify({
           email: formData.email,
           username: formData.username,
@@ -73,12 +71,6 @@ export default function RegisterPage() {
           role: formData.role
         }),
       })
-
-      const data = await response.json()
-
-      if (!response.ok) {
-        throw new Error(data.detail || 'Registration failed')
-      }
 
       // Store verification code and show to user
       setVerificationCode(data.verification_code)

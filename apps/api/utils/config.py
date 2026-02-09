@@ -15,8 +15,8 @@ class Settings(BaseSettings):
     APP_NAME: str = "BR-RetailFlow"
     DEBUG: bool = False
 
-    # Database
-    DATABASE_URL: str = "postgresql://bruser:Mm99090401@br-retailflow-db.cp424kwuw8hu.eu-north-1.rds.amazonaws.com:5432/postgres?sslmode=require"
+    # Database - Override via DATABASE_URL env variable
+    DATABASE_URL: str = "postgresql://bruser:password@localhost:5432/brretailflow"
 
     # JWT Authentication
     SECRET_KEY: str = "your-secret-key-change-in-production"
@@ -24,14 +24,11 @@ class Settings(BaseSettings):
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
     REFRESH_TOKEN_EXPIRE_DAYS: int = 7
 
-    # CORS
+    # CORS - Add your production domains here via CORS_ORIGINS env variable
     CORS_ORIGINS: List[str] = [
         "http://localhost:3000",
         "http://localhost:3001",
         "http://localhost:3002",
-        "https://br-retailflow.vercel.app",
-        "https://flavor-expert.br-retailflow.vercel.app",
-        "https://admin.br-retailflow.vercel.app"
     ]
 
     class Config:

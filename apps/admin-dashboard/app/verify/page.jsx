@@ -9,6 +9,7 @@ import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import Link from 'next/link'
+import api from '@/services/api'
 
 export default function VerifyPage() {
   const router = useRouter()
@@ -33,26 +34,19 @@ export default function VerifyPage() {
     setLoading(true)
 
     try {
-      const response = await fetch('http://16.171.137.58:8000/api/v1/auth/verify', {
+      const data = await api.request('/auth/verify', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
         body: JSON.stringify({
           email: email,
           verification_code: verificationCode,
         }),
       })
 
-      const data = await response.json()
-
-      if (!response.ok) {
-        throw new Error(data.detail || 'Verification failed')
+      // Store token and user data with correct keys
+      if (data.access_token) {
+        localStorage.setItem('br_admin_token', data.access_token)
+        localStorage.setItem('br_admin_user', JSON.stringify(data.user))
       }
-
-      // Store token and user data
-      localStorage.setItem('admin_token', data.access_token)
-      localStorage.setItem('admin_user', JSON.stringify(data.user))
 
       setSuccess(true)
       setTimeout(() => {

@@ -132,9 +132,9 @@ Example:
 │                                                                  │
 ├─────────────────────────────────────────────────────────────────┤
 │  DEPLOYMENT                                                      │
-│  • Backend: AWS EC2 (Free Tier)                                 │
-│  • Frontend: Vercel (Free Tier)                                 │
-│  • Database: PostgreSQL on EC2                                  │
+│  • All services: Docker on AWS EC2                              │
+│  • Database: AWS RDS PostgreSQL                                 │
+│  • CI/CD: GitHub Actions                                        │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
@@ -150,7 +150,7 @@ Example:
 | **Database** | PostgreSQL | Primary data store |
 | **Offline Storage** | IndexedDB (idb) | Offline capability |
 | **Monorepo** | Turborepo | Build system |
-| **Deployment** | AWS EC2 + Vercel | Hosting |
+| **Deployment** | Docker + AWS EC2/RDS | Hosting |
 
 ---
 
@@ -488,23 +488,13 @@ After seeding, use these credentials:
 
 ## Deployment
 
-### Backend (AWS EC2)
+### Docker Deployment (AWS EC2)
 
-1. Launch EC2 instance (t2.micro - Free Tier)
-2. Install Python 3.10+, PostgreSQL
-3. Clone repository
-4. Setup environment variables
-5. Run with Gunicorn + Nginx
-
-### Frontend (Vercel)
-
-1. Connect GitHub repository
-2. Set root directory to `apps/flavor-expert-app` (Flavor Expert App)
-3. Configure environment variables:
-   ```
-   API_URL=https://your-ec2-ip:8000/api/v1
-   ```
-4. Deploy
+1. Launch EC2 instance with Docker installed
+2. Clone repository
+3. Configure `.env` file with DATABASE_URL, SECRET_KEY, API_URL
+4. Run `docker-compose up -d --build`
+5. All services (API, Admin Dashboard, Flavor Expert App) run as Docker containers
 
 ---
 

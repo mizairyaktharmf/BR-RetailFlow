@@ -1,9 +1,8 @@
 /**
  * API Service for Admin Dashboard
- * Connects to live API on EC2
  */
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://16.171.137.58:8000/api/v1'
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1'
 
 class ApiService {
   constructor() {
