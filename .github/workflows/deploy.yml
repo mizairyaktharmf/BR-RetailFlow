@@ -1,8 +1,7 @@
 name: Deploy to AWS
 
 on:
-  push:
-    branches: [ main ]
+  workflow_dispatch:  # Manual trigger only - enable push trigger after setting up new EC2
 
 jobs:
   deploy:
