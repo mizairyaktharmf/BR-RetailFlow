@@ -1,0 +1,21 @@
+name: Deploy to AWS
+
+on:
+  push:
+    branches: [ main ]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Deploy to EC2
+        env:
+          PRIVATE_KEY: ${{ secrets.EC2_SSH_KEY }}
+          HOST: ${{ secrets.EC2_HOST }}
+          USER: ${{ secrets.EC2_USERNAME }}
+        run: |
+          echo "$PRIVATE_KEY" > key.pem && chmod 600 key.pem
+          scp -i key.pem -r * ${USER}@${HOST}:~/BR-RetailFlow/
+          ssh -i key.pem ${USER}@${HOST} "cd ~/BR-RetailFlow && docker-compose down && docker-compose up -d --build"
