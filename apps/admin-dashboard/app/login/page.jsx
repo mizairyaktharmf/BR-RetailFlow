@@ -27,26 +27,38 @@ export default function AdminLoginPage() {
     try {
       const response = await api.login(credentials.username, credentials.password)
 
+      console.log('Login response:', response)
+      console.log('User role:', response.user.role)
+
       // Check if user has admin role (case-insensitive)
       const allowedRoles = ['hq', 'tm', 'am', 'supreme_admin', 'super_admin', 'admin', 'SUPREME_ADMIN', 'SUPER_ADMIN', 'ADMIN']
       const userRole = response.user.role?.toLowerCase() || ''
       const isAdmin = allowedRoles.some(role => role.toLowerCase() === userRole)
 
+      console.log('Is admin?', isAdmin)
+
       if (!isAdmin) {
+        console.log('Access denied - not admin role')
         setError('Access denied. This dashboard is only for administrators.')
         api.clearToken()
         setLoading(false)
         return
       }
 
-      // Store admin user data
-      localStorage.setItem('admin_user', JSON.stringify(response.user))
+      // Store admin user data (use br_admin_user key to match dashboard)
+      localStorage.setItem('br_admin_user', JSON.stringify(response.user))
+      localStorage.setItem('admin_user', JSON.stringify(response.user)) // Keep both for compatibility
+      console.log('Stored user data, redirecting to dashboard...')
+
+      // Small delay to ensure localStorage is saved
+      await new Promise(resolve => setTimeout(resolve, 100))
 
       // Force redirect to dashboard using window.location for clean page load
+      console.log('Redirecting now...')
       window.location.href = '/dashboard'
     } catch (err) {
+      console.error('Login error:', err)
       setError(err.message || 'Invalid credentials. Please try again.')
-    } finally {
       setLoading(false)
     }
   }
