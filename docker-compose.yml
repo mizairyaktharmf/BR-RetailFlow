@@ -1,0 +1,50 @@
+version: '3.8'
+
+services:
+  api:
+    build:
+      context: ./apps/api
+      dockerfile: Dockerfile
+    container_name: br-api
+    restart: unless-stopped
+    environment:
+      - DATABASE_URL=${DATABASE_URL}
+      - SECRET_KEY=${SECRET_KEY}
+    ports:
+      - "8000:8000"
+    networks:
+      - br-network
+
+  admin-dashboard:
+    build:
+      context: ./apps/admin-dashboard
+      dockerfile: Dockerfile
+    container_name: br-admin-dashboard
+    restart: unless-stopped
+    environment:
+      - NEXT_PUBLIC_API_URL=${API_URL}
+    ports:
+      - "3002:3000"
+    networks:
+      - br-network
+    depends_on:
+      - api
+
+  flavor-expert-app:
+    build:
+      context: ./apps/flavor-expert-app
+      dockerfile: Dockerfile
+    container_name: br-flavor-expert-app
+    restart: unless-stopped
+    environment:
+      - NEXT_PUBLIC_API_URL=${API_URL}
+    ports:
+      - "3000:3000"
+    networks:
+      - br-network
+    depends_on:
+      - api
+
+networks:
+  br-network:
+    driver: bridge
