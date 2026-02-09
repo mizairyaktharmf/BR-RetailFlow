@@ -15,7 +15,7 @@ class ApiService {
   getToken() {
     if (this.token) return this.token
     if (typeof window !== 'undefined') {
-      this.token = localStorage.getItem('admin_token')
+      this.token = localStorage.getItem('br_admin_token')
     }
     return this.token
   }
@@ -24,7 +24,7 @@ class ApiService {
   setToken(token) {
     this.token = token
     if (typeof window !== 'undefined') {
-      localStorage.setItem('admin_token', token)
+      localStorage.setItem('br_admin_token', token)
     }
   }
 
@@ -32,6 +32,8 @@ class ApiService {
   clearToken() {
     this.token = null
     if (typeof window !== 'undefined') {
+      localStorage.removeItem('br_admin_token')
+      localStorage.removeItem('br_admin_user')
       localStorage.removeItem('admin_token')
       localStorage.removeItem('admin_user')
     }
@@ -88,7 +90,8 @@ class ApiService {
     })
     if (response.access_token) {
       this.setToken(response.access_token)
-      localStorage.setItem('admin_user', JSON.stringify(response.user))
+      localStorage.setItem('br_admin_user', JSON.stringify(response.user))
+      localStorage.setItem('admin_user', JSON.stringify(response.user)) // Keep both for compatibility
     }
     return response
   }
