@@ -5,7 +5,7 @@ Handles login, logout, token refresh
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 import random
 import string
 
@@ -60,7 +60,7 @@ async def login(credentials: UserLogin, db: Session = Depends(get_db)):
         )
 
     # Update last login
-    user.last_login = datetime.utcnow()
+    user.last_login = datetime.now(timezone.utc)
     db.commit()
 
     # Create tokens
@@ -93,7 +93,7 @@ async def register(user_data: UserCreate, db: Session = Depends(get_db)):
     verification_code = ''.join(random.choices(string.digits, k=6))
 
     # Code expires in 30 minutes
-    code_expires = datetime.utcnow() + timedelta(minutes=30)
+    code_expires = datetime.now(timezone.utc) + timedelta(minutes=30)
 
     # Create user (NOT verified yet)
     user = User(
@@ -150,7 +150,7 @@ async def verify_account(
         )
 
     # Check if code expired
-    if user.verification_code_expires and datetime.utcnow() > user.verification_code_expires:
+    if user.verification_code_expires and datetime.now(timezone.utc) > user.verification_code_expires:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Verification code expired. Please request a new one."

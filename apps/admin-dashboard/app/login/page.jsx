@@ -1,7 +1,6 @@
 "use client"
 
 import { useState } from 'react'
-import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { Loader2, Eye, EyeOff, Shield, Lock, User } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -12,7 +11,6 @@ import { Alert, AlertDescription } from '@/components/ui/alert'
 import api from '@/services/api'
 
 export default function AdminLoginPage() {
-  const router = useRouter()
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [showPassword, setShowPassword] = useState(false)
@@ -29,9 +27,12 @@ export default function AdminLoginPage() {
     try {
       const response = await api.login(credentials.username, credentials.password)
 
-      // Check if user has admin role
-      const allowedRoles = ['hq', 'tm', 'am', 'supreme_admin', 'super_admin', 'admin']
-      if (!allowedRoles.includes(response.user.role)) {
+      // Check if user has admin role (case-insensitive)
+      const allowedRoles = ['hq', 'tm', 'am', 'supreme_admin', 'super_admin', 'admin', 'SUPREME_ADMIN', 'SUPER_ADMIN', 'ADMIN']
+      const userRole = response.user.role?.toLowerCase() || ''
+      const isAdmin = allowedRoles.some(role => role.toLowerCase() === userRole)
+
+      if (!isAdmin) {
         setError('Access denied. This dashboard is only for administrators.')
         api.clearToken()
         setLoading(false)
@@ -41,7 +42,8 @@ export default function AdminLoginPage() {
       // Store admin user data
       localStorage.setItem('admin_user', JSON.stringify(response.user))
 
-      router.push('/dashboard')
+      // Force redirect to dashboard using window.location for clean page load
+      window.location.href = '/dashboard'
     } catch (err) {
       setError(err.message || 'Invalid credentials. Please try again.')
     } finally {
