@@ -19,7 +19,7 @@ from utils.security import (
     get_password_hash
 )
 from models.user import User, UserRole
-from schemas.user import UserLogin, TokenResponse, UserResponse, UserCreate
+from schemas.user import UserLogin, TokenResponse, UserResponse, UserCreate, VerifyAccount
 
 router = APIRouter()
 
@@ -128,15 +128,14 @@ async def register(user_data: UserCreate, db: Session = Depends(get_db)):
 
 @router.post("/verify", response_model=TokenResponse)
 async def verify_account(
-    email: str,
-    verification_code: str,
+    verify_data: VerifyAccount,
     db: Session = Depends(get_db)
 ):
     """
     Verify user account with verification code and return tokens
     """
     # Find user by email
-    user = db.query(User).filter(User.email == email).first()
+    user = db.query(User).filter(User.email == verify_data.email).first()
 
     if not user:
         raise HTTPException(
@@ -158,7 +157,7 @@ async def verify_account(
         )
 
     # Verify code
-    if user.verification_code != verification_code:
+    if user.verification_code != verify_data.verification_code:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Invalid verification code"

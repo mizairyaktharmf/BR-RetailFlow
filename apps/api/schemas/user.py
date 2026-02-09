@@ -77,3 +77,9 @@ class PasswordChange(BaseModel):
     """Schema for password change"""
     current_password: str
     new_password: str = Field(..., min_length=6)
+
+
+class VerifyAccount(BaseModel):
+    """Schema for account verification"""
+    email: EmailStr
+    verification_code: str = Field(..., min_length=6, max_length=6)
