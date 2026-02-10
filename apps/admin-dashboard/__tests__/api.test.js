@@ -48,11 +48,11 @@ describe('ApiService', () => {
 describe('Token Management', () => {
   test('setToken stores token in localStorage', () => {
     ApiService.setToken('test-token-123')
-    expect(localStorageMock.setItem).toHaveBeenCalledWith('admin_token', 'test-token-123')
+    expect(localStorageMock.setItem).toHaveBeenCalledWith('br_admin_token', 'test-token-123')
   })
 
   test('getToken retrieves token from localStorage', () => {
-    localStorageMock.store['admin_token'] = 'stored-token'
+    localStorageMock.store['br_admin_token'] = 'stored-token'
     ApiService.token = null // Reset cache
     const token = ApiService.getToken()
     expect(token).toBe('stored-token')
@@ -60,8 +60,8 @@ describe('Token Management', () => {
 
   test('clearToken removes token and user from localStorage', () => {
     ApiService.clearToken()
-    expect(localStorageMock.removeItem).toHaveBeenCalledWith('admin_token')
-    expect(localStorageMock.removeItem).toHaveBeenCalledWith('admin_user')
+    expect(localStorageMock.removeItem).toHaveBeenCalledWith('br_admin_token')
+    expect(localStorageMock.removeItem).toHaveBeenCalledWith('br_admin_user')
   })
 })
 
@@ -105,7 +105,7 @@ describe('Login', () => {
     })
 
     await ApiService.login('admin', 'pass')
-    expect(localStorageMock.setItem).toHaveBeenCalledWith('admin_token', 'new-token')
+    expect(localStorageMock.setItem).toHaveBeenCalledWith('br_admin_token', 'new-token')
   })
 
   test('login throws on invalid credentials', async () => {

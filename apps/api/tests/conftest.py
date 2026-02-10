@@ -5,21 +5,38 @@ No real database needed!
 
 import sys
 import os
-import pytest
-from fastapi.testclient import TestClient
-from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker
+
+# MUST set env variable BEFORE importing anything from the app
+# This makes the app use SQLite instead of PostgreSQL
+os.environ["DATABASE_URL"] = "sqlite://"
 
 # Add parent directory to path so imports work
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
+import pytest
+from fastapi.testclient import TestClient
+from sqlalchemy import create_engine, event
+from sqlalchemy.orm import sessionmaker
+from sqlalchemy.pool import StaticPool
+
 from utils.database import Base, get_db
 from main import app
 
-# SQLite in-memory database for tests (no PostgreSQL needed!)
-TEST_DATABASE_URL = "sqlite:///./test.db"
-engine = create_engine(TEST_DATABASE_URL, connect_args={"check_same_thread": False})
+# In-memory SQLite with StaticPool so all connections share the same DB
+engine = create_engine(
+    "sqlite://",
+    connect_args={"check_same_thread": False},
+    poolclass=StaticPool,
+)
 TestSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+
+
+# SQLite doesn't support Enum natively - this helps with PostgreSQL Enum columns
+@event.listens_for(engine, "connect")
+def set_sqlite_pragma(dbapi_connection, connection_record):
+    cursor = dbapi_connection.cursor()
+    cursor.execute("PRAGMA foreign_keys=OFF")
+    cursor.close()
 
 
 def override_get_db():
@@ -32,7 +49,7 @@ def override_get_db():
 
 @pytest.fixture(autouse=True)
 def setup_database():
-    """Create fresh database tables before each test"""
+    """Create fresh database tables before each test, drop after"""
     Base.metadata.create_all(bind=engine)
     yield
     Base.metadata.drop_all(bind=engine)

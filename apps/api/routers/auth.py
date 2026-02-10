@@ -149,12 +149,16 @@ async def verify_account(
             detail="Account already verified"
         )
 
-    # Check if code expired
-    if user.verification_code_expires and datetime.now(timezone.utc) > user.verification_code_expires:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Verification code expired. Please request a new one."
-        )
+    # Check if code expired (handle both naive and aware datetimes for SQLite compat)
+    if user.verification_code_expires:
+        expires = user.verification_code_expires
+        if expires.tzinfo is None:
+            expires = expires.replace(tzinfo=timezone.utc)
+        if datetime.now(timezone.utc) > expires:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Verification code expired. Please request a new one."
+            )
 
     # Verify code
     if user.verification_code != verify_data.verification_code:
