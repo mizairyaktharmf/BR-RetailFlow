@@ -92,7 +92,7 @@ export default function CakeStockPage() {
   }
 
   const handleConfirmSale = async (item) => {
-    if (sellQuantity <= 0 || sellQuantity > item.quantity) return
+    if (sellQuantity <= 0 || sellQuantity > item.current_quantity) return
 
     setSubmitting(true)
     setSuccessMessage('')
@@ -109,7 +109,7 @@ export default function CakeStockPage() {
       // Optimistically update local state
       setStock(prev => prev.map(s => {
         if (s.cake_product_id === item.cake_product_id) {
-          return { ...s, quantity: s.quantity - sellQuantity }
+          return { ...s, current_quantity: s.current_quantity - sellQuantity }
         }
         return s
       }))
@@ -136,7 +136,7 @@ export default function CakeStockPage() {
   })
 
   const lowStockCount = stock.filter(item =>
-    item.quantity <= (item.alert_threshold || item.default_alert_threshold || 3)
+    item.current_quantity <= (item.alert_threshold || item.default_alert_threshold || 3)
   ).length
 
   return (
@@ -267,7 +267,7 @@ export default function CakeStockPage() {
                       return (
                         <div
                           key={item.cake_product_id}
-                          className={`rounded-lg overflow-hidden ${getRowBackground(item.quantity, threshold)}`}
+                          className={`rounded-lg overflow-hidden ${getRowBackground(item.current_quantity, threshold)}`}
                         >
                           <div className="flex items-center justify-between p-3">
                             <div className="flex items-center gap-3">
@@ -284,15 +284,15 @@ export default function CakeStockPage() {
                               </div>
                             </div>
                             <div className="flex items-center gap-2">
-                              <span className={`px-3 py-1 rounded-full text-sm font-medium ${getQuantityColor(item.quantity, threshold)}`}>
-                                {item.quantity}
+                              <span className={`px-3 py-1 rounded-full text-sm font-medium ${getQuantityColor(item.current_quantity, threshold)}`}>
+                                {item.current_quantity}
                               </span>
                               <Button
                                 variant="outline"
                                 size="sm"
                                 className="text-orange-600 border-orange-300 hover:bg-orange-50"
                                 onClick={() => handleSellClick(item.cake_product_id)}
-                                disabled={item.quantity <= 0}
+                                disabled={item.current_quantity <= 0}
                               >
                                 <Minus className="w-4 h-4 mr-1" />
                                 Sell
@@ -311,11 +311,11 @@ export default function CakeStockPage() {
                                     <button
                                       key={qty}
                                       onClick={() => setSellQuantity(qty)}
-                                      disabled={qty > item.quantity}
+                                      disabled={qty > item.current_quantity}
                                       className={`w-9 h-9 rounded-lg text-sm font-medium transition-colors ${
                                         sellQuantity === qty
                                           ? 'bg-orange-500 text-white'
-                                          : qty > item.quantity
+                                          : qty > item.current_quantity
                                             ? 'bg-gray-100 text-gray-300 cursor-not-allowed'
                                             : 'bg-gray-100 text-gray-700 hover:bg-orange-100'
                                       }`}
@@ -328,7 +328,7 @@ export default function CakeStockPage() {
                                   size="sm"
                                   className="ml-auto bg-orange-500 hover:bg-orange-600"
                                   onClick={() => handleConfirmSale(item)}
-                                  disabled={submitting || sellQuantity > item.quantity}
+                                  disabled={submitting || sellQuantity > item.current_quantity}
                                 >
                                   {submitting ? (
                                     <Loader2 className="w-4 h-4 animate-spin" />

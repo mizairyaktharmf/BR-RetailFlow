@@ -77,7 +77,7 @@ export default function CakeAlertsPage() {
           configMap[config.cake_product_id] = {
             cake_product_id: config.cake_product_id,
             threshold: config.threshold !== undefined ? config.threshold : (config.alert_threshold || 3),
-            enabled: config.enabled !== undefined ? config.enabled : true,
+            enabled: config.is_enabled !== undefined ? config.is_enabled : true,
           }
         })
       }
@@ -121,7 +121,7 @@ export default function CakeAlertsPage() {
       const configsList = Object.values(configs).map(config => ({
         cake_product_id: config.cake_product_id,
         threshold: parseInt(config.threshold) || 3,
-        enabled: config.enabled,
+        is_enabled: config.enabled,
       }))
 
       await api.updateCakeAlertConfigBulk({
