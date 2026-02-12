@@ -2,8 +2,11 @@ FROM node:20-alpine AS builder
 
 WORKDIR /app
 
-COPY package*.json ./
-RUN npm ci --only=production
+ARG NEXT_PUBLIC_API_URL
+ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
+
+COPY package.json ./
+RUN npm install
 
 COPY . .
 RUN npm run build
@@ -25,7 +28,7 @@ RUN chown -R nextjs:nodejs /app
 
 USER nextjs
 
-EXPOSE 3001
-ENV PORT 3001
+EXPOSE 3000
+ENV PORT 3000
 
 CMD ["node", "server.js"]

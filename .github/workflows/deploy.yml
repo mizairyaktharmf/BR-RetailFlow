@@ -1,15 +1,56 @@
-name: Deploy to AWS
+name: Deploy BR-RetailFlow to AWS
 
 on:
-  workflow_dispatch:  # Manual trigger only - enable push trigger after setting up new EC2
+  push:
+    branches: [main]
+  workflow_dispatch:  # Also allow manual trigger
 
 jobs:
-  deploy:
+  test:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v6.0.2
-      
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install backend dependencies
+        run: |
+          cd apps/api
+          pip install -r requirements.txt
+          pip install pytest httpx bcrypt==4.0.1
+
+      - name: Run backend tests
+        run: |
+          cd apps/api
+          python -m pytest tests/ -v
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install frontend dependencies
+        run: |
+          cd apps/admin-dashboard
+          npm install
+
+      - name: Run frontend tests
+        run: |
+          cd apps/admin-dashboard
+          npx jest --verbose
+
+  deploy:
+    needs: test
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6.0.2
+
       - name: Deploy to EC2
         env:
           PRIVATE_KEY: ${{ secrets.EC2_SSH_KEY }}
@@ -17,5 +58,10 @@ jobs:
           USER: ${{ secrets.EC2_USERNAME }}
         run: |
           echo "$PRIVATE_KEY" > key.pem && chmod 600 key.pem
-          scp -i key.pem -r * ${USER}@${HOST}:~/BR-RetailFlow/
-          ssh -i key.pem ${USER}@${HOST} "cd ~/BR-RetailFlow && docker-compose down && docker-compose up -d --build"
+          ssh -o StrictHostKeyChecking=no -i key.pem ${USER}@${HOST} << 'ENDSSH'
+            cd ~/BR-RetailFlow
+            git pull origin main
+            docker compose down
+            docker compose up -d --build
+            docker compose ps
+          ENDSSH
