@@ -1,6 +1,6 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  output: 'standalone',
+  output: 'export',
   reactStrictMode: true,
   // Enable PWA-like features
   async headers() {

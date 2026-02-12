@@ -14,36 +14,6 @@ services:
     networks:
       - br-network
 
-  admin-dashboard:
-    build:
-      context: ./apps/admin-dashboard
-      dockerfile: Dockerfile
-      args:
-        - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
-    container_name: br-admin-dashboard
-    restart: unless-stopped
-    ports:
-      - "3002:3000"
-    networks:
-      - br-network
-    depends_on:
-      - api
-
-  flavor-expert-app:
-    build:
-      context: ./apps/flavor-expert-app
-      dockerfile: Dockerfile
-      args:
-        - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
-    container_name: br-flavor-expert-app
-    restart: unless-stopped
-    ports:
-      - "3000:3000"
-    networks:
-      - br-network
-    depends_on:
-      - api
-
 networks:
   br-network:
     driver: bridge
