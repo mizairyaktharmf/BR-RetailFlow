@@ -105,7 +105,7 @@ export default function LoginPage() {
                 <Input
                   id="branchId"
                   type="text"
-                  placeholder="Enter your branch ID (e.g., BR-KRM-001)"
+                  placeholder="Enter your branch ID (e.g., BR-BRANCH-CODE)"
                   value={credentials.branchId}
                   onChange={(e) =>
                     setCredentials({ ...credentials, branchId: e.target.value })
