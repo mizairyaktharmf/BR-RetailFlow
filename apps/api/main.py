@@ -6,17 +6,24 @@ Main application entry point
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
+import logging
 
 from routers import auth, users, branches, flavors, inventory, analytics, cake
 from utils.database import engine, Base
 from utils.config import settings
+
+logger = logging.getLogger(__name__)
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Application lifespan events"""
     # Startup: Create database tables
-    Base.metadata.create_all(bind=engine)
+    # Use checkfirst=True and catch errors for ENUM types that may already exist
+    try:
+        Base.metadata.create_all(bind=engine)
+    except Exception as e:
+        logger.warning(f"create_all partial failure (schema may already exist): {e}")
     yield
     # Shutdown: Cleanup if needed
 
