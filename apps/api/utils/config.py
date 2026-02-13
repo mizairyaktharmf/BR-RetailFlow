@@ -4,9 +4,6 @@ Loads settings from environment variables
 """
 
 from pydantic_settings import BaseSettings
-from pydantic import field_validator
-from typing import List
-import json
 import os
 
 
@@ -26,26 +23,12 @@ class Settings(BaseSettings):
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
     REFRESH_TOKEN_EXPIRE_DAYS: int = 7
 
-    # CORS - Add your production domains here via CORS_ORIGINS env variable
-    # Accepts comma-separated string or JSON array
-    CORS_ORIGINS: List[str] = [
-        "http://localhost:3000",
-        "http://localhost:3001",
-        "http://localhost:3002",
-    ]
+    # CORS - comma-separated origins string
+    CORS_ORIGINS: str = "http://localhost:3000,http://localhost:3001,http://localhost:3002"
 
-    @field_validator('CORS_ORIGINS', mode='before')
-    @classmethod
-    def parse_cors_origins(cls, v):
-        if isinstance(v, str):
-            try:
-                parsed = json.loads(v)
-                if isinstance(parsed, list):
-                    return parsed
-            except (json.JSONDecodeError, TypeError):
-                pass
-            return [origin.strip() for origin in v.split(',') if origin.strip()]
-        return v
+    @property
+    def cors_origins_list(self) -> list:
+        return [origin.strip() for origin in self.CORS_ORIGINS.split(',') if origin.strip()]
 
     class Config:
         env_file = ".env"
