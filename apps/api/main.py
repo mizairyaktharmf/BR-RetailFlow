@@ -31,7 +31,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="BR-RetailFlow API",
     description="Ice Cream Inventory & Analytics Solution for Baskin Robbins UAE",
-    version="1.0.0",
+    version="1.0.1",
     lifespan=lifespan
 )
 
