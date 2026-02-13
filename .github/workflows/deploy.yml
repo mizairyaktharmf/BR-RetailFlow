@@ -3,14 +3,14 @@ name: Deploy BR-RetailFlow to AWS
 on:
   push:
     branches: [main]
-  workflow_dispatch:  # Also allow manual trigger
+  workflow_dispatch:
 
 jobs:
   test:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v6.0.2
+        uses: actions/checkout@v4
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -21,7 +21,6 @@ jobs:
         run: |
           cd apps/api
           pip install -r requirements.txt
-          pip install pytest httpx bcrypt==4.0.1
 
       - name: Run backend tests
         run: |
@@ -36,7 +35,7 @@ jobs:
       - name: Install frontend dependencies
         run: |
           cd apps/admin-dashboard
-          npm install
+          npm ci
 
       - name: Run frontend tests
         run: |
@@ -48,9 +47,6 @@ jobs:
     runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/main'
     steps:
-      - name: Checkout
-        uses: actions/checkout@v6.0.2
-
       - name: Deploy to EC2
         env:
           PRIVATE_KEY: ${{ secrets.EC2_SSH_KEY }}
@@ -62,6 +58,10 @@ jobs:
             cd ~/BR-RetailFlow
             git pull origin main
             docker compose down
-            docker compose up -d --build
+            docker compose build --no-cache
+            docker compose up -d
+            sleep 5
             docker compose ps
+            curl -sf http://localhost:8000/health || exit 1
+            echo "Deploy successful - API is healthy"
           ENDSSH
