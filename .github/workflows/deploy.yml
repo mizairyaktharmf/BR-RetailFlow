@@ -42,7 +42,7 @@ jobs:
           cd apps/admin-dashboard
           npx jest --verbose
 
-  deploy:
+  deploy-api:
     needs: test
     runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/main'
@@ -65,3 +65,47 @@ jobs:
             curl -sf http://localhost:8000/health || exit 1
             echo "Deploy successful - API is healthy"
           ENDSSH
+
+  deploy-frontends:
+    needs: test
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ap-southeast-1
+
+      # Build and deploy Admin Dashboard
+      - name: Build Admin Dashboard
+        run: |
+          cd apps/admin-dashboard
+          npm ci
+          echo "NEXT_PUBLIC_API_URL=${{ secrets.API_URL }}" > .env.local
+          npm run build
+
+      - name: Deploy Admin Dashboard to S3
+        run: |
+          aws s3 sync apps/admin-dashboard/out/ s3://br-admin-dashboard --delete
+
+      # Build and deploy Flavor Expert App
+      - name: Build Flavor Expert App
+        run: |
+          cd apps/flavor-expert-app
+          npm ci
+          echo "NEXT_PUBLIC_API_URL=${{ secrets.API_URL }}" > .env.local
+          npm run build
+
+      - name: Deploy Flavor Expert App to S3
+        run: |
+          aws s3 sync apps/flavor-expert-app/out/ s3://br-flavor-expert-app --delete
