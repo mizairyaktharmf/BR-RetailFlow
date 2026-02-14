@@ -74,7 +74,8 @@ class ApiService {
         throw new Error(error.detail || `HTTP error! status: ${response.status}`)
       }
 
-      return await response.json()
+      const text = await response.text()
+      return text ? JSON.parse(text) : {}
     } catch (error) {
       console.error('API Error:', error)
       throw error
