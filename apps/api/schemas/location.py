@@ -33,8 +33,9 @@ class TerritoryResponse(TerritoryBase):
     id: int
     is_active: bool
     created_at: datetime
-    area_count: Optional[int] = None
-    branch_count: Optional[int] = None
+    areas_count: Optional[int] = None
+    branches_count: Optional[int] = None
+    users_count: Optional[int] = None
 
     class Config:
         from_attributes = True
@@ -69,7 +70,8 @@ class AreaResponse(AreaBase):
     is_active: bool
     created_at: datetime
     territory_name: Optional[str] = None
-    branch_count: Optional[int] = None
+    branches_count: Optional[int] = None
+    users_count: Optional[int] = None
 
     class Config:
         from_attributes = True

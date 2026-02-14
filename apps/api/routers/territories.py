@@ -15,6 +15,7 @@ from schemas.location import (
     TerritoryCreate, TerritoryUpdate, TerritoryResponse,
     TerritoryWithAreas
 )
+from sqlalchemy import func as sa_func
 
 router = APIRouter()
 
@@ -47,12 +48,13 @@ async def list_territories(
     result = []
     for t in territories:
         resp = TerritoryResponse.model_validate(t)
-        resp.area_count = len(t.areas) if hasattr(t, 'areas') and t.areas else 0
+        resp.areas_count = len(t.areas) if hasattr(t, 'areas') and t.areas else 0
         branch_total = 0
         if hasattr(t, 'areas') and t.areas:
             for a in t.areas:
                 branch_total += len(a.branches) if hasattr(a, 'branches') and a.branches else 0
-        resp.branch_count = branch_total
+        resp.branches_count = branch_total
+        resp.users_count = db.query(sa_func.count(User.id)).filter(User.territory_id == t.id).scalar() or 0
         result.append(resp)
     return result
 

@@ -129,7 +129,7 @@ async def list_areas(
     for area in areas:
         area_dict = AreaResponse.model_validate(area)
         area_dict.territory_name = area.territory.name if area.territory else None
-        area_dict.branch_count = len(area.branches)
+        area_dict.branches_count = len(area.branches)
         result.append(area_dict)
     return result
 

@@ -14,6 +14,7 @@ from models.location import Territory, Area, Branch
 from schemas.location import (
     AreaCreate, AreaUpdate, AreaResponse
 )
+from sqlalchemy import func as sa_func
 
 router = APIRouter()
 
@@ -46,7 +47,8 @@ async def list_areas(
     for area in areas:
         area_resp = AreaResponse.model_validate(area)
         area_resp.territory_name = area.territory.name if area.territory else None
-        area_resp.branch_count = len(area.branches) if hasattr(area, 'branches') and area.branches else 0
+        area_resp.branches_count = len(area.branches) if hasattr(area, 'branches') and area.branches else 0
+        area_resp.users_count = db.query(sa_func.count(User.id)).filter(User.area_id == area.id).scalar() or 0
         result.append(area_resp)
     return result
 
@@ -63,7 +65,8 @@ async def get_area(
 
     resp = AreaResponse.model_validate(area)
     resp.territory_name = area.territory.name if area.territory else None
-    resp.branch_count = len(area.branches) if hasattr(area, 'branches') and area.branches else 0
+    resp.branches_count = len(area.branches) if hasattr(area, 'branches') and area.branches else 0
+    resp.users_count = db.query(sa_func.count(User.id)).filter(User.area_id == area.id).scalar() or 0
     return resp
 
 
@@ -127,7 +130,8 @@ async def update_area(
 
     resp = AreaResponse.model_validate(area)
     resp.territory_name = area.territory.name if area.territory else None
-    resp.branch_count = len(area.branches) if hasattr(area, 'branches') and area.branches else 0
+    resp.branches_count = len(area.branches) if hasattr(area, 'branches') and area.branches else 0
+    resp.users_count = db.query(sa_func.count(User.id)).filter(User.area_id == area.id).scalar() or 0
     return resp
 
 
