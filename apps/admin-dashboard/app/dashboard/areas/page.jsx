@@ -21,27 +21,7 @@ import {
   Globe,
   ChevronDown
 } from 'lucide-react'
-
-// Demo areas data
-const demoAreas = [
-  { id: 1, name: 'Karama', code: 'KRM', territory_id: 1, territory_name: 'Dubai', branches_count: 3, users_count: 9, manager: 'Ali Hassan' },
-  { id: 2, name: 'Deira', code: 'DRA', territory_id: 1, territory_name: 'Dubai', branches_count: 4, users_count: 12, manager: 'Fatima Ahmed' },
-  { id: 3, name: 'Jumeirah', code: 'JMR', territory_id: 1, territory_name: 'Dubai', branches_count: 3, users_count: 9, manager: 'Omar Al Farsi' },
-  { id: 4, name: 'Marina', code: 'MRN', territory_id: 1, territory_name: 'Dubai', branches_count: 2, users_count: 6, manager: 'Sara Khan' },
-  { id: 5, name: 'Khalidiya', code: 'KHL', territory_id: 2, territory_name: 'Abu Dhabi', branches_count: 3, users_count: 9, manager: 'Khalid Mansoor' },
-  { id: 6, name: 'Al Wahda', code: 'WHD', territory_id: 2, territory_name: 'Abu Dhabi', branches_count: 3, users_count: 9, manager: 'Noura Al Ali' },
-  { id: 7, name: 'Corniche', code: 'CRN', territory_id: 2, territory_name: 'Abu Dhabi', branches_count: 3, users_count: 9, manager: 'Rashid Ibrahim' },
-  { id: 8, name: 'Al Majaz', code: 'MJZ', territory_id: 3, territory_name: 'Sharjah', branches_count: 3, users_count: 9, manager: 'Layla Mohammed' },
-  { id: 9, name: 'Al Nahda', code: 'NHD', territory_id: 3, territory_name: 'Sharjah', branches_count: 3, users_count: 9, manager: 'Yusuf Al Hashimi' },
-]
-
-const demoTerritories = [
-  { id: 1, name: 'Dubai', code: 'DXB' },
-  { id: 2, name: 'Abu Dhabi', code: 'AUH' },
-  { id: 3, name: 'Sharjah', code: 'SHJ' },
-  { id: 4, name: 'Ajman', code: 'AJM' },
-  { id: 5, name: 'RAK', code: 'RAK' },
-]
+import api from '@/services/api'
 
 export default function AreasPage() {
   const router = useRouter()
@@ -69,33 +49,36 @@ export default function AreasPage() {
         router.push('/dashboard')
         return
       }
-
-      // Load demo data
-      const demoMode = localStorage.getItem('br_demo_mode')
-      if (demoMode === 'true') {
-        if (userData.role === 'supreme_admin') {
-          setAreas(demoAreas)
-          setTerritories(demoTerritories)
-        } else {
-          // TM only sees their territory's areas
-          setAreas(demoAreas.filter(a => a.territory_id === userData.territory_id))
-          setTerritories(demoTerritories.filter(t => t.id === userData.territory_id))
-        }
-      }
     }
+
+    // Load real data from API
+    loadData()
   }, [router])
+
+  const loadData = async () => {
+    try {
+      const [areasData, territoriesData] = await Promise.all([
+        api.getAreas().catch(() => []),
+        api.getTerritories().catch(() => []),
+      ])
+      setAreas(areasData)
+      setTerritories(territoriesData)
+    } catch (err) {
+      // Silently fail
+    }
+  }
 
   const filteredAreas = areas.filter(a => {
     const matchesSearch = a.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       a.code.toLowerCase().includes(searchTerm.toLowerCase())
-    const matchesTerritory = !filterTerritory || a.territory_id.toString() === filterTerritory
+    const matchesTerritory = !filterTerritory || a.territory_id?.toString() === filterTerritory
     return matchesSearch && matchesTerritory
   })
 
   const handleOpenModal = (area = null) => {
     setSelectedArea(area)
     setFormData(area
-      ? { name: area.name, code: area.code, territory_id: area.territory_id.toString() }
+      ? { name: area.name, code: area.code, territory_id: area.territory_id?.toString() || '' }
       : { name: '', code: '', territory_id: user?.role === 'super_admin' ? user.territory_id?.toString() : '' }
     )
     setError('')
@@ -120,40 +103,26 @@ export default function AreasPage() {
 
     setLoading(true)
 
-    // Simulate API call
-    setTimeout(() => {
-      const territory = territories.find(t => t.id.toString() === formData.territory_id)
+    try {
+      const apiData = {
+        name: formData.name,
+        code: formData.code.toUpperCase(),
+        territory_id: parseInt(formData.territory_id)
+      }
 
       if (selectedArea) {
-        // Update
-        setAreas(areas.map(a =>
-          a.id === selectedArea.id
-            ? {
-                ...a,
-                name: formData.name,
-                code: formData.code.toUpperCase(),
-                territory_id: parseInt(formData.territory_id),
-                territory_name: territory?.name
-              }
-            : a
-        ))
+        const updated = await api.updateArea(selectedArea.id, apiData)
+        setAreas(areas.map(a => a.id === selectedArea.id ? updated : a))
       } else {
-        // Create
-        const newArea = {
-          id: areas.length + 10,
-          name: formData.name,
-          code: formData.code.toUpperCase(),
-          territory_id: parseInt(formData.territory_id),
-          territory_name: territory?.name,
-          branches_count: 0,
-          users_count: 0,
-          manager: null,
-        }
-        setAreas([...areas, newArea])
+        const created = await api.createArea(apiData)
+        setAreas([...areas, created])
       }
-      setLoading(false)
       handleCloseModal()
-    }, 500)
+    } catch (err) {
+      setError(err.message || 'Failed to save area')
+    } finally {
+      setLoading(false)
+    }
   }
 
   const handleDelete = (area) => {
@@ -161,14 +130,18 @@ export default function AreasPage() {
     setIsDeleteModalOpen(true)
   }
 
-  const confirmDelete = () => {
+  const confirmDelete = async () => {
     setLoading(true)
-    setTimeout(() => {
+    try {
+      await api.deleteArea(selectedArea.id)
       setAreas(areas.filter(a => a.id !== selectedArea.id))
-      setLoading(false)
       setIsDeleteModalOpen(false)
       setSelectedArea(null)
-    }, 500)
+    } catch (err) {
+      alert(err.message || 'Failed to delete area')
+    } finally {
+      setLoading(false)
+    }
   }
 
   if (!user || !['supreme_admin', 'super_admin'].includes(user.role)) return null
@@ -301,7 +274,7 @@ export default function AreasPage() {
               <div className="mb-3">
                 <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-purple-500/20 text-purple-300 text-xs">
                   <Globe className="w-3 h-3" />
-                  {area.territory_name}
+                  {area.territory_name || territories.find(t => t.id === area.territory_id)?.name || 'Unknown'}
                 </span>
               </div>
 
@@ -310,23 +283,17 @@ export default function AreasPage() {
                   <div className="flex items-center justify-center gap-1 text-cyan-400 mb-1">
                     <Building2 className="w-3 h-3" />
                   </div>
-                  <p className="text-sm font-semibold text-white">{area.branches_count}</p>
+                  <p className="text-sm font-semibold text-white">{area.branches_count || 0}</p>
                   <p className="text-[10px] text-slate-500">Branches</p>
                 </div>
                 <div className="p-2 rounded-lg bg-slate-700/30">
                   <div className="flex items-center justify-center gap-1 text-green-400 mb-1">
                     <Users className="w-3 h-3" />
                   </div>
-                  <p className="text-sm font-semibold text-white">{area.users_count}</p>
+                  <p className="text-sm font-semibold text-white">{area.users_count || 0}</p>
                   <p className="text-[10px] text-slate-500">Users</p>
                 </div>
               </div>
-              {area.manager && (
-                <div className="mt-3 pt-3 border-t border-slate-700">
-                  <p className="text-xs text-slate-500">Area Manager</p>
-                  <p className="text-sm text-white">{area.manager}</p>
-                </div>
-              )}
             </CardContent>
           </Card>
         ))}

@@ -26,36 +26,7 @@ import {
   Phone,
   MapPinned
 } from 'lucide-react'
-
-// Demo branches data
-const demoBranches = [
-  { id: 1, name: 'Karama Center', code: 'KRM-01', branch_id: 'BR001', area_id: 1, area_name: 'Karama', territory_id: 1, territory_name: 'Dubai', users_count: 3, address: 'Shop 12, Karama Shopping Complex', phone: '+971-4-123-4567', is_active: true, last_submission: '2024-01-15' },
-  { id: 2, name: 'Karama Mall', code: 'KRM-02', branch_id: 'BR002', area_id: 1, area_name: 'Karama', territory_id: 1, territory_name: 'Dubai', users_count: 3, address: 'Karama Mall, Ground Floor', phone: '+971-4-123-4568', is_active: true, last_submission: '2024-01-15' },
-  { id: 3, name: 'BurJuman', code: 'KRM-03', branch_id: 'BR003', area_id: 1, area_name: 'Karama', territory_id: 1, territory_name: 'Dubai', users_count: 3, address: 'BurJuman Center, Level 2', phone: '+971-4-123-4569', is_active: true, last_submission: '2024-01-14' },
-  { id: 4, name: 'Deira City Centre', code: 'DRA-01', branch_id: 'BR004', area_id: 2, area_name: 'Deira', territory_id: 1, territory_name: 'Dubai', users_count: 4, address: 'Deira City Centre, Food Court', phone: '+971-4-234-5670', is_active: true, last_submission: '2024-01-15' },
-  { id: 5, name: 'Al Ghurair', code: 'DRA-02', branch_id: 'BR005', area_id: 2, area_name: 'Deira', territory_id: 1, territory_name: 'Dubai', users_count: 3, address: 'Al Ghurair Centre, Ground Floor', phone: '+971-4-234-5671', is_active: false, last_submission: '2024-01-10' },
-  { id: 6, name: 'JBR Walk', code: 'JMR-01', branch_id: 'BR006', area_id: 3, area_name: 'Jumeirah', territory_id: 1, territory_name: 'Dubai', users_count: 3, address: 'JBR Walk, Shop 15', phone: '+971-4-345-6780', is_active: true, last_submission: '2024-01-15' },
-  { id: 7, name: 'Khalidiya Mall', code: 'KHL-01', branch_id: 'BR007', area_id: 5, area_name: 'Khalidiya', territory_id: 2, territory_name: 'Abu Dhabi', users_count: 3, address: 'Khalidiya Mall, Level 1', phone: '+971-2-456-7890', is_active: true, last_submission: '2024-01-15' },
-  { id: 8, name: 'Al Wahda Mall', code: 'WHD-01', branch_id: 'BR008', area_id: 6, area_name: 'Al Wahda', territory_id: 2, territory_name: 'Abu Dhabi', users_count: 3, address: 'Al Wahda Mall, Ground Floor', phone: '+971-2-456-7891', is_active: true, last_submission: '2024-01-15' },
-]
-
-const demoAreas = [
-  { id: 1, name: 'Karama', territory_id: 1, territory_name: 'Dubai' },
-  { id: 2, name: 'Deira', territory_id: 1, territory_name: 'Dubai' },
-  { id: 3, name: 'Jumeirah', territory_id: 1, territory_name: 'Dubai' },
-  { id: 4, name: 'Marina', territory_id: 1, territory_name: 'Dubai' },
-  { id: 5, name: 'Khalidiya', territory_id: 2, territory_name: 'Abu Dhabi' },
-  { id: 6, name: 'Al Wahda', territory_id: 2, territory_name: 'Abu Dhabi' },
-  { id: 7, name: 'Corniche', territory_id: 2, territory_name: 'Abu Dhabi' },
-  { id: 8, name: 'Al Majaz', territory_id: 3, territory_name: 'Sharjah' },
-  { id: 9, name: 'Al Nahda', territory_id: 3, territory_name: 'Sharjah' },
-]
-
-const demoTerritories = [
-  { id: 1, name: 'Dubai' },
-  { id: 2, name: 'Abu Dhabi' },
-  { id: 3, name: 'Sharjah' },
-]
+import api from '@/services/api'
 
 export default function BranchesPage() {
   const router = useRouter()
@@ -73,7 +44,6 @@ export default function BranchesPage() {
   const [formData, setFormData] = useState({
     name: '',
     code: '',
-    branch_id: '',
     area_id: '',
     address: '',
     phone: '',
@@ -88,35 +58,32 @@ export default function BranchesPage() {
     if (storedUser) {
       const userData = JSON.parse(storedUser)
       setUser(userData)
-
-      // Load demo data based on role
-      const demoMode = localStorage.getItem('br_demo_mode')
-      if (demoMode === 'true') {
-        if (userData.role === 'supreme_admin') {
-          setBranches(demoBranches)
-          setAreas(demoAreas)
-          setTerritories(demoTerritories)
-        } else if (userData.role === 'super_admin') {
-          // TM sees all branches in their territory
-          setBranches(demoBranches.filter(b => b.territory_id === userData.territory_id))
-          setAreas(demoAreas.filter(a => a.territory_id === userData.territory_id))
-          setTerritories(demoTerritories.filter(t => t.id === userData.territory_id))
-        } else {
-          // AM sees only their area's branches
-          setBranches(demoBranches.filter(b => b.area_id === userData.area_id))
-          setAreas(demoAreas.filter(a => a.id === userData.area_id))
-          setTerritories([])
-        }
-      }
     }
+
+    // Load real data from API
+    loadData()
   }, [router])
 
+  const loadData = async () => {
+    try {
+      const [branchesData, areasData, territoriesData] = await Promise.all([
+        api.getBranches().catch(() => []),
+        api.getAreas().catch(() => []),
+        api.getTerritories().catch(() => []),
+      ])
+      setBranches(branchesData)
+      setAreas(areasData)
+      setTerritories(territoriesData)
+    } catch (err) {
+      // Silently fail
+    }
+  }
+
   const filteredBranches = branches.filter(b => {
-    const matchesSearch = b.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      b.code.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      b.branch_id.toLowerCase().includes(searchTerm.toLowerCase())
-    const matchesArea = !filterArea || b.area_id.toString() === filterArea
-    const matchesTerritory = !filterTerritory || b.territory_id.toString() === filterTerritory
+    const matchesSearch = b.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      b.code?.toLowerCase().includes(searchTerm.toLowerCase())
+    const matchesArea = !filterArea || b.area_id?.toString() === filterArea
+    const matchesTerritory = !filterTerritory || b.territory_id?.toString() === filterTerritory
     return matchesSearch && matchesArea && matchesTerritory
   })
 
@@ -126,24 +93,15 @@ export default function BranchesPage() {
       setFormData({
         name: branch.name,
         code: branch.code,
-        branch_id: branch.branch_id,
-        area_id: branch.area_id.toString(),
+        area_id: branch.area_id?.toString() || '',
         address: branch.address || '',
         phone: branch.phone || '',
         is_active: branch.is_active
       })
     } else {
-      // Generate new branch ID
-      const maxId = branches.reduce((max, b) => {
-        const num = parseInt(b.branch_id.replace('BR', ''))
-        return num > max ? num : max
-      }, 0)
-      const newBranchId = `BR${String(maxId + 1).padStart(3, '0')}`
-
       setFormData({
         name: '',
         code: '',
-        branch_id: newBranchId,
         area_id: user?.role === 'admin' ? user.area_id?.toString() : '',
         address: '',
         phone: '',
@@ -157,7 +115,7 @@ export default function BranchesPage() {
   const handleCloseModal = () => {
     setIsModalOpen(false)
     setSelectedBranch(null)
-    setFormData({ name: '', code: '', branch_id: '', area_id: '', address: '', phone: '', is_active: true })
+    setFormData({ name: '', code: '', area_id: '', address: '', phone: '', is_active: true })
     setError('')
   }
 
@@ -165,58 +123,36 @@ export default function BranchesPage() {
     e.preventDefault()
     setError('')
 
-    if (!formData.name.trim() || !formData.code.trim() || !formData.branch_id.trim() || !formData.area_id) {
+    if (!formData.name.trim() || !formData.code.trim() || !formData.area_id) {
       setError('Please fill in all required fields')
       return
     }
 
     setLoading(true)
 
-    // Simulate API call
-    setTimeout(() => {
-      const area = areas.find(a => a.id.toString() === formData.area_id)
+    try {
+      const apiData = {
+        name: formData.name,
+        code: formData.code.toUpperCase(),
+        area_id: parseInt(formData.area_id),
+        address: formData.address || null,
+        phone: formData.phone || null,
+        is_active: formData.is_active
+      }
 
       if (selectedBranch) {
-        // Update
-        setBranches(branches.map(b =>
-          b.id === selectedBranch.id
-            ? {
-                ...b,
-                name: formData.name,
-                code: formData.code.toUpperCase(),
-                branch_id: formData.branch_id.toUpperCase(),
-                area_id: parseInt(formData.area_id),
-                area_name: area?.name,
-                territory_id: area?.territory_id,
-                territory_name: area?.territory_name,
-                address: formData.address,
-                phone: formData.phone,
-                is_active: formData.is_active
-              }
-            : b
-        ))
+        const updated = await api.updateBranch(selectedBranch.id, apiData)
+        setBranches(branches.map(b => b.id === selectedBranch.id ? updated : b))
       } else {
-        // Create
-        const newBranch = {
-          id: branches.length + 10,
-          name: formData.name,
-          code: formData.code.toUpperCase(),
-          branch_id: formData.branch_id.toUpperCase(),
-          area_id: parseInt(formData.area_id),
-          area_name: area?.name,
-          territory_id: area?.territory_id,
-          territory_name: area?.territory_name,
-          address: formData.address,
-          phone: formData.phone,
-          is_active: formData.is_active,
-          users_count: 0,
-          last_submission: null
-        }
-        setBranches([...branches, newBranch])
+        const created = await api.createBranch(apiData)
+        setBranches([...branches, created])
       }
-      setLoading(false)
       handleCloseModal()
-    }, 500)
+    } catch (err) {
+      setError(err.message || 'Failed to save branch')
+    } finally {
+      setLoading(false)
+    }
   }
 
   const handleDelete = (branch) => {
@@ -224,25 +160,32 @@ export default function BranchesPage() {
     setIsDeleteModalOpen(true)
   }
 
-  const confirmDelete = () => {
+  const confirmDelete = async () => {
     setLoading(true)
-    setTimeout(() => {
+    try {
+      await api.deleteBranch(selectedBranch.id)
       setBranches(branches.filter(b => b.id !== selectedBranch.id))
-      setLoading(false)
       setIsDeleteModalOpen(false)
       setSelectedBranch(null)
-    }, 500)
+    } catch (err) {
+      alert(err.message || 'Failed to delete branch')
+    } finally {
+      setLoading(false)
+    }
   }
 
-  const toggleBranchStatus = (branch) => {
-    setBranches(branches.map(b =>
-      b.id === branch.id ? { ...b, is_active: !b.is_active } : b
-    ))
+  const toggleBranchStatus = async (branch) => {
+    try {
+      const updated = await api.updateBranch(branch.id, { is_active: !branch.is_active })
+      setBranches(branches.map(b => b.id === branch.id ? updated : b))
+    } catch (err) {
+      alert(err.message || 'Failed to update branch status')
+    }
   }
 
   // Filter areas based on selected territory (for HQ)
-  const filteredAreas = user?.role === 'supreme_admin' && filterTerritory
-    ? areas.filter(a => a.territory_id.toString() === filterTerritory)
+  const displayAreas = user?.role === 'supreme_admin' && filterTerritory
+    ? areas.filter(a => a.territory_id?.toString() === filterTerritory)
     : areas
 
   if (!user) return null
@@ -265,13 +208,15 @@ export default function BranchesPage() {
             }
           </p>
         </div>
-        <Button
-          onClick={() => handleOpenModal()}
-          className="bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500"
-        >
-          <Plus className="w-4 h-4 mr-2" />
-          Add Branch
-        </Button>
+        {user.role === 'supreme_admin' && (
+          <Button
+            onClick={() => handleOpenModal()}
+            className="bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500"
+          >
+            <Plus className="w-4 h-4 mr-2" />
+            Add Branch
+          </Button>
+        )}
       </div>
 
       {/* Filters */}
@@ -279,7 +224,7 @@ export default function BranchesPage() {
         <div className="relative flex-1 max-w-md">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
           <Input
-            placeholder="Search branches or ID..."
+            placeholder="Search branches..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             className="pl-10 bg-slate-800/50 border-slate-700 text-white placeholder:text-slate-500"
@@ -348,7 +293,7 @@ export default function BranchesPage() {
               <MapPin className="w-4 h-4 text-blue-400" />
               <span>
                 {filterArea
-                  ? filteredAreas.find(a => a.id.toString() === filterArea)?.name
+                  ? displayAreas.find(a => a.id.toString() === filterArea)?.name
                   : 'All Areas'
                 }
               </span>
@@ -370,7 +315,7 @@ export default function BranchesPage() {
                   >
                     All Areas
                   </button>
-                  {filteredAreas.map((area) => (
+                  {displayAreas.map((area) => (
                     <button
                       key={area.id}
                       onClick={() => {
@@ -410,23 +355,25 @@ export default function BranchesPage() {
                         <XCircle className="w-3.5 h-3.5 text-red-400" />
                       )}
                     </CardTitle>
-                    <CardDescription className="text-slate-500 text-xs font-mono">{branch.branch_id}</CardDescription>
+                    <CardDescription className="text-slate-500 text-xs font-mono">{branch.code}</CardDescription>
                   </div>
                 </div>
-                <div className="flex gap-1">
-                  <button
-                    onClick={() => handleOpenModal(branch)}
-                    className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-700 transition-colors"
-                  >
-                    <Edit2 className="w-4 h-4" />
-                  </button>
-                  <button
-                    onClick={() => handleDelete(branch)}
-                    className="p-1.5 rounded-lg text-slate-400 hover:text-red-400 hover:bg-red-500/10 transition-colors"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
-                </div>
+                {user.role === 'supreme_admin' && (
+                  <div className="flex gap-1">
+                    <button
+                      onClick={() => handleOpenModal(branch)}
+                      className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-700 transition-colors"
+                    >
+                      <Edit2 className="w-4 h-4" />
+                    </button>
+                    <button
+                      onClick={() => handleDelete(branch)}
+                      className="p-1.5 rounded-lg text-slate-400 hover:text-red-400 hover:bg-red-500/10 transition-colors"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
+                )}
               </div>
             </CardHeader>
             <CardContent className="pt-0 space-y-3">
@@ -434,32 +381,12 @@ export default function BranchesPage() {
               <div className="flex flex-wrap gap-2">
                 <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-blue-500/20 text-blue-300 text-xs">
                   <MapPin className="w-3 h-3" />
-                  {branch.area_name}
+                  {branch.area_name || areas.find(a => a.id === branch.area_id)?.name || 'Unknown'}
                 </span>
                 <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-purple-500/20 text-purple-300 text-xs">
                   <Globe className="w-3 h-3" />
-                  {branch.territory_name}
+                  {branch.territory_name || 'Unknown'}
                 </span>
-              </div>
-
-              {/* Stats */}
-              <div className="grid grid-cols-2 gap-2">
-                <div className="p-2 rounded-lg bg-slate-700/30">
-                  <div className="flex items-center gap-1.5 text-green-400">
-                    <Users className="w-3 h-3" />
-                    <span className="text-xs text-slate-400">Flavor Experts</span>
-                  </div>
-                  <p className="text-sm font-semibold text-white mt-1">{branch.users_count}</p>
-                </div>
-                <div className="p-2 rounded-lg bg-slate-700/30">
-                  <div className="flex items-center gap-1.5 text-amber-400">
-                    <Clock className="w-3 h-3" />
-                    <span className="text-xs text-slate-400">Last Report</span>
-                  </div>
-                  <p className="text-sm font-semibold text-white mt-1">
-                    {branch.last_submission ? new Date(branch.last_submission).toLocaleDateString('en-AE', { month: 'short', day: 'numeric' }) : 'Never'}
-                  </p>
-                </div>
               </div>
 
               {/* Address & Phone */}
@@ -480,17 +407,19 @@ export default function BranchesPage() {
                 </div>
               )}
 
-              {/* Toggle Active */}
-              <button
-                onClick={() => toggleBranchStatus(branch)}
-                className={`w-full py-2 rounded-lg text-xs font-medium transition-colors ${
-                  branch.is_active
-                    ? 'bg-red-500/10 text-red-300 hover:bg-red-500/20'
-                    : 'bg-green-500/10 text-green-300 hover:bg-green-500/20'
-                }`}
-              >
-                {branch.is_active ? 'Deactivate Branch' : 'Activate Branch'}
-              </button>
+              {/* Toggle Active - HQ only */}
+              {user.role === 'supreme_admin' && (
+                <button
+                  onClick={() => toggleBranchStatus(branch)}
+                  className={`w-full py-2 rounded-lg text-xs font-medium transition-colors ${
+                    branch.is_active
+                      ? 'bg-red-500/10 text-red-300 hover:bg-red-500/20'
+                      : 'bg-green-500/10 text-green-300 hover:bg-green-500/20'
+                  }`}
+                >
+                  {branch.is_active ? 'Deactivate Branch' : 'Activate Branch'}
+                </button>
+              )}
             </CardContent>
           </Card>
         ))}
@@ -529,30 +458,16 @@ export default function BranchesPage() {
                 </Alert>
               )}
 
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="branch_id" className="text-slate-300">Branch ID *</Label>
-                  <Input
-                    id="branch_id"
-                    placeholder="e.g., BR001"
-                    value={formData.branch_id}
-                    onChange={(e) => setFormData({ ...formData, branch_id: e.target.value.toUpperCase() })}
-                    disabled={selectedBranch}
-                    className="bg-slate-700/50 border-slate-600 text-white placeholder:text-slate-500 uppercase font-mono"
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="code" className="text-slate-300">Branch Code *</Label>
-                  <Input
-                    id="code"
-                    placeholder="e.g., KRM-01"
-                    value={formData.code}
-                    onChange={(e) => setFormData({ ...formData, code: e.target.value.toUpperCase() })}
-                    maxLength={10}
-                    className="bg-slate-700/50 border-slate-600 text-white placeholder:text-slate-500 uppercase"
-                  />
-                </div>
+              <div className="space-y-2">
+                <Label htmlFor="code" className="text-slate-300">Branch Code *</Label>
+                <Input
+                  id="code"
+                  placeholder="e.g., KRM-01"
+                  value={formData.code}
+                  onChange={(e) => setFormData({ ...formData, code: e.target.value.toUpperCase() })}
+                  maxLength={10}
+                  className="bg-slate-700/50 border-slate-600 text-white placeholder:text-slate-500 uppercase"
+                />
               </div>
 
               <div className="space-y-2">
@@ -578,7 +493,7 @@ export default function BranchesPage() {
                   <option value="">Select area</option>
                   {areas.map((area) => (
                     <option key={area.id} value={area.id.toString()}>
-                      {area.name} ({area.territory_name})
+                      {area.name} ({area.territory_name || territories.find(t => t.id === area.territory_id)?.name || ''})
                     </option>
                   ))}
                 </select>
@@ -657,7 +572,7 @@ export default function BranchesPage() {
               </div>
               <h2 className="text-lg font-semibold text-white mb-2">Delete Branch</h2>
               <p className="text-slate-400 text-sm mb-6">
-                Are you sure you want to delete <span className="text-white font-medium">{selectedBranch?.name}</span> ({selectedBranch?.branch_id})? This action cannot be undone.
+                Are you sure you want to delete <span className="text-white font-medium">{selectedBranch?.name}</span> ({selectedBranch?.code})? This action cannot be undone.
               </p>
               <div className="flex gap-3">
                 <Button

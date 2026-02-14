@@ -20,15 +20,7 @@ import {
   Loader2,
   AlertCircle
 } from 'lucide-react'
-
-// Demo territories data
-const demoTerritories = [
-  { id: 1, name: 'Dubai', code: 'DXB', areas_count: 4, branches_count: 12, users_count: 36, manager: 'Ahmed Al Maktoum' },
-  { id: 2, name: 'Abu Dhabi', code: 'AUH', areas_count: 3, branches_count: 9, users_count: 27, manager: 'Fatima Al Nahyan' },
-  { id: 3, name: 'Sharjah', code: 'SHJ', areas_count: 2, branches_count: 6, users_count: 18, manager: 'Mohammed Al Qasimi' },
-  { id: 4, name: 'Ajman', code: 'AJM', areas_count: 1, branches_count: 3, users_count: 9, manager: 'Sara Al Nuaimi' },
-  { id: 5, name: 'RAK', code: 'RAK', areas_count: 2, branches_count: 5, users_count: 15, manager: 'Khalid Al Kaabi' },
-]
+import api from '@/services/api'
 
 export default function TerritoriesPage() {
   const router = useRouter()
@@ -55,12 +47,18 @@ export default function TerritoriesPage() {
       }
     }
 
-    // Load demo data
-    const demoMode = localStorage.getItem('br_demo_mode')
-    if (demoMode === 'true') {
-      setTerritories(demoTerritories)
-    }
+    // Load real data from API
+    loadTerritories()
   }, [router])
+
+  const loadTerritories = async () => {
+    try {
+      const data = await api.getTerritories()
+      setTerritories(data)
+    } catch (err) {
+      // Silently fail
+    }
+  }
 
   const filteredTerritories = territories.filter(t =>
     t.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -92,31 +90,26 @@ export default function TerritoriesPage() {
 
     setLoading(true)
 
-    // Simulate API call
-    setTimeout(() => {
+    try {
       if (selectedTerritory) {
-        // Update
-        setTerritories(territories.map(t =>
-          t.id === selectedTerritory.id
-            ? { ...t, name: formData.name, code: formData.code.toUpperCase() }
-            : t
-        ))
-      } else {
-        // Create
-        const newTerritory = {
-          id: territories.length + 1,
+        const updated = await api.updateTerritory(selectedTerritory.id, {
           name: formData.name,
-          code: formData.code.toUpperCase(),
-          areas_count: 0,
-          branches_count: 0,
-          users_count: 0,
-          manager: null,
-        }
-        setTerritories([...territories, newTerritory])
+          code: formData.code.toUpperCase()
+        })
+        setTerritories(territories.map(t => t.id === selectedTerritory.id ? updated : t))
+      } else {
+        const created = await api.createTerritory({
+          name: formData.name,
+          code: formData.code.toUpperCase()
+        })
+        setTerritories([...territories, created])
       }
-      setLoading(false)
       handleCloseModal()
-    }, 500)
+    } catch (err) {
+      setError(err.message || 'Failed to save territory')
+    } finally {
+      setLoading(false)
+    }
   }
 
   const handleDelete = (territory) => {
@@ -124,14 +117,18 @@ export default function TerritoriesPage() {
     setIsDeleteModalOpen(true)
   }
 
-  const confirmDelete = () => {
+  const confirmDelete = async () => {
     setLoading(true)
-    setTimeout(() => {
+    try {
+      await api.deleteTerritory(selectedTerritory.id)
       setTerritories(territories.filter(t => t.id !== selectedTerritory.id))
-      setLoading(false)
       setIsDeleteModalOpen(false)
       setSelectedTerritory(null)
-    }, 500)
+    } catch (err) {
+      alert(err.message || 'Failed to delete territory')
+    } finally {
+      setLoading(false)
+    }
   }
 
   if (!user || user.role !== 'supreme_admin') return null
@@ -206,30 +203,24 @@ export default function TerritoriesPage() {
                   <div className="flex items-center justify-center gap-1 text-blue-400 mb-1">
                     <MapPin className="w-3 h-3" />
                   </div>
-                  <p className="text-sm font-semibold text-white">{territory.areas_count}</p>
+                  <p className="text-sm font-semibold text-white">{territory.areas_count || 0}</p>
                   <p className="text-[10px] text-slate-500">Areas</p>
                 </div>
                 <div className="p-2 rounded-lg bg-slate-700/30">
                   <div className="flex items-center justify-center gap-1 text-cyan-400 mb-1">
                     <Building2 className="w-3 h-3" />
                   </div>
-                  <p className="text-sm font-semibold text-white">{territory.branches_count}</p>
+                  <p className="text-sm font-semibold text-white">{territory.branches_count || 0}</p>
                   <p className="text-[10px] text-slate-500">Branches</p>
                 </div>
                 <div className="p-2 rounded-lg bg-slate-700/30">
                   <div className="flex items-center justify-center gap-1 text-green-400 mb-1">
                     <Users className="w-3 h-3" />
                   </div>
-                  <p className="text-sm font-semibold text-white">{territory.users_count}</p>
+                  <p className="text-sm font-semibold text-white">{territory.users_count || 0}</p>
                   <p className="text-[10px] text-slate-500">Users</p>
                 </div>
               </div>
-              {territory.manager && (
-                <div className="mt-3 pt-3 border-t border-slate-700">
-                  <p className="text-xs text-slate-500">Territory Manager</p>
-                  <p className="text-sm text-white">{territory.manager}</p>
-                </div>
-              )}
             </CardContent>
           </Card>
         ))}
