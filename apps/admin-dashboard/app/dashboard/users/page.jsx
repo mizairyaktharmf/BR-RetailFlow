@@ -1,7 +1,7 @@
 "use client"
 
-import { useState, useEffect } from 'react'
-import { useRouter } from 'next/navigation'
+import { useState, useEffect, Suspense } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -29,6 +29,7 @@ import {
   Copy,
   Check
 } from 'lucide-react'
+import api from '@/services/api'
 
 // Demo users data
 const demoUsers = [
@@ -83,7 +84,16 @@ const roleColors = {
 }
 
 export default function UsersPage() {
+  return (
+    <Suspense fallback={<div className="p-6 text-white">Loading...</div>}>
+      <UsersContent />
+    </Suspense>
+  )
+}
+
+function UsersContent() {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const [currentUser, setCurrentUser] = useState(null)
   const [users, setUsers] = useState([])
   const [branches, setBranches] = useState([])
@@ -92,6 +102,9 @@ export default function UsersPage() {
   const [searchTerm, setSearchTerm] = useState('')
   const [filterRole, setFilterRole] = useState('')
   const [filterTerritory, setFilterTerritory] = useState('')
+  const [activeTab, setActiveTab] = useState('all')
+  const [pendingUsers, setPendingUsers] = useState([])
+  const [approvalLoading, setApprovalLoading] = useState({})
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false)
   const [isResetPasswordModalOpen, setIsResetPasswordModalOpen] = useState(false)
@@ -116,12 +129,26 @@ export default function UsersPage() {
   const [newPassword, setNewPassword] = useState('')
 
   useEffect(() => {
+    // Check if URL has tab=pending
+    const tabParam = searchParams.get('tab')
+    if (tabParam === 'pending') {
+      setActiveTab('pending')
+    }
+
     const storedUser = localStorage.getItem('br_admin_user')
     if (storedUser) {
       const userData = JSON.parse(storedUser)
       setCurrentUser(userData)
 
-      // Load demo data based on role
+      // Load pending approvals for HQ users
+      if (userData.role === 'supreme_admin') {
+        loadPendingApprovals()
+      }
+
+      // Load real data from API
+      loadRealData()
+
+      // Also load demo data if in demo mode
       const demoMode = localStorage.getItem('br_demo_mode')
       if (demoMode === 'true') {
         if (userData.role === 'supreme_admin') {
@@ -130,13 +157,11 @@ export default function UsersPage() {
           setAreas(demoAreas)
           setTerritories(demoTerritories)
         } else if (userData.role === 'super_admin') {
-          // TM sees all users in their territory
           setUsers(demoUsers.filter(u => u.territory_id === userData.territory_id || (u.role === 'super_admin' && u.territory_id === userData.territory_id)))
           setBranches(demoBranches.filter(b => b.territory_id === userData.territory_id))
           setAreas(demoAreas.filter(a => a.territory_id === userData.territory_id))
           setTerritories(demoTerritories.filter(t => t.id === userData.territory_id))
         } else {
-          // AM sees only their area's users (flavor experts)
           setUsers(demoUsers.filter(u => u.area_id === userData.area_id && u.role === 'staff'))
           setBranches(demoBranches.filter(b => b.area_id === userData.area_id))
           setAreas(demoAreas.filter(a => a.id === userData.area_id))
@@ -144,7 +169,58 @@ export default function UsersPage() {
         }
       }
     }
-  }, [router])
+  }, [router, searchParams])
+
+  const loadRealData = async () => {
+    try {
+      const [usersData, territoriesData, areasData, branchesData] = await Promise.all([
+        api.getUsers().catch(() => []),
+        api.getTerritories().catch(() => []),
+        api.getAreas().catch(() => []),
+        api.getBranches().catch(() => []),
+      ])
+      if (usersData.length > 0) setUsers(usersData)
+      if (territoriesData.length > 0) setTerritories(territoriesData)
+      if (areasData.length > 0) setAreas(areasData)
+      if (branchesData.length > 0) setBranches(branchesData)
+    } catch (err) {
+      // Silently fail - demo data or empty state will show
+    }
+  }
+
+  const loadPendingApprovals = async () => {
+    try {
+      const data = await api.getPendingApprovals()
+      setPendingUsers(data)
+    } catch (err) {
+      // Silently fail
+    }
+  }
+
+  const handleApprove = async (userId) => {
+    setApprovalLoading(prev => ({ ...prev, [userId]: 'approving' }))
+    try {
+      await api.approveUser(userId)
+      setPendingUsers(prev => prev.filter(u => u.id !== userId))
+    } catch (err) {
+      alert(err.message || 'Failed to approve user')
+    } finally {
+      setApprovalLoading(prev => ({ ...prev, [userId]: null }))
+    }
+  }
+
+  const handleReject = async (userId) => {
+    if (!confirm('Are you sure you want to reject this user? Their account will be deactivated.')) return
+    setApprovalLoading(prev => ({ ...prev, [userId]: 'rejecting' }))
+    try {
+      await api.rejectUser(userId)
+      setPendingUsers(prev => prev.filter(u => u.id !== userId))
+    } catch (err) {
+      alert(err.message || 'Failed to reject user')
+    } finally {
+      setApprovalLoading(prev => ({ ...prev, [userId]: null }))
+    }
+  }
 
   const filteredUsers = users.filter(u => {
     const matchesSearch = u.username.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -266,56 +342,34 @@ export default function UsersPage() {
 
     setLoading(true)
 
-    // Simulate API call
-    setTimeout(() => {
-      const territory = territories.find(t => t.id.toString() === formData.territory_id)
-      const area = areas.find(a => a.id.toString() === formData.area_id)
-      const branch = branches.find(b => b.id.toString() === formData.branch_id)
+    try {
+      const apiData = {
+        username: formData.username,
+        full_name: formData.full_name,
+        email: formData.email,
+        role: formData.role,
+        territory_id: formData.territory_id ? parseInt(formData.territory_id) : null,
+        area_id: formData.area_id ? parseInt(formData.area_id) : null,
+        branch_id: formData.branch_id ? parseInt(formData.branch_id) : null,
+        is_active: formData.is_active,
+      }
 
       if (selectedUser) {
-        // Update
-        setUsers(users.map(u =>
-          u.id === selectedUser.id
-            ? {
-                ...u,
-                username: formData.username,
-                full_name: formData.full_name,
-                email: formData.email,
-                role: formData.role,
-                role_label: formData.role === 'super_admin' ? 'TM' : formData.role === 'admin' ? 'AM' : 'Flavor Expert',
-                territory_id: formData.territory_id ? parseInt(formData.territory_id) : null,
-                territory_name: territory?.name || null,
-                area_id: formData.area_id ? parseInt(formData.area_id) : null,
-                area_name: area?.name || null,
-                branch_id: formData.branch_id ? parseInt(formData.branch_id) : null,
-                branch_name: branch?.name || null,
-                is_active: formData.is_active
-              }
-            : u
-        ))
+        // Update via API
+        const updated = await api.updateUser(selectedUser.id, apiData)
+        setUsers(users.map(u => u.id === selectedUser.id ? updated : u))
       } else {
-        // Create
-        const newUser = {
-          id: users.length + 10,
-          username: formData.username,
-          full_name: formData.full_name,
-          email: formData.email || `${formData.username.toLowerCase()}@br-retailflow.com`,
-          role: formData.role,
-          role_label: formData.role === 'super_admin' ? 'TM' : formData.role === 'admin' ? 'AM' : 'Flavor Expert',
-          territory_id: formData.territory_id ? parseInt(formData.territory_id) : null,
-          territory_name: territory?.name || null,
-          area_id: formData.area_id ? parseInt(formData.area_id) : null,
-          area_name: area?.name || null,
-          branch_id: formData.branch_id ? parseInt(formData.branch_id) : null,
-          branch_name: branch?.name || null,
-          is_active: formData.is_active,
-          last_login: null
-        }
-        setUsers([...users, newUser])
+        // Create via API
+        apiData.password = formData.password
+        const created = await api.createUser(apiData)
+        setUsers([...users, created])
       }
-      setLoading(false)
       handleCloseModal()
-    }, 500)
+    } catch (err) {
+      setError(err.message || 'Failed to save user')
+    } finally {
+      setLoading(false)
+    }
   }
 
   const handleDelete = (user) => {
@@ -323,14 +377,18 @@ export default function UsersPage() {
     setIsDeleteModalOpen(true)
   }
 
-  const confirmDelete = () => {
+  const confirmDelete = async () => {
     setLoading(true)
-    setTimeout(() => {
+    try {
+      await api.deleteUser(selectedUser.id)
       setUsers(users.filter(u => u.id !== selectedUser.id))
-      setLoading(false)
       setIsDeleteModalOpen(false)
       setSelectedUser(null)
-    }, 500)
+    } catch (err) {
+      alert(err.message || 'Failed to delete user')
+    } finally {
+      setLoading(false)
+    }
   }
 
   const handleResetPassword = (user) => {
@@ -350,10 +408,13 @@ export default function UsersPage() {
     }, 500)
   }
 
-  const toggleUserStatus = (user) => {
-    setUsers(users.map(u =>
-      u.id === user.id ? { ...u, is_active: !u.is_active } : u
-    ))
+  const toggleUserStatus = async (user) => {
+    try {
+      const updated = await api.updateUser(user.id, { is_active: !user.is_active })
+      setUsers(users.map(u => u.id === user.id ? updated : u))
+    } catch (err) {
+      alert(err.message || 'Failed to update user status')
+    }
   }
 
   const copyToClipboard = (text, id) => {
@@ -403,8 +464,103 @@ export default function UsersPage() {
         </Button>
       </div>
 
-      {/* Filters */}
-      <div className="flex flex-col sm:flex-row gap-4">
+      {/* Tabs - HQ only */}
+      {currentUser.role === 'supreme_admin' && (
+        <div className="flex gap-1 p-1 bg-slate-800/50 rounded-lg w-fit">
+          <button
+            onClick={() => setActiveTab('all')}
+            className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+              activeTab === 'all'
+                ? 'bg-slate-700 text-white'
+                : 'text-slate-400 hover:text-white'
+            }`}
+          >
+            All Users
+          </button>
+          <button
+            onClick={() => setActiveTab('pending')}
+            className={`px-4 py-2 rounded-md text-sm font-medium transition-colors flex items-center gap-2 ${
+              activeTab === 'pending'
+                ? 'bg-amber-600/80 text-white'
+                : 'text-slate-400 hover:text-white'
+            }`}
+          >
+            Pending Approval
+            {pendingUsers.length > 0 && (
+              <span className="px-1.5 py-0.5 rounded-full text-xs bg-amber-500/30 text-amber-200">
+                {pendingUsers.length}
+              </span>
+            )}
+          </button>
+        </div>
+      )}
+
+      {/* Pending Approvals Section */}
+      {activeTab === 'pending' && currentUser.role === 'supreme_admin' && (
+        <div className="space-y-4">
+          {pendingUsers.length === 0 ? (
+            <div className="text-center py-12">
+              <UserCheck className="w-12 h-12 mx-auto text-slate-600 mb-4" />
+              <p className="text-slate-400">No pending approvals</p>
+              <p className="text-slate-500 text-sm mt-1">All user registrations have been reviewed</p>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {pendingUsers.map((user) => (
+                <div key={user.id} className="p-4 rounded-lg bg-slate-800/50 border border-slate-700 flex flex-col sm:flex-row sm:items-center gap-4">
+                  <div className="flex items-center gap-3 flex-1">
+                    <div className="w-10 h-10 rounded-full bg-gradient-to-br from-amber-500 to-orange-500 flex items-center justify-center text-white font-medium text-sm">
+                      {user.full_name.split(' ').map(n => n[0]).join('').slice(0, 2)}
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium text-white">{user.full_name}</p>
+                      <p className="text-xs text-slate-500">{user.email}</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${roleColors[user.role]}`}>
+                      {user.role === 'super_admin' ? 'TM' : user.role === 'admin' ? 'AM' : user.role === 'staff' ? 'Staff' : 'HQ'}
+                    </span>
+                    <span className="text-xs text-slate-500">
+                      {new Date(user.created_at).toLocaleDateString('en-AE', { month: 'short', day: 'numeric', year: 'numeric' })}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      onClick={() => handleApprove(user.id)}
+                      disabled={!!approvalLoading[user.id]}
+                      className="bg-green-600 hover:bg-green-500 text-white text-xs px-3 py-1.5 h-auto"
+                    >
+                      {approvalLoading[user.id] === 'approving' ? (
+                        <Loader2 className="w-3 h-3 animate-spin mr-1" />
+                      ) : (
+                        <Check className="w-3 h-3 mr-1" />
+                      )}
+                      Approve
+                    </Button>
+                    <Button
+                      onClick={() => handleReject(user.id)}
+                      disabled={!!approvalLoading[user.id]}
+                      variant="outline"
+                      className="border-red-500/50 text-red-400 hover:bg-red-500/10 text-xs px-3 py-1.5 h-auto"
+                    >
+                      {approvalLoading[user.id] === 'rejecting' ? (
+                        <Loader2 className="w-3 h-3 animate-spin mr-1" />
+                      ) : (
+                        <X className="w-3 h-3 mr-1" />
+                      )}
+                      Reject
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Filters - only show on All Users tab */}
+      {activeTab === 'all' && <div className="flex flex-col sm:flex-row gap-4">
         <div className="relative flex-1 max-w-md">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
           <Input
@@ -514,10 +670,10 @@ export default function UsersPage() {
             )}
           </div>
         )}
-      </div>
+      </div>}
 
       {/* Users Table */}
-      <div className="overflow-x-auto">
+      {activeTab === 'all' && <div className="overflow-x-auto">
         <table className="w-full">
           <thead>
             <tr className="border-b border-slate-700">
@@ -557,7 +713,7 @@ export default function UsersPage() {
                 </td>
                 <td className="py-3 px-4">
                   <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${roleColors[user.role]}`}>
-                    {user.role_label}
+                    {user.role === 'supreme_admin' ? 'HQ' : user.role === 'super_admin' ? 'TM' : user.role === 'admin' ? 'AM' : 'Staff'}
                   </span>
                 </td>
                 <td className="py-3 px-4 hidden md:table-cell">
@@ -638,9 +794,9 @@ export default function UsersPage() {
             ))}
           </tbody>
         </table>
-      </div>
+      </div>}
 
-      {filteredUsers.length === 0 && (
+      {activeTab === 'all' && filteredUsers.length === 0 && (
         <div className="text-center py-12">
           <Users className="w-12 h-12 mx-auto text-slate-600 mb-4" />
           <p className="text-slate-400">No users found</p>

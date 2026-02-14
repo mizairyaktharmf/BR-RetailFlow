@@ -33,6 +33,7 @@ class User(Base):
     role = Column(Enum(UserRole), default=UserRole.STAFF, nullable=False)
     is_active = Column(Boolean, default=True)
     is_verified = Column(Boolean, default=False)
+    is_approved = Column(Boolean, default=False)
 
     # Email verification
     verification_code = Column(String(6), nullable=True)

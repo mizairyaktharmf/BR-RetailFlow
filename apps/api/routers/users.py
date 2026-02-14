@@ -10,9 +10,25 @@ from typing import List, Optional
 from utils.database import get_db
 from utils.security import get_current_user, require_role, get_password_hash
 from models.user import User, UserRole
-from schemas.user import UserCreate, UserUpdate, UserResponse
+from schemas.user import UserCreate, UserUpdate, UserResponse, ApprovalAction
 
 router = APIRouter()
+
+
+@router.get("/pending-approvals", response_model=List[UserResponse])
+async def get_pending_approvals(
+    current_user: User = Depends(require_role([UserRole.SUPREME_ADMIN])),
+    db: Session = Depends(get_db)
+):
+    """
+    List users pending HQ approval (verified but not approved) - Supreme Admin only
+    """
+    users = db.query(User).filter(
+        User.is_verified == True,
+        User.is_approved == False,
+        User.is_active == True
+    ).all()
+    return [UserResponse.model_validate(u) for u in users]
 
 
 @router.get("/", response_model=List[UserResponse])
@@ -22,6 +38,7 @@ async def list_users(
     area_id: Optional[int] = None,
     territory_id: Optional[int] = None,
     is_active: Optional[bool] = None,
+    is_approved: Optional[bool] = None,
     skip: int = Query(0, ge=0),
     limit: int = Query(50, ge=1, le=100),
     current_user: User = Depends(require_role([
@@ -56,6 +73,8 @@ async def list_users(
         query = query.filter(User.territory_id == territory_id)
     if is_active is not None:
         query = query.filter(User.is_active == is_active)
+    if is_approved is not None:
+        query = query.filter(User.is_approved == is_approved)
 
     users = query.offset(skip).limit(limit).all()
     return [UserResponse.model_validate(u) for u in users]
@@ -124,7 +143,7 @@ async def create_user(
             raise HTTPException(status_code=403, detail="Can only create staff or admin users")
         user_data.territory_id = current_user.territory_id
 
-    # Create user
+    # Create user (admin-created users are pre-approved and pre-verified)
     user = User(
         email=user_data.email,
         username=user_data.username,
@@ -134,7 +153,9 @@ async def create_user(
         role=user_data.role,
         branch_id=user_data.branch_id,
         area_id=user_data.area_id,
-        territory_id=user_data.territory_id
+        territory_id=user_data.territory_id,
+        is_verified=True,
+        is_approved=True
     )
 
     db.add(user)
@@ -201,3 +222,48 @@ async def delete_user(
 
     db.delete(user)
     db.commit()
+
+
+@router.post("/{user_id}/approve", response_model=UserResponse)
+async def approve_user(
+    user_id: int,
+    current_user: User = Depends(require_role([UserRole.SUPREME_ADMIN])),
+    db: Session = Depends(get_db)
+):
+    """
+    Approve a user account (Supreme Admin only)
+    """
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    if user.is_approved:
+        raise HTTPException(status_code=400, detail="User is already approved")
+
+    user.is_approved = True
+    db.commit()
+    db.refresh(user)
+
+    return UserResponse.model_validate(user)
+
+
+@router.post("/{user_id}/reject", status_code=status.HTTP_200_OK)
+async def reject_user(
+    user_id: int,
+    current_user: User = Depends(require_role([UserRole.SUPREME_ADMIN])),
+    db: Session = Depends(get_db)
+):
+    """
+    Reject a user account (Supreme Admin only) - deactivates the account
+    """
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    if user.is_approved:
+        raise HTTPException(status_code=400, detail="Cannot reject an already approved user")
+
+    user.is_active = False
+    db.commit()
+
+    return {"message": f"User {user.full_name} has been rejected and deactivated"}

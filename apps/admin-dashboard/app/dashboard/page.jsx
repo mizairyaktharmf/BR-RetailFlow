@@ -11,7 +11,8 @@ import {
   Package,
   AlertCircle,
   CheckCircle2,
-  Cake
+  Cake,
+  UserPlus
 } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import api from '@/services/api'
@@ -28,6 +29,7 @@ export default function DashboardPage() {
   const [stats, setStats] = useState(null)
   const [isDemo, setIsDemo] = useState(false)
   const [cakeAlerts, setCakeAlerts] = useState({ alerts: [], total_count: 0, critical_count: 0, warning_count: 0 })
+  const [pendingApprovals, setPendingApprovals] = useState([])
 
   useEffect(() => {
     const storedUser = localStorage.getItem('br_admin_user')
@@ -81,6 +83,23 @@ export default function DashboardPage() {
       }
     }
     loadCakeAlerts()
+
+    // Load pending approvals (HQ only)
+    const loadPendingApprovals = async () => {
+      try {
+        const storedUserData = localStorage.getItem('br_admin_user')
+        if (storedUserData) {
+          const userData = JSON.parse(storedUserData)
+          if (userData.role === 'supreme_admin') {
+            const data = await api.getPendingApprovals()
+            setPendingApprovals(data)
+          }
+        }
+      } catch (err) {
+        // Silently fail
+      }
+    }
+    loadPendingApprovals()
   }, [])
 
   if (!user) return null
@@ -174,6 +193,30 @@ export default function DashboardPage() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Pending Approvals Banner */}
+      {user.role === 'supreme_admin' && pendingApprovals.length > 0 && (
+        <div
+          className="p-4 rounded-lg bg-amber-500/10 border border-amber-500/30 cursor-pointer hover:bg-amber-500/20 transition-colors"
+          onClick={() => router.push('/dashboard/users?tab=pending')}
+        >
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-lg bg-amber-500/20 flex items-center justify-center flex-shrink-0">
+              <UserPlus className="w-5 h-5 text-amber-400" />
+            </div>
+            <div className="flex-1">
+              <p className="text-sm font-medium text-amber-300">
+                {pendingApprovals.length} Pending Account Approval{pendingApprovals.length > 1 ? 's' : ''}
+              </p>
+              <p className="text-xs text-amber-400/70 mt-0.5">
+                {pendingApprovals.slice(0, 3).map(u => `${u.full_name} (${u.role})`).join(' | ')}
+                {pendingApprovals.length > 3 && ` +${pendingApprovals.length - 3} more`}
+              </p>
+            </div>
+            <span className="text-xs text-amber-400">Review Now</span>
+          </div>
+        </div>
+      )}
 
       {/* Cake Alerts Banner */}
       {cakeAlerts.total_count > 0 && (

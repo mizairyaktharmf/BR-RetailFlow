@@ -59,6 +59,13 @@ async def login(credentials: UserLogin, db: Session = Depends(get_db)):
             detail="Please verify your account first. Check your email for verification code."
         )
 
+    # Check if user is approved by HQ
+    if not user.is_approved:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Your account is under review. Please wait for HQ approval."
+        )
+
     # Update last login
     user.last_login = datetime.now(timezone.utc)
     db.commit()
@@ -126,13 +133,15 @@ async def register(user_data: UserCreate, db: Session = Depends(get_db)):
     }
 
 
-@router.post("/verify", response_model=TokenResponse)
+@router.post("/verify")
 async def verify_account(
     verify_data: VerifyAccount,
     db: Session = Depends(get_db)
 ):
     """
-    Verify user account with verification code and return tokens
+    Verify user account with verification code.
+    Supreme Admin users are auto-approved and get tokens immediately.
+    Other roles need HQ approval before they can login.
     """
     # Find user by email
     user = db.query(User).filter(User.email == verify_data.email).first()
@@ -171,18 +180,32 @@ async def verify_account(
     user.is_verified = True
     user.verification_code = None
     user.verification_code_expires = None
+
+    # Auto-approve HQ (supreme_admin) users
+    if user.role == UserRole.SUPREME_ADMIN:
+        user.is_approved = True
+
     db.commit()
     db.refresh(user)
 
-    # Create tokens
-    access_token = create_access_token(data={"sub": str(user.id)})
-    refresh_token = create_refresh_token(data={"sub": str(user.id)})
+    # If user is approved (HQ), return tokens so they can login immediately
+    if user.is_approved:
+        access_token = create_access_token(data={"sub": str(user.id)})
+        refresh_token_val = create_refresh_token(data={"sub": str(user.id)})
+        return {
+            "message": "Account verified and approved. You can now login.",
+            "approved": True,
+            "access_token": access_token,
+            "refresh_token": refresh_token_val,
+            "token_type": "bearer",
+            "user": UserResponse.model_validate(user).model_dump()
+        }
 
-    return TokenResponse(
-        access_token=access_token,
-        refresh_token=refresh_token,
-        user=UserResponse.model_validate(user)
-    )
+    # For non-HQ users, return pending approval message (no tokens)
+    return {
+        "message": "Account verified successfully. Your account is pending HQ approval. You will be able to login once approved.",
+        "approved": False
+    }
 
 
 @router.post("/refresh", response_model=TokenResponse)

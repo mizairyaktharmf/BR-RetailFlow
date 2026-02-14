@@ -29,6 +29,7 @@ function VerifyContent() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState(false)
+  const [pendingApproval, setPendingApproval] = useState(false)
   const [email, setEmail] = useState('')
   const [verificationCode, setVerificationCode] = useState('')
 
@@ -54,16 +55,21 @@ function VerifyContent() {
         }),
       })
 
-      // Store token and user data with correct keys
-      if (data.access_token) {
-        localStorage.setItem('br_admin_token', data.access_token)
-        localStorage.setItem('br_admin_user', JSON.stringify(data.user))
-      }
-
       setSuccess(true)
-      setTimeout(() => {
-        router.push('/dashboard')
-      }, 2000)
+
+      if (data.approved) {
+        // HQ user - auto-approved, store token and redirect
+        if (data.access_token) {
+          localStorage.setItem('br_admin_token', data.access_token)
+          localStorage.setItem('br_admin_user', JSON.stringify(data.user))
+        }
+        setTimeout(() => {
+          router.push('/dashboard')
+        }, 2000)
+      } else {
+        // Non-HQ user - pending approval
+        setPendingApproval(true)
+      }
     } catch (err) {
       setError(err.message || 'Verification failed. Please try again.')
     } finally {
@@ -109,11 +115,26 @@ function VerifyContent() {
                 </Alert>
               )}
 
-              {success && (
+              {success && !pendingApproval && (
                 <Alert className="bg-green-500/10 border-green-500/50 py-2">
                   <AlertDescription className="text-green-300 text-sm flex items-center gap-2">
                     <Check className="w-4 h-4" />
                     Account verified successfully! Redirecting to dashboard...
+                  </AlertDescription>
+                </Alert>
+              )}
+
+              {success && pendingApproval && (
+                <Alert className="bg-amber-500/10 border-amber-500/50 p-4">
+                  <AlertDescription className="text-amber-300 text-sm space-y-2">
+                    <p className="font-semibold flex items-center gap-2">
+                      <Check className="w-4 h-4 text-green-400" />
+                      Account verified successfully!
+                    </p>
+                    <p>Your account is now pending HQ approval. You will be able to login once your account has been approved by headquarters.</p>
+                    <Link href="/login" className="inline-block mt-2 text-white underline hover:text-purple-300">
+                      Go to Login Page
+                    </Link>
                   </AlertDescription>
                 </Alert>
               )}

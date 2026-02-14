@@ -83,16 +83,27 @@ class ApiService {
 
   // ============ AUTH ============
   async login(username, password) {
-    const response = await this.request('/auth/login', {
+    const url = `${this.baseUrl}/auth/login`
+    const response = await fetch(url, {
       method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ username, password }),
     })
-    if (response.access_token) {
-      this.setToken(response.access_token)
-      localStorage.setItem('br_admin_user', JSON.stringify(response.user))
-      localStorage.setItem('admin_user', JSON.stringify(response.user)) // Keep both for compatibility
+
+    const data = await response.json().catch(() => ({}))
+
+    if (!response.ok) {
+      const error = new Error(data.detail || 'Login failed')
+      error.status = response.status
+      throw error
     }
-    return response
+
+    if (data.access_token) {
+      this.setToken(data.access_token)
+      localStorage.setItem('br_admin_user', JSON.stringify(data.user))
+      localStorage.setItem('admin_user', JSON.stringify(data.user))
+    }
+    return data
   }
 
   async logout() {
@@ -266,6 +277,22 @@ class ApiService {
 
   async resetUserPassword(id) {
     return this.request(`/users/${id}/reset-password`, {
+      method: 'POST',
+    })
+  }
+
+  async getPendingApprovals() {
+    return this.request('/users/pending-approvals')
+  }
+
+  async approveUser(id) {
+    return this.request(`/users/${id}/approve`, {
+      method: 'POST',
+    })
+  }
+
+  async rejectUser(id) {
+    return this.request(`/users/${id}/reject`, {
       method: 'POST',
     })
   }

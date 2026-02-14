@@ -244,15 +244,11 @@ async def get_branch(
 @router.post("/", response_model=BranchResponse, status_code=status.HTTP_201_CREATED)
 async def create_branch(
     data: BranchCreate,
-    current_user: User = Depends(require_role([
-        UserRole.SUPREME_ADMIN,
-        UserRole.SUPER_ADMIN,
-        UserRole.ADMIN
-    ])),
+    current_user: User = Depends(require_role([UserRole.SUPREME_ADMIN])),
     db: Session = Depends(get_db)
 ):
     """
-    Create a new branch
+    Create a new branch (Supreme Admin / HQ only)
     """
     # Check for duplicate code
     existing = db.query(Branch).filter(Branch.code == data.code).first()
@@ -263,14 +259,6 @@ async def create_branch(
     area = db.query(Area).filter(Area.id == data.area_id).first()
     if not area:
         raise HTTPException(status_code=400, detail="Area not found")
-
-    # Check permissions
-    if current_user.role == UserRole.ADMIN:
-        if data.area_id != current_user.area_id:
-            raise HTTPException(status_code=403, detail="Cannot create branch in another area")
-    elif current_user.role == UserRole.SUPER_ADMIN:
-        if area.territory_id != current_user.territory_id:
-            raise HTTPException(status_code=403, detail="Cannot create branch in another territory")
 
     branch = Branch(**data.model_dump())
     db.add(branch)
@@ -284,27 +272,15 @@ async def create_branch(
 async def update_branch(
     branch_id: int,
     data: BranchUpdate,
-    current_user: User = Depends(require_role([
-        UserRole.SUPREME_ADMIN,
-        UserRole.SUPER_ADMIN,
-        UserRole.ADMIN
-    ])),
+    current_user: User = Depends(require_role([UserRole.SUPREME_ADMIN])),
     db: Session = Depends(get_db)
 ):
     """
-    Update a branch
+    Update a branch (Supreme Admin / HQ only)
     """
     branch = db.query(Branch).filter(Branch.id == branch_id).first()
     if not branch:
         raise HTTPException(status_code=404, detail="Branch not found")
-
-    # Check permissions
-    if current_user.role == UserRole.ADMIN:
-        if branch.area_id != current_user.area_id:
-            raise HTTPException(status_code=403, detail="Access denied")
-    elif current_user.role == UserRole.SUPER_ADMIN:
-        if branch.area.territory_id != current_user.territory_id:
-            raise HTTPException(status_code=403, detail="Access denied")
 
     # Update fields
     update_data = data.model_dump(exclude_unset=True)

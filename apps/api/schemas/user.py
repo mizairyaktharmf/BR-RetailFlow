@@ -44,6 +44,7 @@ class UserResponse(UserBase):
     role: UserRole
     is_active: bool
     is_verified: bool
+    is_approved: bool = False
     branch_id: Optional[int] = None
     area_id: Optional[int] = None
     territory_id: Optional[int] = None
@@ -83,3 +84,8 @@ class VerifyAccount(BaseModel):
     """Schema for account verification"""
     email: EmailStr
     verification_code: str = Field(..., min_length=6, max_length=6)
+
+
+class ApprovalAction(BaseModel):
+    """Schema for approving/rejecting a user"""
+    reason: Optional[str] = None

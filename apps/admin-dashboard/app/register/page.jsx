@@ -26,7 +26,7 @@ export default function RegisterPage() {
     confirmPassword: '',
     full_name: '',
     phone: '',
-    role: 'supreme_admin'
+    role: 'super_admin'
   })
 
   const handleNext = (e) => {
@@ -76,10 +76,10 @@ export default function RegisterPage() {
       setVerificationCode(data.verification_code)
       setSuccess(true)
 
-      // Redirect to verify page after 3 seconds
+      // Redirect to verify page after 4 seconds
       setTimeout(() => {
-        router.push(`/verify?email=${encodeURIComponent(formData.email)}`)
-      }, 3000)
+        router.push(`/verify?email=${encodeURIComponent(formData.email)}&role=${formData.role}`)
+      }, 4000)
     } catch (err) {
       setError(err.message || 'Registration failed. Please try again.')
     } finally {
@@ -139,6 +139,11 @@ export default function RegisterPage() {
                       <p className="text-2xl font-bold text-white tracking-widest text-center">{verificationCode}</p>
                     </div>
                     <p className="text-xs">Save this code! Redirecting to verification page...</p>
+                    {formData.role !== 'supreme_admin' && (
+                      <div className="mt-2 p-2 rounded bg-amber-500/10 border border-amber-500/30">
+                        <p className="text-xs text-amber-300">After verification, your account will need HQ approval before you can login.</p>
+                      </div>
+                    )}
                   </AlertDescription>
                 </Alert>
               )}
@@ -238,10 +243,10 @@ export default function RegisterPage() {
                   disabled={loading}
                   className="h-10 w-full px-3 bg-slate-700/50 border border-slate-600 rounded-md text-white focus:border-pink-500 focus:outline-none focus:ring-1 focus:ring-pink-500"
                 >
-                  <option value="supreme_admin" className="bg-slate-800">🏢 Supreme Admin (HQ) - Full System Access</option>
-                  <option value="super_admin" className="bg-slate-800">🗺️ Super Admin (TM) - Territory Manager</option>
-                  <option value="admin" className="bg-slate-800">📍 Admin (AM) - Area Manager</option>
+                  <option value="super_admin" className="bg-slate-800">Territory Manager (TM)</option>
+                  <option value="admin" className="bg-slate-800">Area Manager (AM)</option>
                 </select>
+                <p className="text-xs text-slate-500 mt-1">Your account will need HQ approval after verification.</p>
               </div>
 
               <div className="space-y-2">

@@ -13,6 +13,7 @@ import api from '@/services/api'
 export default function AdminLoginPage() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const [pendingApproval, setPendingApproval] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
   const [credentials, setCredentials] = useState({
     username: '',
@@ -25,40 +26,35 @@ export default function AdminLoginPage() {
     setLoading(true)
 
     try {
+      setPendingApproval(false)
       const response = await api.login(credentials.username, credentials.password)
-
-      console.log('Login response:', response)
-      console.log('User role:', response.user.role)
 
       // Check if user has admin role (case-insensitive)
       const allowedRoles = ['hq', 'tm', 'am', 'supreme_admin', 'super_admin', 'admin', 'SUPREME_ADMIN', 'SUPER_ADMIN', 'ADMIN']
       const userRole = response.user.role?.toLowerCase() || ''
       const isAdmin = allowedRoles.some(role => role.toLowerCase() === userRole)
 
-      console.log('Is admin?', isAdmin)
-
       if (!isAdmin) {
-        console.log('Access denied - not admin role')
         setError('Access denied. This dashboard is only for administrators.')
         api.clearToken()
         setLoading(false)
         return
       }
 
-      // Store admin user data (use br_admin_user key to match dashboard)
+      // Store admin user data
       localStorage.setItem('br_admin_user', JSON.stringify(response.user))
-      localStorage.setItem('admin_user', JSON.stringify(response.user)) // Keep both for compatibility
-      console.log('Stored user data, redirecting to dashboard...')
+      localStorage.setItem('admin_user', JSON.stringify(response.user))
 
-      // Small delay to ensure localStorage is saved
       await new Promise(resolve => setTimeout(resolve, 100))
-
-      // Force redirect to dashboard using window.location for clean page load
-      console.log('Redirecting now...')
       window.location.href = '/dashboard'
     } catch (err) {
-      console.error('Login error:', err)
-      setError(err.message || 'Invalid credentials. Please try again.')
+      // Check if this is a 403 "pending approval" response
+      if (err.status === 403) {
+        setPendingApproval(true)
+        setError('')
+      } else {
+        setError(err.message || 'Invalid credentials. Please try again.')
+      }
       setLoading(false)
     }
   }
@@ -95,6 +91,15 @@ export default function AdminLoginPage() {
           </CardHeader>
           <CardContent>
             <form onSubmit={handleLogin} className="space-y-5">
+              {pendingApproval && (
+                <Alert className="bg-amber-500/10 border-amber-500/50">
+                  <AlertDescription className="text-amber-300 text-sm">
+                    <p className="font-semibold mb-1">Account Under Review</p>
+                    <p>Your account is pending HQ approval. You will be able to login once your account has been approved.</p>
+                  </AlertDescription>
+                </Alert>
+              )}
+
               {error && (
                 <Alert variant="destructive" className="bg-red-500/10 border-red-500/50">
                   <AlertDescription className="text-red-300 text-sm">{error}</AlertDescription>
