@@ -8,7 +8,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 import logging
 
-from routers import auth, users, branches, flavors, inventory, analytics, cake
+from routers import auth, users, territories, areas, branches, flavors, inventory, analytics, cake
 from utils.database import engine, Base
 from utils.config import settings
 
@@ -47,6 +47,8 @@ app.add_middleware(
 # Include routers
 app.include_router(auth.router, prefix="/api/v1/auth", tags=["Authentication"])
 app.include_router(users.router, prefix="/api/v1/users", tags=["Users"])
+app.include_router(territories.router, prefix="/api/v1/territories", tags=["Territories"])
+app.include_router(areas.router, prefix="/api/v1/areas", tags=["Areas"])
 app.include_router(branches.router, prefix="/api/v1/branches", tags=["Branches"])
 app.include_router(flavors.router, prefix="/api/v1/flavors", tags=["Flavors"])
 app.include_router(inventory.router, prefix="/api/v1/inventory", tags=["Inventory"])
