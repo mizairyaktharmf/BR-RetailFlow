@@ -18,7 +18,7 @@ from schemas.location import (
 router = APIRouter()
 
 
-@router.get("/", response_model=List[AreaResponse])
+@router.get("", response_model=List[AreaResponse])
 async def list_areas(
     territory_id: Optional[int] = None,
     is_active: Optional[bool] = None,
@@ -67,7 +67,7 @@ async def get_area(
     return resp
 
 
-@router.post("/", response_model=AreaResponse, status_code=status.HTTP_201_CREATED)
+@router.post("", response_model=AreaResponse, status_code=status.HTTP_201_CREATED)
 async def create_area(
     data: AreaCreate,
     current_user: User = Depends(require_role([UserRole.SUPREME_ADMIN, UserRole.SUPER_ADMIN])),

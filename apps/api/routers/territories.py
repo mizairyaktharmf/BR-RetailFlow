@@ -19,7 +19,7 @@ from schemas.location import (
 router = APIRouter()
 
 
-@router.get("/", response_model=List[TerritoryResponse])
+@router.get("", response_model=List[TerritoryResponse])
 async def list_territories(
     is_active: Optional[bool] = None,
     current_user: User = Depends(get_current_user),
@@ -69,7 +69,7 @@ async def get_territory(
     return territory
 
 
-@router.post("/", response_model=TerritoryResponse, status_code=status.HTTP_201_CREATED)
+@router.post("", response_model=TerritoryResponse, status_code=status.HTTP_201_CREATED)
 async def create_territory(
     data: TerritoryCreate,
     current_user: User = Depends(require_role([UserRole.SUPREME_ADMIN])),
