@@ -132,6 +132,7 @@ describe('Request Method', () => {
     global.fetch.mockResolvedValueOnce({
       ok: true,
       status: 200,
+      text: async () => JSON.stringify({ data: 'test' }),
       json: async () => ({ data: 'test' })
     })
 
