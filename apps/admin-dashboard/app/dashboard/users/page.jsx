@@ -329,20 +329,24 @@ function UsersContent() {
     }
   }
 
-  const handleResetPassword = (user) => {
+  const handleResetPassword = async (user) => {
     setSelectedUser(user)
-    setNewPassword(generatePassword())
+    setNewPassword('')
     setIsResetPasswordModalOpen(true)
+    try {
+      const result = await api.resetUserPassword(user.id)
+      setNewPassword(result.new_password)
+    } catch (err) {
+      alert(err.message || 'Failed to reset password')
+      setIsResetPasswordModalOpen(false)
+      setSelectedUser(null)
+    }
   }
 
   const confirmResetPassword = () => {
-    setLoading(true)
-    setTimeout(() => {
-      setLoading(false)
-      setIsResetPasswordModalOpen(false)
-      setSelectedUser(null)
-      setNewPassword('')
-    }, 500)
+    setIsResetPasswordModalOpen(false)
+    setSelectedUser(null)
+    setNewPassword('')
   }
 
   const toggleUserStatus = async (user) => {
@@ -995,44 +999,37 @@ function UsersContent() {
 
               <div className="bg-slate-700/50 rounded-lg p-4 mb-6">
                 <p className="text-xs text-slate-500 mb-2">New Password</p>
-                <div className="flex items-center justify-center gap-2">
-                  <code className="text-lg text-white font-mono">{newPassword}</code>
-                  <button
-                    onClick={() => copyToClipboard(newPassword, 'reset-password')}
-                    className="p-1.5 rounded hover:bg-slate-600 transition-colors"
-                  >
-                    {copiedId === 'reset-password' ? (
-                      <Check className="w-4 h-4 text-green-400" />
-                    ) : (
-                      <Copy className="w-4 h-4 text-slate-400" />
-                    )}
-                  </button>
-                </div>
+                {newPassword ? (
+                  <div className="flex items-center justify-center gap-2">
+                    <code className="text-lg text-white font-mono">{newPassword}</code>
+                    <button
+                      onClick={() => copyToClipboard(newPassword, 'reset-password')}
+                      className="p-1.5 rounded hover:bg-slate-600 transition-colors"
+                    >
+                      {copiedId === 'reset-password' ? (
+                        <Check className="w-4 h-4 text-green-400" />
+                      ) : (
+                        <Copy className="w-4 h-4 text-slate-400" />
+                      )}
+                    </button>
+                  </div>
+                ) : (
+                  <div className="flex items-center justify-center gap-2 py-1">
+                    <Loader2 className="w-5 h-5 text-amber-400 animate-spin" />
+                    <span className="text-slate-400 text-sm">Resetting password...</span>
+                  </div>
+                )}
               </div>
 
-              <div className="flex gap-3">
-                <Button
-                  variant="outline"
-                  onClick={() => setIsResetPasswordModalOpen(false)}
-                  className="flex-1 border-slate-600 text-slate-300 hover:bg-slate-700"
-                >
-                  Cancel
-                </Button>
-                <Button
-                  onClick={confirmResetPassword}
-                  disabled={loading}
-                  className="flex-1 bg-amber-600 hover:bg-amber-500 text-white"
-                >
-                  {loading ? (
-                    <>
-                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                      Resetting...
-                    </>
-                  ) : (
-                    'Reset Password'
-                  )}
-                </Button>
-              </div>
+              <p className="text-xs text-amber-400/70 mb-4">Copy this password and share it with the user. It cannot be retrieved later.</p>
+
+              <Button
+                onClick={confirmResetPassword}
+                disabled={!newPassword}
+                className="w-full bg-slate-700 hover:bg-slate-600 text-white"
+              >
+                Done
+              </Button>
             </div>
           </div>
         </div>

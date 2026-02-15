@@ -302,6 +302,43 @@ async def assign_user(
     return enrich_user_response(user, db)
 
 
+@router.post("/{user_id}/reset-password")
+async def reset_user_password(
+    user_id: int,
+    current_user: User = Depends(require_role([
+        UserRole.SUPREME_ADMIN,
+        UserRole.SUPER_ADMIN
+    ])),
+    db: Session = Depends(get_db)
+):
+    """
+    Reset a user's password - generates a new random password.
+    Supreme Admin and Territory Manager only.
+    """
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    if user.id == current_user.id:
+        raise HTTPException(status_code=400, detail="Cannot reset your own password here. Use change password instead.")
+
+    # TM can only reset passwords for users in their territory
+    if current_user.role == UserRole.SUPER_ADMIN:
+        if user.territory_id != current_user.territory_id:
+            raise HTTPException(status_code=403, detail="Access denied")
+
+    import secrets
+    import string
+    # Generate a random 10-char password
+    alphabet = string.ascii_letters + string.digits
+    new_password = ''.join(secrets.choice(alphabet) for _ in range(10))
+
+    user.hashed_password = get_password_hash(new_password)
+    db.commit()
+
+    return {"new_password": new_password, "message": f"Password reset for {user.full_name}"}
+
+
 @router.delete("/{user_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_user(
     user_id: int,
