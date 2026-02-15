@@ -298,6 +298,13 @@ class ApiService {
     })
   }
 
+  async assignUser(id, data) {
+    return this.request(`/users/${id}/assign`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    })
+  }
+
   // ============ INVENTORY ============
   async getInventory(filters = {}) {
     const params = new URLSearchParams()

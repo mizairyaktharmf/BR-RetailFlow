@@ -31,45 +31,6 @@ import {
 } from 'lucide-react'
 import api from '@/services/api'
 
-// Demo users data
-const demoUsers = [
-  { id: 1, username: 'hq_admin', full_name: 'HQ Administrator', email: 'hq@br-retailflow.com', role: 'supreme_admin', role_label: 'HQ', territory_id: null, territory_name: null, area_id: null, area_name: null, branch_id: null, branch_name: null, is_active: true, last_login: '2024-01-15T10:30:00' },
-  { id: 2, username: 'tm_dubai', full_name: 'Dubai Territory Manager', email: 'tm.dubai@br-retailflow.com', role: 'super_admin', role_label: 'TM', territory_id: 1, territory_name: 'Dubai', area_id: null, area_name: null, branch_id: null, branch_name: null, is_active: true, last_login: '2024-01-15T09:15:00' },
-  { id: 3, username: 'tm_abudhabi', full_name: 'Abu Dhabi Territory Manager', email: 'tm.abudhabi@br-retailflow.com', role: 'super_admin', role_label: 'TM', territory_id: 2, territory_name: 'Abu Dhabi', area_id: null, area_name: null, branch_id: null, branch_name: null, is_active: true, last_login: '2024-01-14T18:00:00' },
-  { id: 4, username: 'am_karama', full_name: 'Karama Area Manager', email: 'am.karama@br-retailflow.com', role: 'admin', role_label: 'AM', territory_id: 1, territory_name: 'Dubai', area_id: 1, area_name: 'Karama', branch_id: null, branch_name: null, is_active: true, last_login: '2024-01-15T08:00:00' },
-  { id: 5, username: 'am_deira', full_name: 'Deira Area Manager', email: 'am.deira@br-retailflow.com', role: 'admin', role_label: 'AM', territory_id: 1, territory_name: 'Dubai', area_id: 2, area_name: 'Deira', branch_id: null, branch_name: null, is_active: true, last_login: '2024-01-15T07:45:00' },
-  { id: 6, username: 'BR001', full_name: 'Ahmed Hassan', email: 'ahmed@br-retailflow.com', role: 'staff', role_label: 'Flavor Expert', territory_id: 1, territory_name: 'Dubai', area_id: 1, area_name: 'Karama', branch_id: 1, branch_name: 'Karama Center', is_active: true, last_login: '2024-01-15T06:00:00' },
-  { id: 7, username: 'BR002', full_name: 'Fatima Ali', email: 'fatima@br-retailflow.com', role: 'staff', role_label: 'Flavor Expert', territory_id: 1, territory_name: 'Dubai', area_id: 1, area_name: 'Karama', branch_id: 2, branch_name: 'Karama Mall', is_active: true, last_login: '2024-01-15T06:15:00' },
-  { id: 8, username: 'BR003', full_name: 'Omar Khan', email: 'omar@br-retailflow.com', role: 'staff', role_label: 'Flavor Expert', territory_id: 1, territory_name: 'Dubai', area_id: 1, area_name: 'Karama', branch_id: 3, branch_name: 'BurJuman', is_active: true, last_login: '2024-01-14T22:00:00' },
-  { id: 9, username: 'BR004', full_name: 'Sara Mohammed', email: 'sara@br-retailflow.com', role: 'staff', role_label: 'Flavor Expert', territory_id: 1, territory_name: 'Dubai', area_id: 2, area_name: 'Deira', branch_id: 4, branch_name: 'Deira City Centre', is_active: true, last_login: '2024-01-15T06:30:00' },
-  { id: 10, username: 'BR005', full_name: 'Khalid Ibrahim', email: 'khalid@br-retailflow.com', role: 'staff', role_label: 'Flavor Expert', territory_id: 1, territory_name: 'Dubai', area_id: 2, area_name: 'Deira', branch_id: 5, branch_name: 'Al Ghurair', is_active: false, last_login: '2024-01-10T19:00:00' },
-]
-
-const demoBranches = [
-  { id: 1, name: 'Karama Center', branch_id: 'BR001', area_id: 1, area_name: 'Karama', territory_id: 1, territory_name: 'Dubai' },
-  { id: 2, name: 'Karama Mall', branch_id: 'BR002', area_id: 1, area_name: 'Karama', territory_id: 1, territory_name: 'Dubai' },
-  { id: 3, name: 'BurJuman', branch_id: 'BR003', area_id: 1, area_name: 'Karama', territory_id: 1, territory_name: 'Dubai' },
-  { id: 4, name: 'Deira City Centre', branch_id: 'BR004', area_id: 2, area_name: 'Deira', territory_id: 1, territory_name: 'Dubai' },
-  { id: 5, name: 'Al Ghurair', branch_id: 'BR005', area_id: 2, area_name: 'Deira', territory_id: 1, territory_name: 'Dubai' },
-  { id: 6, name: 'JBR Walk', branch_id: 'BR006', area_id: 3, area_name: 'Jumeirah', territory_id: 1, territory_name: 'Dubai' },
-  { id: 7, name: 'Khalidiya Mall', branch_id: 'BR007', area_id: 5, area_name: 'Khalidiya', territory_id: 2, territory_name: 'Abu Dhabi' },
-  { id: 8, name: 'Al Wahda Mall', branch_id: 'BR008', area_id: 6, area_name: 'Al Wahda', territory_id: 2, territory_name: 'Abu Dhabi' },
-]
-
-const demoAreas = [
-  { id: 1, name: 'Karama', territory_id: 1 },
-  { id: 2, name: 'Deira', territory_id: 1 },
-  { id: 3, name: 'Jumeirah', territory_id: 1 },
-  { id: 5, name: 'Khalidiya', territory_id: 2 },
-  { id: 6, name: 'Al Wahda', territory_id: 2 },
-]
-
-const demoTerritories = [
-  { id: 1, name: 'Dubai' },
-  { id: 2, name: 'Abu Dhabi' },
-  { id: 3, name: 'Sharjah' },
-]
-
 const roleOptions = [
   { value: 'super_admin', label: 'Territory Manager (TM)', color: 'bg-blue-500/20 text-blue-300' },
   { value: 'admin', label: 'Area Manager (AM)', color: 'bg-cyan-500/20 text-cyan-300' },
@@ -110,6 +71,7 @@ function UsersContent() {
   const [isResetPasswordModalOpen, setIsResetPasswordModalOpen] = useState(false)
   const [selectedUser, setSelectedUser] = useState(null)
   const [loading, setLoading] = useState(false)
+  const [pageLoading, setPageLoading] = useState(true)
   const [showPassword, setShowPassword] = useState(false)
   const [copiedId, setCopiedId] = useState(null)
   const [formData, setFormData] = useState({
@@ -129,7 +91,6 @@ function UsersContent() {
   const [newPassword, setNewPassword] = useState('')
 
   useEffect(() => {
-    // Check if URL has tab=pending
     const tabParam = searchParams.get('tab')
     if (tabParam === 'pending') {
       setActiveTab('pending')
@@ -140,38 +101,16 @@ function UsersContent() {
       const userData = JSON.parse(storedUser)
       setCurrentUser(userData)
 
-      // Load pending approvals for HQ users
       if (userData.role === 'supreme_admin') {
         loadPendingApprovals()
       }
 
-      // Load real data from API
-      loadRealData()
-
-      // Also load demo data if in demo mode
-      const demoMode = localStorage.getItem('br_demo_mode')
-      if (demoMode === 'true') {
-        if (userData.role === 'supreme_admin') {
-          setUsers(demoUsers)
-          setBranches(demoBranches)
-          setAreas(demoAreas)
-          setTerritories(demoTerritories)
-        } else if (userData.role === 'super_admin') {
-          setUsers(demoUsers.filter(u => u.territory_id === userData.territory_id || (u.role === 'super_admin' && u.territory_id === userData.territory_id)))
-          setBranches(demoBranches.filter(b => b.territory_id === userData.territory_id))
-          setAreas(demoAreas.filter(a => a.territory_id === userData.territory_id))
-          setTerritories(demoTerritories.filter(t => t.id === userData.territory_id))
-        } else {
-          setUsers(demoUsers.filter(u => u.area_id === userData.area_id && u.role === 'staff'))
-          setBranches(demoBranches.filter(b => b.area_id === userData.area_id))
-          setAreas(demoAreas.filter(a => a.id === userData.area_id))
-          setTerritories([])
-        }
-      }
+      loadData()
     }
   }, [router, searchParams])
 
-  const loadRealData = async () => {
+  const loadData = async () => {
+    setPageLoading(true)
     try {
       const [usersData, territoriesData, areasData, branchesData] = await Promise.all([
         api.getUsers().catch(() => []),
@@ -179,12 +118,14 @@ function UsersContent() {
         api.getAreas().catch(() => []),
         api.getBranches().catch(() => []),
       ])
-      if (usersData.length > 0) setUsers(usersData)
-      if (territoriesData.length > 0) setTerritories(territoriesData)
-      if (areasData.length > 0) setAreas(areasData)
-      if (branchesData.length > 0) setBranches(branchesData)
+      setUsers(usersData)
+      setTerritories(territoriesData)
+      setAreas(areasData)
+      setBranches(branchesData)
     } catch (err) {
-      // Silently fail - demo data or empty state will show
+      // Silently fail
+    } finally {
+      setPageLoading(false)
     }
   }
 
@@ -202,6 +143,7 @@ function UsersContent() {
     try {
       await api.approveUser(userId)
       setPendingUsers(prev => prev.filter(u => u.id !== userId))
+      loadData()
     } catch (err) {
       alert(err.message || 'Failed to approve user')
     } finally {
@@ -223,9 +165,9 @@ function UsersContent() {
   }
 
   const filteredUsers = users.filter(u => {
-    const matchesSearch = u.username.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      u.full_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      u.email.toLowerCase().includes(searchTerm.toLowerCase())
+    const matchesSearch = u.username?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      u.full_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      u.email?.toLowerCase().includes(searchTerm.toLowerCase())
     const matchesRole = !filterRole || u.role === filterRole
     const matchesTerritory = !filterTerritory || u.territory_id?.toString() === filterTerritory
     return matchesSearch && matchesRole && matchesTerritory
@@ -284,7 +226,6 @@ function UsersContent() {
   const handleRoleChange = (role) => {
     let updates = { role }
 
-    // Reset location fields based on role
     if (role === 'super_admin') {
       updates.area_id = ''
       updates.branch_id = ''
@@ -297,13 +238,13 @@ function UsersContent() {
 
   const handleBranchSelect = (branchId) => {
     const branch = branches.find(b => b.id.toString() === branchId)
-    if (branch && formData.role === 'staff') {
+    if (branch) {
+      const area = areas.find(a => a.id === branch.area_id)
       setFormData({
         ...formData,
         branch_id: branchId,
-        username: branch.branch_id, // Auto-set username to branch ID
-        area_id: branch.area_id.toString(),
-        territory_id: branch.territory_id.toString()
+        area_id: branch.area_id?.toString() || '',
+        territory_id: area?.territory_id?.toString() || formData.territory_id
       })
     } else {
       setFormData({ ...formData, branch_id: branchId })
@@ -314,8 +255,7 @@ function UsersContent() {
     e.preventDefault()
     setError('')
 
-    // Validation
-    if (!formData.username.trim() || !formData.full_name.trim()) {
+    if (!formData.username.trim() || !formData.full_name.trim() || !formData.email.trim()) {
       setError('Please fill in all required fields')
       return
     }
@@ -355,11 +295,9 @@ function UsersContent() {
       }
 
       if (selectedUser) {
-        // Update via API
         const updated = await api.updateUser(selectedUser.id, apiData)
         setUsers(users.map(u => u.id === selectedUser.id ? updated : u))
       } else {
-        // Create via API
         apiData.password = formData.password
         const created = await api.createUser(apiData)
         setUsers([...users, created])
@@ -400,7 +338,6 @@ function UsersContent() {
   const confirmResetPassword = () => {
     setLoading(true)
     setTimeout(() => {
-      // In real app, this would call API to reset password
       setLoading(false)
       setIsResetPasswordModalOpen(false)
       setSelectedUser(null)
@@ -425,12 +362,12 @@ function UsersContent() {
 
   // Filter areas based on selected territory
   const filteredAreas = formData.territory_id
-    ? areas.filter(a => a.territory_id.toString() === formData.territory_id)
+    ? areas.filter(a => a.territory_id?.toString() === formData.territory_id)
     : areas
 
   // Filter branches based on selected area
   const filteredBranches = formData.area_id
-    ? branches.filter(b => b.area_id.toString() === formData.area_id)
+    ? branches.filter(b => b.area_id?.toString() === formData.area_id)
     : branches
 
   // Available roles based on current user
@@ -452,7 +389,7 @@ function UsersContent() {
             Users
           </h1>
           <p className="text-slate-400 text-sm mt-1">
-            Manage users and set credentials for flavor experts
+            Manage users and assign them to territories, areas, and branches
           </p>
         </div>
         <Button
@@ -510,7 +447,7 @@ function UsersContent() {
                 <div key={user.id} className="p-4 rounded-lg bg-slate-800/50 border border-slate-700 flex flex-col sm:flex-row sm:items-center gap-4">
                   <div className="flex items-center gap-3 flex-1">
                     <div className="w-10 h-10 rounded-full bg-gradient-to-br from-amber-500 to-orange-500 flex items-center justify-center text-white font-medium text-sm">
-                      {user.full_name.split(' ').map(n => n[0]).join('').slice(0, 2)}
+                      {user.full_name?.split(' ').map(n => n[0]).join('').slice(0, 2)}
                     </div>
                     <div>
                       <p className="text-sm font-medium text-white">{user.full_name}</p>
@@ -519,7 +456,7 @@ function UsersContent() {
                   </div>
                   <div className="flex items-center gap-3">
                     <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${roleColors[user.role]}`}>
-                      {user.role === 'super_admin' ? 'TM' : user.role === 'admin' ? 'AM' : user.role === 'staff' ? 'Staff' : 'HQ'}
+                      {user.role === 'supreme_admin' ? 'HQ' : user.role === 'super_admin' ? 'TM' : user.role === 'admin' ? 'AM' : 'Staff'}
                     </span>
                     <span className="text-xs text-slate-500">
                       {new Date(user.created_at).toLocaleDateString('en-AE', { month: 'short', day: 'numeric', year: 'numeric' })}
@@ -673,130 +610,142 @@ function UsersContent() {
       </div>}
 
       {/* Users Table */}
-      {activeTab === 'all' && <div className="overflow-x-auto">
-        <table className="w-full">
-          <thead>
-            <tr className="border-b border-slate-700">
-              <th className="text-left py-3 px-4 text-xs font-medium text-slate-400 uppercase">User</th>
-              <th className="text-left py-3 px-4 text-xs font-medium text-slate-400 uppercase">Role</th>
-              <th className="text-left py-3 px-4 text-xs font-medium text-slate-400 uppercase hidden md:table-cell">Location</th>
-              <th className="text-left py-3 px-4 text-xs font-medium text-slate-400 uppercase hidden lg:table-cell">Last Login</th>
-              <th className="text-center py-3 px-4 text-xs font-medium text-slate-400 uppercase">Status</th>
-              <th className="text-right py-3 px-4 text-xs font-medium text-slate-400 uppercase">Actions</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-slate-700/50">
-            {filteredUsers.map((user) => (
-              <tr key={user.id} className={`hover:bg-slate-800/30 transition-colors ${!user.is_active && 'opacity-60'}`}>
-                <td className="py-3 px-4">
-                  <div className="flex items-center gap-3">
-                    <div className="w-9 h-9 rounded-full bg-gradient-to-br from-green-500 to-emerald-500 flex items-center justify-center text-white font-medium text-sm">
-                      {user.full_name.split(' ').map(n => n[0]).join('').slice(0, 2)}
-                    </div>
-                    <div>
-                      <p className="text-sm font-medium text-white">{user.full_name}</p>
-                      <div className="flex items-center gap-2">
-                        <p className="text-xs text-slate-500 font-mono">{user.username}</p>
-                        <button
-                          onClick={() => copyToClipboard(user.username, `username-${user.id}`)}
-                          className="p-0.5 rounded hover:bg-slate-700 transition-colors"
-                        >
-                          {copiedId === `username-${user.id}` ? (
-                            <Check className="w-3 h-3 text-green-400" />
-                          ) : (
-                            <Copy className="w-3 h-3 text-slate-500" />
-                          )}
-                        </button>
+      {activeTab === 'all' && (
+        pageLoading ? (
+          <div className="text-center py-12">
+            <Loader2 className="w-8 h-8 mx-auto text-slate-400 animate-spin mb-4" />
+            <p className="text-slate-400">Loading users...</p>
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead>
+                <tr className="border-b border-slate-700">
+                  <th className="text-left py-3 px-4 text-xs font-medium text-slate-400 uppercase">User</th>
+                  <th className="text-left py-3 px-4 text-xs font-medium text-slate-400 uppercase">Role</th>
+                  <th className="text-left py-3 px-4 text-xs font-medium text-slate-400 uppercase hidden md:table-cell">Location</th>
+                  <th className="text-left py-3 px-4 text-xs font-medium text-slate-400 uppercase hidden lg:table-cell">Last Login</th>
+                  <th className="text-center py-3 px-4 text-xs font-medium text-slate-400 uppercase">Status</th>
+                  <th className="text-right py-3 px-4 text-xs font-medium text-slate-400 uppercase">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-700/50">
+                {filteredUsers.map((user) => (
+                  <tr key={user.id} className={`hover:bg-slate-800/30 transition-colors ${!user.is_active && 'opacity-60'}`}>
+                    <td className="py-3 px-4">
+                      <div className="flex items-center gap-3">
+                        <div className="w-9 h-9 rounded-full bg-gradient-to-br from-green-500 to-emerald-500 flex items-center justify-center text-white font-medium text-sm">
+                          {user.full_name?.split(' ').map(n => n[0]).join('').slice(0, 2)}
+                        </div>
+                        <div>
+                          <p className="text-sm font-medium text-white">{user.full_name}</p>
+                          <div className="flex items-center gap-2">
+                            <p className="text-xs text-slate-500 font-mono">{user.username}</p>
+                            <button
+                              onClick={() => copyToClipboard(user.username, `username-${user.id}`)}
+                              className="p-0.5 rounded hover:bg-slate-700 transition-colors"
+                            >
+                              {copiedId === `username-${user.id}` ? (
+                                <Check className="w-3 h-3 text-green-400" />
+                              ) : (
+                                <Copy className="w-3 h-3 text-slate-500" />
+                              )}
+                            </button>
+                          </div>
+                        </div>
                       </div>
-                    </div>
-                  </div>
-                </td>
-                <td className="py-3 px-4">
-                  <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${roleColors[user.role]}`}>
-                    {user.role === 'supreme_admin' ? 'HQ' : user.role === 'super_admin' ? 'TM' : user.role === 'admin' ? 'AM' : 'Staff'}
-                  </span>
-                </td>
-                <td className="py-3 px-4 hidden md:table-cell">
-                  <div className="space-y-1">
-                    {user.branch_name && (
-                      <div className="flex items-center gap-1 text-xs text-slate-400">
-                        <Building2 className="w-3 h-3 text-cyan-400" />
-                        {user.branch_name}
+                    </td>
+                    <td className="py-3 px-4">
+                      <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${roleColors[user.role]}`}>
+                        {user.role === 'supreme_admin' ? 'HQ' : user.role === 'super_admin' ? 'TM' : user.role === 'admin' ? 'AM' : 'Staff'}
+                      </span>
+                    </td>
+                    <td className="py-3 px-4 hidden md:table-cell">
+                      <div className="space-y-1">
+                        {user.territory_name && (
+                          <div className="flex items-center gap-1 text-xs text-slate-400">
+                            <Globe className="w-3 h-3 text-purple-400" />
+                            {user.territory_name}
+                          </div>
+                        )}
+                        {user.area_name && (
+                          <div className="flex items-center gap-1 text-xs text-slate-500">
+                            <MapPin className="w-3 h-3 text-blue-400" />
+                            {user.area_name}
+                          </div>
+                        )}
+                        {user.branch_name && (
+                          <div className="flex items-center gap-1 text-xs text-slate-500">
+                            <Building2 className="w-3 h-3 text-cyan-400" />
+                            {user.branch_name}
+                          </div>
+                        )}
+                        {!user.territory_name && !user.area_name && !user.branch_name && (
+                          <span className="text-xs text-slate-600">Not assigned</span>
+                        )}
                       </div>
-                    )}
-                    {user.area_name && (
-                      <div className="flex items-center gap-1 text-xs text-slate-500">
-                        <MapPin className="w-3 h-3" />
-                        {user.area_name}
-                      </div>
-                    )}
-                    {user.territory_name && !user.area_name && (
-                      <div className="flex items-center gap-1 text-xs text-slate-500">
-                        <Globe className="w-3 h-3" />
-                        {user.territory_name}
-                      </div>
-                    )}
-                  </div>
-                </td>
-                <td className="py-3 px-4 hidden lg:table-cell">
-                  <p className="text-xs text-slate-400">
-                    {user.last_login
-                      ? new Date(user.last_login).toLocaleDateString('en-AE', {
-                          month: 'short',
-                          day: 'numeric',
-                          hour: '2-digit',
-                          minute: '2-digit'
-                        })
-                      : 'Never'
-                    }
-                  </p>
-                </td>
-                <td className="py-3 px-4 text-center">
-                  <button
-                    onClick={() => toggleUserStatus(user)}
-                    className={`p-1.5 rounded-lg transition-colors ${
-                      user.is_active
-                        ? 'bg-green-500/20 text-green-400 hover:bg-green-500/30'
-                        : 'bg-red-500/20 text-red-400 hover:bg-red-500/30'
-                    }`}
-                  >
-                    {user.is_active ? <UserCheck className="w-4 h-4" /> : <UserX className="w-4 h-4" />}
-                  </button>
-                </td>
-                <td className="py-3 px-4">
-                  <div className="flex items-center justify-end gap-1">
-                    <button
-                      onClick={() => handleResetPassword(user)}
-                      className="p-1.5 rounded-lg text-slate-400 hover:text-amber-400 hover:bg-amber-500/10 transition-colors"
-                      title="Reset Password"
-                    >
-                      <Key className="w-4 h-4" />
-                    </button>
-                    <button
-                      onClick={() => handleOpenModal(user)}
-                      className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-700 transition-colors"
-                      title="Edit"
-                    >
-                      <Edit2 className="w-4 h-4" />
-                    </button>
-                    {user.role !== 'supreme_admin' && (
+                    </td>
+                    <td className="py-3 px-4 hidden lg:table-cell">
+                      <p className="text-xs text-slate-400">
+                        {user.last_login
+                          ? new Date(user.last_login).toLocaleDateString('en-AE', {
+                              month: 'short',
+                              day: 'numeric',
+                              hour: '2-digit',
+                              minute: '2-digit'
+                            })
+                          : 'Never'
+                        }
+                      </p>
+                    </td>
+                    <td className="py-3 px-4 text-center">
                       <button
-                        onClick={() => handleDelete(user)}
-                        className="p-1.5 rounded-lg text-slate-400 hover:text-red-400 hover:bg-red-500/10 transition-colors"
-                        title="Delete"
+                        onClick={() => toggleUserStatus(user)}
+                        className={`p-1.5 rounded-lg transition-colors ${
+                          user.is_active
+                            ? 'bg-green-500/20 text-green-400 hover:bg-green-500/30'
+                            : 'bg-red-500/20 text-red-400 hover:bg-red-500/30'
+                        }`}
                       >
-                        <Trash2 className="w-4 h-4" />
+                        {user.is_active ? <UserCheck className="w-4 h-4" /> : <UserX className="w-4 h-4" />}
                       </button>
-                    )}
-                  </div>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>}
+                    </td>
+                    <td className="py-3 px-4">
+                      <div className="flex items-center justify-end gap-1">
+                        <button
+                          onClick={() => handleResetPassword(user)}
+                          className="p-1.5 rounded-lg text-slate-400 hover:text-amber-400 hover:bg-amber-500/10 transition-colors"
+                          title="Reset Password"
+                        >
+                          <Key className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={() => handleOpenModal(user)}
+                          className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-700 transition-colors"
+                          title="Edit"
+                        >
+                          <Edit2 className="w-4 h-4" />
+                        </button>
+                        {user.role !== 'supreme_admin' && (
+                          <button
+                            onClick={() => handleDelete(user)}
+                            className="p-1.5 rounded-lg text-slate-400 hover:text-red-400 hover:bg-red-500/10 transition-colors"
+                            title="Delete"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )
+      )}
 
-      {activeTab === 'all' && filteredUsers.length === 0 && (
+      {activeTab === 'all' && !pageLoading && filteredUsers.length === 0 && (
         <div className="text-center py-12">
           <Users className="w-12 h-12 mx-auto text-slate-600 mb-4" />
           <p className="text-slate-400">No users found</p>
@@ -844,8 +793,8 @@ function UsersContent() {
                 </select>
               </div>
 
-              {/* Location fields based on role */}
-              {(formData.role === 'super_admin' || (currentUser.role === 'supreme_admin' && formData.role !== 'staff')) && (
+              {/* Territory - show for TM role or when HQ creates AM/Staff */}
+              {(formData.role === 'super_admin' || ((formData.role === 'admin' || formData.role === 'staff') && currentUser.role === 'supreme_admin')) && (
                 <div className="space-y-2">
                   <Label htmlFor="territory" className="text-slate-300">Territory *</Label>
                   <select
@@ -857,12 +806,13 @@ function UsersContent() {
                   >
                     <option value="">Select territory</option>
                     {territories.map((territory) => (
-                      <option key={territory.id} value={territory.id.toString()}>{territory.name}</option>
+                      <option key={territory.id} value={territory.id.toString()}>{territory.name} ({territory.code})</option>
                     ))}
                   </select>
                 </div>
               )}
 
+              {/* Area - show for AM and Staff roles */}
               {(formData.role === 'admin' || formData.role === 'staff') && (
                 <div className="space-y-2">
                   <Label htmlFor="area" className="text-slate-300">Area *</Label>
@@ -875,12 +825,13 @@ function UsersContent() {
                   >
                     <option value="">Select area</option>
                     {filteredAreas.map((area) => (
-                      <option key={area.id} value={area.id.toString()}>{area.name}</option>
+                      <option key={area.id} value={area.id.toString()}>{area.name} ({area.code})</option>
                     ))}
                   </select>
                 </div>
               )}
 
+              {/* Branch - show for Staff role */}
               {formData.role === 'staff' && (
                 <div className="space-y-2">
                   <Label htmlFor="branch" className="text-slate-300">Branch *</Label>
@@ -893,23 +844,21 @@ function UsersContent() {
                     <option value="">Select branch</option>
                     {filteredBranches.map((branch) => (
                       <option key={branch.id} value={branch.id.toString()}>
-                        {branch.name} ({branch.branch_id})
+                        {branch.name} ({branch.code})
                       </option>
                     ))}
                   </select>
-                  <p className="text-xs text-slate-500">Username will be set to Branch ID</p>
                 </div>
               )}
 
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label htmlFor="username" className="text-slate-300">Username / Branch ID *</Label>
+                  <Label htmlFor="username" className="text-slate-300">Username *</Label>
                   <Input
                     id="username"
-                    placeholder={formData.role === 'staff' ? 'BR001' : 'e.g., tm_dubai'}
+                    placeholder={formData.role === 'staff' ? 'e.g., staff_ahmed' : 'e.g., tm_dubai'}
                     value={formData.username}
                     onChange={(e) => setFormData({ ...formData, username: e.target.value })}
-                    disabled={formData.role === 'staff' && formData.branch_id}
                     className="bg-slate-700/50 border-slate-600 text-white placeholder:text-slate-500 font-mono"
                   />
                 </div>
@@ -927,7 +876,7 @@ function UsersContent() {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="email" className="text-slate-300">Email</Label>
+                <Label htmlFor="email" className="text-slate-300">Email *</Label>
                 <Input
                   id="email"
                   type="email"

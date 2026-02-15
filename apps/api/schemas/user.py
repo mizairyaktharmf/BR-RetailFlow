@@ -48,6 +48,9 @@ class UserResponse(UserBase):
     branch_id: Optional[int] = None
     area_id: Optional[int] = None
     territory_id: Optional[int] = None
+    branch_name: Optional[str] = None
+    area_name: Optional[str] = None
+    territory_name: Optional[str] = None
     created_at: datetime
     last_login: Optional[datetime] = None
 
