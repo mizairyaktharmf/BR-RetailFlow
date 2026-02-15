@@ -12,7 +12,8 @@ import {
   AlertCircle,
   CheckCircle2,
   Cake,
-  UserPlus
+  UserPlus,
+  Loader2
 } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import api from '@/services/api'
@@ -27,80 +28,64 @@ export default function DashboardPage() {
   const router = useRouter()
   const [user, setUser] = useState(null)
   const [stats, setStats] = useState(null)
-  const [isDemo, setIsDemo] = useState(false)
+  const [statsLoading, setStatsLoading] = useState(true)
   const [cakeAlerts, setCakeAlerts] = useState({ alerts: [], total_count: 0, critical_count: 0, warning_count: 0 })
   const [pendingApprovals, setPendingApprovals] = useState([])
 
   useEffect(() => {
     const storedUser = localStorage.getItem('br_admin_user')
-    const demoMode = localStorage.getItem('br_demo_mode')
 
     if (storedUser) {
       setUser(JSON.parse(storedUser))
     }
-    setIsDemo(demoMode === 'true')
 
-    // Demo stats based on role
-    if (demoMode === 'true' && storedUser) {
-      const userData = JSON.parse(storedUser)
-      if (userData.role === 'supreme_admin') {
-        setStats({
-          territories: 5,
-          areas: 18,
-          branches: 52,
-          users: 156,
-          activeToday: 48,
-          inventorySubmitted: 45,
-          salesSubmitted: 42,
-        })
-      } else if (userData.role === 'super_admin') {
-        setStats({
-          areas: 4,
-          branches: 12,
-          users: 36,
-          activeToday: 10,
-          inventorySubmitted: 10,
-          salesSubmitted: 9,
-        })
-      } else {
-        setStats({
-          branches: 3,
-          users: 9,
-          activeToday: 3,
-          inventorySubmitted: 3,
-          salesSubmitted: 2,
-        })
-      }
-    }
+    loadDashboardData()
+  }, [])
 
-    // Load cake low-stock alerts
-    const loadCakeAlerts = async () => {
+  const loadDashboardData = async () => {
+    setStatsLoading(true)
+    try {
+      const storedUser = localStorage.getItem('br_admin_user')
+      const userData = storedUser ? JSON.parse(storedUser) : null
+
+      // Fetch real counts from API in parallel
+      const [territoriesData, areasData, branchesData, usersData] = await Promise.all([
+        api.getTerritories().catch(() => []),
+        api.getAreas().catch(() => []),
+        api.getBranches().catch(() => []),
+        api.getUsers().catch(() => []),
+      ])
+
+      setStats({
+        territories: territoriesData.length,
+        areas: areasData.length,
+        branches: branchesData.length,
+        users: usersData.length,
+      })
+
+      // Load cake low-stock alerts
       try {
-        const data = await api.getCakeLowStockAlerts()
-        setCakeAlerts(data)
-      } catch (err) {
-        // Silently fail - alerts are not critical for dashboard load
-      }
-    }
-    loadCakeAlerts()
-
-    // Load pending approvals (HQ only)
-    const loadPendingApprovals = async () => {
-      try {
-        const storedUserData = localStorage.getItem('br_admin_user')
-        if (storedUserData) {
-          const userData = JSON.parse(storedUserData)
-          if (userData.role === 'supreme_admin') {
-            const data = await api.getPendingApprovals()
-            setPendingApprovals(data)
-          }
-        }
+        const cakeData = await api.getCakeLowStockAlerts()
+        setCakeAlerts(cakeData)
       } catch (err) {
         // Silently fail
       }
+
+      // Load pending approvals (HQ only)
+      if (userData?.role === 'supreme_admin') {
+        try {
+          const pending = await api.getPendingApprovals()
+          setPendingApprovals(pending)
+        } catch (err) {
+          // Silently fail
+        }
+      }
+    } catch (err) {
+      // Silently fail
+    } finally {
+      setStatsLoading(false)
     }
-    loadPendingApprovals()
-  }, [])
+  }
 
   if (!user) return null
 
@@ -123,12 +108,6 @@ export default function DashboardPage() {
             Here's what's happening in your {user.role === 'supreme_admin' ? 'network' : user.role === 'super_admin' ? 'territory' : 'area'} today.
           </p>
         </div>
-        {isDemo && (
-          <div className="px-3 py-1.5 rounded-full bg-amber-500/20 border border-amber-500/30 text-amber-300 text-xs font-medium flex items-center gap-2">
-            <AlertCircle className="w-3.5 h-3.5" />
-            Demo Mode
-          </div>
-        )}
       </div>
 
       {/* Stats Grid */}
@@ -139,7 +118,11 @@ export default function DashboardPage() {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-slate-400 text-xs font-medium">Territories</p>
-                  <p className="text-2xl font-bold text-white mt-1">{stats?.territories || 0}</p>
+                  {statsLoading ? (
+                    <Loader2 className="w-5 h-5 text-slate-500 animate-spin mt-2" />
+                  ) : (
+                    <p className="text-2xl font-bold text-white mt-1">{stats?.territories || 0}</p>
+                  )}
                 </div>
                 <div className="w-10 h-10 rounded-lg bg-purple-500/20 flex items-center justify-center">
                   <Globe className="w-5 h-5 text-purple-400" />
@@ -154,8 +137,12 @@ export default function DashboardPage() {
             <CardContent className="p-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-slate-400 text-xs font-medium">Areas</p>
-                  <p className="text-2xl font-bold text-white mt-1">{stats?.areas || 0}</p>
+                  <p className="text-slate-400 text-xs font-medium">Area Managers</p>
+                  {statsLoading ? (
+                    <Loader2 className="w-5 h-5 text-slate-500 animate-spin mt-2" />
+                  ) : (
+                    <p className="text-2xl font-bold text-white mt-1">{stats?.areas || 0}</p>
+                  )}
                 </div>
                 <div className="w-10 h-10 rounded-lg bg-blue-500/20 flex items-center justify-center">
                   <MapPin className="w-5 h-5 text-blue-400" />
@@ -170,7 +157,11 @@ export default function DashboardPage() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-slate-400 text-xs font-medium">Branches</p>
-                <p className="text-2xl font-bold text-white mt-1">{stats?.branches || 0}</p>
+                {statsLoading ? (
+                  <Loader2 className="w-5 h-5 text-slate-500 animate-spin mt-2" />
+                ) : (
+                  <p className="text-2xl font-bold text-white mt-1">{stats?.branches || 0}</p>
+                )}
               </div>
               <div className="w-10 h-10 rounded-lg bg-cyan-500/20 flex items-center justify-center">
                 <Building2 className="w-5 h-5 text-cyan-400" />
@@ -184,7 +175,11 @@ export default function DashboardPage() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-slate-400 text-xs font-medium">Users</p>
-                <p className="text-2xl font-bold text-white mt-1">{stats?.users || 0}</p>
+                {statsLoading ? (
+                  <Loader2 className="w-5 h-5 text-slate-500 animate-spin mt-2" />
+                ) : (
+                  <p className="text-2xl font-bold text-white mt-1">{stats?.users || 0}</p>
+                )}
               </div>
               <div className="w-10 h-10 rounded-lg bg-green-500/20 flex items-center justify-center">
                 <Users className="w-5 h-5 text-green-400" />
@@ -242,71 +237,13 @@ export default function DashboardPage() {
                 {cakeAlerts.total_count > 3 && ` +${cakeAlerts.total_count - 3} more`}
               </p>
             </div>
-            <span className="text-xs text-red-400">View All →</span>
+            <span className="text-xs text-red-400">View All</span>
           </div>
         </div>
       )}
 
-      {/* Activity Section */}
+      {/* Quick Actions */}
       <div className="grid lg:grid-cols-2 gap-6">
-        {/* Today's Activity */}
-        <Card className="bg-slate-800/50 border-slate-700">
-          <CardHeader className="pb-3">
-            <CardTitle className="text-lg text-white">Today's Activity</CardTitle>
-            <CardDescription className="text-slate-400">Branch submission status</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="flex items-center justify-between p-3 rounded-lg bg-slate-700/30">
-              <div className="flex items-center gap-3">
-                <div className="w-8 h-8 rounded-lg bg-green-500/20 flex items-center justify-center">
-                  <CheckCircle2 className="w-4 h-4 text-green-400" />
-                </div>
-                <div>
-                  <p className="text-sm font-medium text-white">Inventory Submitted</p>
-                  <p className="text-xs text-slate-400">Branches completed today</p>
-                </div>
-              </div>
-              <div className="text-right">
-                <p className="text-lg font-bold text-white">{stats?.inventorySubmitted || 0}</p>
-                <p className="text-xs text-slate-500">of {stats?.branches || 0}</p>
-              </div>
-            </div>
-
-            <div className="flex items-center justify-between p-3 rounded-lg bg-slate-700/30">
-              <div className="flex items-center gap-3">
-                <div className="w-8 h-8 rounded-lg bg-blue-500/20 flex items-center justify-center">
-                  <TrendingUp className="w-4 h-4 text-blue-400" />
-                </div>
-                <div>
-                  <p className="text-sm font-medium text-white">Sales Reported</p>
-                  <p className="text-xs text-slate-400">At least one window</p>
-                </div>
-              </div>
-              <div className="text-right">
-                <p className="text-lg font-bold text-white">{stats?.salesSubmitted || 0}</p>
-                <p className="text-xs text-slate-500">of {stats?.branches || 0}</p>
-              </div>
-            </div>
-
-            <div className="flex items-center justify-between p-3 rounded-lg bg-slate-700/30">
-              <div className="flex items-center gap-3">
-                <div className="w-8 h-8 rounded-lg bg-purple-500/20 flex items-center justify-center">
-                  <Users className="w-4 h-4 text-purple-400" />
-                </div>
-                <div>
-                  <p className="text-sm font-medium text-white">Active Flavor Experts</p>
-                  <p className="text-xs text-slate-400">Logged in today</p>
-                </div>
-              </div>
-              <div className="text-right">
-                <p className="text-lg font-bold text-white">{stats?.activeToday || 0}</p>
-                <p className="text-xs text-slate-500">of {stats?.users || 0}</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Quick Actions */}
         <Card className="bg-slate-800/50 border-slate-700">
           <CardHeader className="pb-3">
             <CardTitle className="text-lg text-white">Quick Actions</CardTitle>
@@ -337,8 +274,8 @@ export default function DashboardPage() {
                   <MapPin className="w-4 h-4 text-blue-400" />
                 </div>
                 <div>
-                  <p className="text-sm font-medium text-white">Manage Areas</p>
-                  <p className="text-xs text-slate-400">Add, edit, or remove areas</p>
+                  <p className="text-sm font-medium text-white">Manage Area Managers</p>
+                  <p className="text-xs text-slate-400">Add, assign, or manage area managers</p>
                 </div>
               </a>
             )}
@@ -386,6 +323,81 @@ export default function DashboardPage() {
                 </p>
               </div>
             </a>
+          </CardContent>
+        </Card>
+
+        {/* Overview Card */}
+        <Card className="bg-slate-800/50 border-slate-700">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-lg text-white">System Overview</CardTitle>
+            <CardDescription className="text-slate-400">Current system status</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="flex items-center justify-between p-3 rounded-lg bg-slate-700/30">
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 rounded-lg bg-green-500/20 flex items-center justify-center">
+                  <CheckCircle2 className="w-4 h-4 text-green-400" />
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-white">API Status</p>
+                  <p className="text-xs text-slate-400">Backend service</p>
+                </div>
+              </div>
+              <span className="px-2 py-1 rounded text-xs font-medium bg-green-500/20 text-green-300">Online</span>
+            </div>
+
+            <div className="flex items-center justify-between p-3 rounded-lg bg-slate-700/30">
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 rounded-lg bg-purple-500/20 flex items-center justify-center">
+                  <Users className="w-4 h-4 text-purple-400" />
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-white">Your Role</p>
+                  <p className="text-xs text-slate-400">{
+                    user.role === 'supreme_admin' ? 'HQ Admin' :
+                    user.role === 'super_admin' ? 'Territory Manager' :
+                    user.role === 'admin' ? 'Area Manager' : 'Staff'
+                  }</p>
+                </div>
+              </div>
+              <span className="px-2 py-1 rounded text-xs font-medium bg-purple-500/20 text-purple-300">
+                {roleLabels[user.role] || user.role}
+              </span>
+            </div>
+
+            {user.territory_name && (
+              <div className="flex items-center justify-between p-3 rounded-lg bg-slate-700/30">
+                <div className="flex items-center gap-3">
+                  <div className="w-8 h-8 rounded-lg bg-blue-500/20 flex items-center justify-center">
+                    <Globe className="w-4 h-4 text-blue-400" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium text-white">Territory</p>
+                    <p className="text-xs text-slate-400">Your assigned territory</p>
+                  </div>
+                </div>
+                <span className="px-2 py-1 rounded text-xs font-medium bg-blue-500/20 text-blue-300">
+                  {user.territory_name}
+                </span>
+              </div>
+            )}
+
+            {user.area_name && (
+              <div className="flex items-center justify-between p-3 rounded-lg bg-slate-700/30">
+                <div className="flex items-center gap-3">
+                  <div className="w-8 h-8 rounded-lg bg-cyan-500/20 flex items-center justify-center">
+                    <MapPin className="w-4 h-4 text-cyan-400" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium text-white">Area</p>
+                    <p className="text-xs text-slate-400">Your assigned area</p>
+                  </div>
+                </div>
+                <span className="px-2 py-1 rounded text-xs font-medium bg-cyan-500/20 text-cyan-300">
+                  {user.area_name}
+                </span>
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>
