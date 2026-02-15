@@ -19,7 +19,7 @@ from utils.security import (
     get_password_hash
 )
 from models.user import User, UserRole
-from schemas.user import UserLogin, TokenResponse, UserResponse, UserCreate, VerifyAccount
+from schemas.user import UserLogin, TokenResponse, UserResponse, UserCreate, VerifyAccount, PasswordChange
 
 router = APIRouter()
 
@@ -242,10 +242,66 @@ async def refresh_token(refresh_token: str, db: Session = Depends(get_db)):
 
 
 @router.get("/me", response_model=UserResponse)
-async def get_current_user_info(current_user: User = Depends(get_current_user)):
+async def get_current_user_info(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
     """
-    Get current authenticated user info
+    Get current authenticated user info with location names
     """
+    from models.location import Territory, Area, Branch
+    resp = UserResponse.model_validate(current_user)
+    if current_user.territory_id:
+        territory = db.query(Territory).filter(Territory.id == current_user.territory_id).first()
+        resp.territory_name = territory.name if territory else None
+    if current_user.area_id:
+        area = db.query(Area).filter(Area.id == current_user.area_id).first()
+        resp.area_name = area.name if area else None
+    if current_user.branch_id:
+        branch = db.query(Branch).filter(Branch.id == current_user.branch_id).first()
+        resp.branch_name = branch.name if branch else None
+    return resp
+
+
+@router.post("/change-password")
+async def change_password(
+    data: PasswordChange,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Change current user's password. Requires current password for verification.
+    """
+    if not verify_password(data.current_password, current_user.hashed_password):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Current password is incorrect"
+        )
+
+    current_user.hashed_password = get_password_hash(data.new_password)
+    db.commit()
+
+    return {"message": "Password changed successfully"}
+
+
+@router.put("/profile", response_model=UserResponse)
+async def update_profile(
+    data: dict,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Update current user's own profile (full_name, phone only).
+    Users cannot change their own role, email, or username.
+    """
+    allowed_fields = {'full_name', 'phone'}
+    for field, value in data.items():
+        if field in allowed_fields and value is not None:
+            setattr(current_user, field, value)
+
+    db.commit()
+    db.refresh(current_user)
+
     return UserResponse.model_validate(current_user)
 
 

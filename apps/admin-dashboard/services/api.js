@@ -120,6 +120,20 @@ class ApiService {
     return this.request('/auth/me')
   }
 
+  async changePassword(currentPassword, newPassword) {
+    return this.request('/auth/change-password', {
+      method: 'POST',
+      body: JSON.stringify({ current_password: currentPassword, new_password: newPassword }),
+    })
+  }
+
+  async updateProfile(data) {
+    return this.request('/auth/profile', {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    })
+  }
+
   // ============ FLAVORS ============
   async getFlavors() {
     return this.request('/flavors')

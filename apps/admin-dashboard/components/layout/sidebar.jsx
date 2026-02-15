@@ -22,7 +22,7 @@ import { Button } from '@/components/ui/button'
 const navigation = [
   { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard, roles: ['supreme_admin', 'super_admin', 'admin'] },
   { name: 'Territories', href: '/dashboard/territories', icon: Globe, roles: ['supreme_admin'] },
-  { name: 'Areas', href: '/dashboard/areas', icon: MapPin, roles: ['supreme_admin', 'super_admin'] },
+  { name: 'Area Managers', href: '/dashboard/areas', icon: MapPin, roles: ['supreme_admin', 'super_admin'] },
   { name: 'Branches', href: '/dashboard/branches', icon: Building2, roles: ['supreme_admin', 'super_admin', 'admin'] },
   { name: 'Users', href: '/dashboard/users', icon: Users, roles: ['supreme_admin', 'super_admin', 'admin'] },
   { name: 'Cake Alerts', href: '/dashboard/cake-alerts', icon: Cake, roles: ['supreme_admin', 'super_admin', 'admin'] },
@@ -88,9 +88,15 @@ export default function Sidebar() {
         )}
       </div>
 
-      {/* User Info */}
+      {/* User Info - clickable to profile */}
       {user && (!collapsed || mobile) && (
-        <div className="p-4 border-b border-slate-700">
+        <button
+          onClick={() => {
+            router.push('/dashboard/profile')
+            if (mobile) setMobileOpen(false)
+          }}
+          className="w-full p-4 border-b border-slate-700 hover:bg-slate-800/50 transition-colors text-left"
+        >
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-full bg-gradient-to-br from-purple-500 to-indigo-500 flex items-center justify-center text-white font-medium text-sm">
               {user.full_name?.split(' ').map(n => n[0]).join('').slice(0, 2) || 'AD'}
@@ -107,7 +113,17 @@ export default function Sidebar() {
               </div>
             </div>
           </div>
-        </div>
+        </button>
+      )}
+      {user && collapsed && !mobile && (
+        <button
+          onClick={() => router.push('/dashboard/profile')}
+          className="w-full p-3 border-b border-slate-700 hover:bg-slate-800/50 transition-colors flex justify-center"
+        >
+          <div className="w-8 h-8 rounded-full bg-gradient-to-br from-purple-500 to-indigo-500 flex items-center justify-center text-white font-medium text-xs">
+            {user.full_name?.split(' ').map(n => n[0]).join('').slice(0, 2) || 'AD'}
+          </div>
+        </button>
       )}
 
       {/* Navigation */}

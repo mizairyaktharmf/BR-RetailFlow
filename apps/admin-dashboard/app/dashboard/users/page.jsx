@@ -31,11 +31,14 @@ import {
 } from 'lucide-react'
 import api from '@/services/api'
 
-const roleOptions = [
+const allRoleOptions = [
+  { value: 'supreme_admin', label: 'HQ Admin', color: 'bg-purple-500/20 text-purple-300' },
   { value: 'super_admin', label: 'Territory Manager (TM)', color: 'bg-blue-500/20 text-blue-300' },
   { value: 'admin', label: 'Area Manager (AM)', color: 'bg-cyan-500/20 text-cyan-300' },
   { value: 'staff', label: 'Flavor Expert', color: 'bg-green-500/20 text-green-300' },
 ]
+
+const roleOptions = allRoleOptions.filter(r => r.value !== 'supreme_admin')
 
 const roleColors = {
   supreme_admin: 'bg-purple-500/20 text-purple-300',
@@ -791,7 +794,7 @@ function UsersContent() {
                   disabled={selectedUser}
                   className="w-full px-3 py-2 rounded-lg bg-slate-700/50 border border-slate-600 text-white focus:outline-none focus:ring-2 focus:ring-green-500 disabled:opacity-50"
                 >
-                  {availableRoles.map((role) => (
+                  {(selectedUser ? allRoleOptions : availableRoles).map((role) => (
                     <option key={role.value} value={role.value}>{role.label}</option>
                   ))}
                 </select>

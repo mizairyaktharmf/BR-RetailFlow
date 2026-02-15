@@ -58,7 +58,7 @@ class Area(Base):
 
     # Relationships
     territory = relationship("Territory", back_populates="areas")
-    branches = relationship("Branch", back_populates="area", cascade="all, delete-orphan")
+    branches = relationship("Branch", back_populates="area")
     managers = relationship("User", back_populates="area")
 
     def __repr__(self):
@@ -80,14 +80,16 @@ class Branch(Base):
     phone = Column(String(20), nullable=True)
     is_active = Column(Boolean, default=True)
 
-    # Foreign key to area
-    area_id = Column(Integer, ForeignKey("areas.id"), nullable=False)
+    # Foreign keys
+    territory_id = Column(Integer, ForeignKey("territories.id"), nullable=False)
+    area_id = Column(Integer, ForeignKey("areas.id"), nullable=True)  # Set when TM assigns to AM
 
     # Timestamps
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
 
     # Relationships
+    territory = relationship("Territory")
     area = relationship("Area", back_populates="branches")
     staff = relationship("User", back_populates="branch")
     daily_inventory = relationship("DailyInventory", back_populates="branch", cascade="all, delete-orphan")

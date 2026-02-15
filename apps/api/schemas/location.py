@@ -84,7 +84,8 @@ class BranchBase(BaseModel):
     code: str = Field(..., min_length=2, max_length=50)
     address: Optional[str] = None
     phone: Optional[str] = None
-    area_id: int
+    territory_id: int
+    area_id: Optional[int] = None  # Set when TM assigns to AM
 
 
 class BranchCreate(BranchBase):
@@ -98,6 +99,7 @@ class BranchUpdate(BaseModel):
     code: Optional[str] = Field(None, min_length=2, max_length=50)
     address: Optional[str] = None
     phone: Optional[str] = None
+    territory_id: Optional[int] = None
     area_id: Optional[int] = None
     is_active: Optional[bool] = None
 

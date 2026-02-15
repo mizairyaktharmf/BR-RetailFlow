@@ -189,13 +189,13 @@ async def list_branches(
     elif current_user.role == UserRole.ADMIN:
         query = query.filter(Branch.area_id == current_user.area_id)
     elif current_user.role == UserRole.SUPER_ADMIN:
-        query = query.join(Area).filter(Area.territory_id == current_user.territory_id)
+        query = query.filter(Branch.territory_id == current_user.territory_id)
     # Supreme admin sees all
 
     if area_id:
         query = query.filter(Branch.area_id == area_id)
     if territory_id:
-        query = query.join(Area).filter(Area.territory_id == territory_id)
+        query = query.filter(Branch.territory_id == territory_id)
     if is_active is not None:
         query = query.filter(Branch.is_active == is_active)
 
@@ -205,7 +205,7 @@ async def list_branches(
     for branch in branches:
         branch_response = BranchResponse.model_validate(branch)
         branch_response.area_name = branch.area.name if branch.area else None
-        branch_response.territory_name = branch.area.territory.name if branch.area and branch.area.territory else None
+        branch_response.territory_name = branch.territory.name if branch.territory else None
         branch_response.staff_count = len(branch.staff)
         result.append(branch_response)
     return result
@@ -232,12 +232,12 @@ async def get_branch(
         if branch.area_id != current_user.area_id:
             raise HTTPException(status_code=403, detail="Access denied")
     elif current_user.role == UserRole.SUPER_ADMIN:
-        if branch.area.territory_id != current_user.territory_id:
+        if branch.territory_id != current_user.territory_id:
             raise HTTPException(status_code=403, detail="Access denied")
 
     response = BranchResponse.model_validate(branch)
     response.area_name = branch.area.name if branch.area else None
-    response.territory_name = branch.area.territory.name if branch.area and branch.area.territory else None
+    response.territory_name = branch.territory.name if branch.territory else None
     return response
 
 
@@ -248,24 +248,37 @@ async def create_branch(
     db: Session = Depends(get_db)
 ):
     """
-    Create a new branch (Supreme Admin / HQ only)
+    Create a new branch under a territory (Supreme Admin / HQ only).
+    TM will later assign the branch to an Area Manager.
     """
     # Check for duplicate code
     existing = db.query(Branch).filter(Branch.code == data.code).first()
     if existing:
         raise HTTPException(status_code=400, detail="Branch code already exists")
 
-    # Verify area exists
-    area = db.query(Area).filter(Area.id == data.area_id).first()
-    if not area:
-        raise HTTPException(status_code=400, detail="Area not found")
+    # Verify territory exists
+    territory = db.query(Territory).filter(Territory.id == data.territory_id).first()
+    if not territory:
+        raise HTTPException(status_code=400, detail="Territory not found")
+
+    # If area_id provided, verify it belongs to the same territory
+    if data.area_id:
+        area = db.query(Area).filter(Area.id == data.area_id).first()
+        if not area:
+            raise HTTPException(status_code=400, detail="Area not found")
+        if area.territory_id != data.territory_id:
+            raise HTTPException(status_code=400, detail="Area does not belong to selected territory")
 
     branch = Branch(**data.model_dump())
     db.add(branch)
     db.commit()
     db.refresh(branch)
 
-    return BranchResponse.model_validate(branch)
+    response = BranchResponse.model_validate(branch)
+    response.territory_name = territory.name
+    if branch.area:
+        response.area_name = branch.area.name
+    return response
 
 
 @router.put("/{branch_id}", response_model=BranchResponse)

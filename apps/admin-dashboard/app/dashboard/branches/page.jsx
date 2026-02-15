@@ -44,7 +44,7 @@ export default function BranchesPage() {
   const [formData, setFormData] = useState({
     name: '',
     code: '',
-    area_id: '',
+    territory_id: '',
     address: '',
     phone: '',
     is_active: true
@@ -93,7 +93,7 @@ export default function BranchesPage() {
       setFormData({
         name: branch.name,
         code: branch.code,
-        area_id: branch.area_id?.toString() || '',
+        territory_id: branch.territory_id?.toString() || '',
         address: branch.address || '',
         phone: branch.phone || '',
         is_active: branch.is_active
@@ -102,7 +102,7 @@ export default function BranchesPage() {
       setFormData({
         name: '',
         code: '',
-        area_id: user?.role === 'admin' ? user.area_id?.toString() : '',
+        territory_id: '',
         address: '',
         phone: '',
         is_active: true
@@ -115,7 +115,7 @@ export default function BranchesPage() {
   const handleCloseModal = () => {
     setIsModalOpen(false)
     setSelectedBranch(null)
-    setFormData({ name: '', code: '', area_id: '', address: '', phone: '', is_active: true })
+    setFormData({ name: '', code: '', territory_id: '', address: '', phone: '', is_active: true })
     setError('')
   }
 
@@ -123,7 +123,7 @@ export default function BranchesPage() {
     e.preventDefault()
     setError('')
 
-    if (!formData.name.trim() || !formData.code.trim() || !formData.area_id) {
+    if (!formData.name.trim() || !formData.code.trim() || !formData.territory_id) {
       setError('Please fill in all required fields')
       return
     }
@@ -134,7 +134,7 @@ export default function BranchesPage() {
       const apiData = {
         name: formData.name,
         code: formData.code.toUpperCase(),
-        area_id: parseInt(formData.area_id),
+        territory_id: parseInt(formData.territory_id),
         address: formData.address || null,
         phone: formData.phone || null,
         is_active: formData.is_active
@@ -379,14 +379,21 @@ export default function BranchesPage() {
             <CardContent className="pt-0 space-y-3">
               {/* Location Badges */}
               <div className="flex flex-wrap gap-2">
-                <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-blue-500/20 text-blue-300 text-xs">
-                  <MapPin className="w-3 h-3" />
-                  {branch.area_name || areas.find(a => a.id === branch.area_id)?.name || 'Unknown'}
-                </span>
                 <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-purple-500/20 text-purple-300 text-xs">
                   <Globe className="w-3 h-3" />
                   {branch.territory_name || 'Unknown'}
                 </span>
+                {branch.area_name ? (
+                  <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-blue-500/20 text-blue-300 text-xs">
+                    <MapPin className="w-3 h-3" />
+                    {branch.area_name}
+                  </span>
+                ) : (
+                  <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-amber-500/20 text-amber-300 text-xs">
+                    <MapPin className="w-3 h-3" />
+                    Not assigned to AM
+                  </span>
+                )}
               </div>
 
               {/* Address & Phone */}
@@ -482,18 +489,17 @@ export default function BranchesPage() {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="area" className="text-slate-300">Area *</Label>
+                <Label htmlFor="territory" className="text-slate-300">Territory *</Label>
                 <select
-                  id="area"
-                  value={formData.area_id}
-                  onChange={(e) => setFormData({ ...formData, area_id: e.target.value })}
-                  disabled={user?.role === 'admin'}
+                  id="territory"
+                  value={formData.territory_id}
+                  onChange={(e) => setFormData({ ...formData, territory_id: e.target.value })}
                   className="w-full px-3 py-2 rounded-lg bg-slate-700/50 border border-slate-600 text-white focus:outline-none focus:ring-2 focus:ring-cyan-500 disabled:opacity-50"
                 >
-                  <option value="">Select area</option>
-                  {areas.map((area) => (
-                    <option key={area.id} value={area.id.toString()}>
-                      {area.name} ({area.territory_name || territories.find(t => t.id === area.territory_id)?.name || ''})
+                  <option value="">Select territory</option>
+                  {territories.map((territory) => (
+                    <option key={territory.id} value={territory.id.toString()}>
+                      {territory.name} ({territory.code})
                     </option>
                   ))}
                 </select>
