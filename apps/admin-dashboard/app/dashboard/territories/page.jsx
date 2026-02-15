@@ -277,10 +277,8 @@ export default function TerritoriesPage() {
                   placeholder="e.g., DXB"
                   value={formData.code}
                   onChange={(e) => setFormData({ ...formData, code: e.target.value.toUpperCase() })}
-                  maxLength={5}
                   className="bg-slate-700/50 border-slate-600 text-white placeholder:text-slate-500 uppercase"
                 />
-                <p className="text-xs text-slate-500">Short code for the territory (max 5 chars)</p>
               </div>
 
               <div className="flex gap-3 pt-2">
