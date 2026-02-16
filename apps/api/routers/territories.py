@@ -57,6 +57,13 @@ async def list_territories(
         ).first()
         resp.tm_name = tm.full_name if tm else None
 
+        # Count Area Managers in this territory
+        resp.am_count = db.query(sa_func.count(User.id)).filter(
+            User.territory_id == t.id,
+            User.role == UserRole.ADMIN,
+            User.is_active == True
+        ).scalar() or 0
+
         # Count branches directly by territory_id
         resp.branches_count = db.query(sa_func.count(Branch.id)).filter(
             Branch.territory_id == t.id

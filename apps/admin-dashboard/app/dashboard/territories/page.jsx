@@ -14,6 +14,7 @@ import {
   Edit2,
   Trash2,
   Shield,
+  UserCheck,
   Building2,
   Users,
   X,
@@ -198,15 +199,20 @@ export default function TerritoriesPage() {
               </div>
             </CardHeader>
             <CardContent className="pt-0">
+              <div className="flex items-center gap-1.5 mb-2 px-1">
+                <Shield className="w-3 h-3 text-purple-400 shrink-0" />
+                <p className="text-[10px] text-slate-500">TM:</p>
+                <p className="text-xs font-semibold text-white truncate" title={territory.tm_name || 'Not Assigned'}>
+                  {territory.tm_name || '—'}
+                </p>
+              </div>
               <div className="grid grid-cols-3 gap-2 text-center">
                 <div className="p-2 rounded-lg bg-slate-700/30">
-                  <div className="flex items-center justify-center gap-1 text-purple-400 mb-1">
-                    <Shield className="w-3 h-3" />
+                  <div className="flex items-center justify-center gap-1 text-orange-400 mb-1">
+                    <UserCheck className="w-3 h-3" />
                   </div>
-                  <p className="text-xs font-semibold text-white truncate" title={territory.tm_name || 'Not Assigned'}>
-                    {territory.tm_name || '—'}
-                  </p>
-                  <p className="text-[10px] text-slate-500">TM</p>
+                  <p className="text-sm font-semibold text-white">{territory.am_count || 0}</p>
+                  <p className="text-[10px] text-slate-500">AMs</p>
                 </div>
                 <div className="p-2 rounded-lg bg-slate-700/30">
                   <div className="flex items-center justify-center gap-1 text-cyan-400 mb-1">

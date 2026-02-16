@@ -34,6 +34,7 @@ class TerritoryResponse(TerritoryBase):
     is_active: bool
     created_at: datetime
     tm_name: Optional[str] = None
+    am_count: Optional[int] = None
     branches_count: Optional[int] = None
     users_count: Optional[int] = None
 
