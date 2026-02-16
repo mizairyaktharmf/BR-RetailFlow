@@ -6,11 +6,17 @@ Handles territory, area, and branch management
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.orm import Session
 from typing import List, Optional
+from pydantic import BaseModel
 
 from utils.database import get_db
 from utils.security import get_current_user, require_role
 from models.user import User, UserRole
 from models.location import Territory, Area, Branch
+
+
+class BranchAssignRequest(BaseModel):
+    """Schema for assigning a branch to an area/AM"""
+    area_id: Optional[int] = None
 from schemas.location import (
     TerritoryCreate, TerritoryUpdate, TerritoryResponse,
     AreaCreate, AreaUpdate, AreaResponse,
@@ -278,6 +284,45 @@ async def create_branch(
     response.territory_name = territory.name
     if branch.area:
         response.area_name = branch.area.name
+    return response
+
+
+@router.post("/{branch_id}/assign", response_model=BranchResponse)
+async def assign_branch(
+    branch_id: int,
+    data: BranchAssignRequest,
+    current_user: User = Depends(require_role([UserRole.SUPREME_ADMIN, UserRole.SUPER_ADMIN])),
+    db: Session = Depends(get_db),
+):
+    """
+    Assign a branch to an area (and its Area Manager), or unassign by passing area_id=null.
+    HQ and TM can assign. TM only within their territory.
+    """
+    branch = db.query(Branch).filter(Branch.id == branch_id).first()
+    if not branch:
+        raise HTTPException(status_code=404, detail="Branch not found")
+
+    # TM can only assign within their territory
+    if current_user.role == UserRole.SUPER_ADMIN:
+        if branch.territory_id != current_user.territory_id:
+            raise HTTPException(status_code=403, detail="Cannot assign branches outside your territory")
+
+    if data.area_id is not None:
+        # Verify area exists and belongs to the same territory
+        area = db.query(Area).filter(Area.id == data.area_id).first()
+        if not area:
+            raise HTTPException(status_code=400, detail="Area not found")
+        if area.territory_id != branch.territory_id:
+            raise HTTPException(status_code=400, detail="Area does not belong to the same territory as the branch")
+
+    branch.area_id = data.area_id
+    db.commit()
+    db.refresh(branch)
+
+    response = BranchResponse.model_validate(branch)
+    response.area_name = branch.area.name if branch.area else None
+    response.territory_name = branch.territory.name if branch.territory else None
+    response.staff_count = len(branch.staff)
     return response
 
 

@@ -255,6 +255,13 @@ class ApiService {
     })
   }
 
+  async assignBranch(branchId, data) {
+    return this.request(`/branches/${branchId}/assign`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    })
+  }
+
   // ============ USERS ============
   async getUsers(filters = {}) {
     const params = new URLSearchParams()
