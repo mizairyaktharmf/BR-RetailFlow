@@ -45,11 +45,13 @@ export default function BranchesPage() {
   const [formData, setFormData] = useState({
     name: '',
     code: '',
+    password: '',
     territory_id: '',
     address: '',
     phone: '',
     is_active: true
   })
+  const [showFormPassword, setShowFormPassword] = useState(false)
   const [error, setError] = useState('')
   const [showTerritoryDropdown, setShowTerritoryDropdown] = useState(false)
 
@@ -104,12 +106,14 @@ export default function BranchesPage() {
       setFormData({
         name: '',
         code: '',
+        password: '',
         territory_id: '',
         address: '',
         phone: '',
         is_active: true
       })
     }
+    setShowFormPassword(false)
     setError('')
     setIsModalOpen(true)
   }
@@ -117,7 +121,7 @@ export default function BranchesPage() {
   const handleCloseModal = () => {
     setIsModalOpen(false)
     setSelectedBranch(null)
-    setFormData({ name: '', code: '', territory_id: '', address: '', phone: '', is_active: true })
+    setFormData({ name: '', code: '', password: '', territory_id: '', address: '', phone: '', is_active: true })
     setError('')
   }
 
@@ -127,6 +131,12 @@ export default function BranchesPage() {
 
     if (!formData.name.trim() || !formData.code.trim() || !formData.territory_id) {
       setError('Please fill in all required fields')
+      return
+    }
+
+    // Password required for new branches
+    if (!selectedBranch && (!formData.password || formData.password.length < 6)) {
+      setError('Password is required (minimum 6 characters)')
       return
     }
 
@@ -142,6 +152,11 @@ export default function BranchesPage() {
         is_active: formData.is_active
       }
 
+      // Include password only for new branch creation
+      if (!selectedBranch) {
+        apiData.password = formData.password
+      }
+
       if (selectedBranch) {
         const updated = await api.updateBranch(selectedBranch.id, apiData)
         setBranches(branches.map(b => b.id === selectedBranch.id ? updated : b))
@@ -152,13 +167,12 @@ export default function BranchesPage() {
         setBranches([...branches, created])
         handleCloseModal()
 
-        // Show branch credentials modal (login_id + password from backend)
-        if (created.login_id && created.generated_password) {
+        // Show branch credentials modal (branch code = Branch ID, password from form)
+        if (created.code) {
           setCreatedCredentials({
             branchName: created.name,
             branchCode: created.code,
-            loginId: created.login_id,
-            password: created.generated_password,
+            password: formData.password,
           })
           setShowCredsPassword(false)
           setCopiedField(null)
@@ -423,7 +437,7 @@ export default function BranchesPage() {
 
             {!selectedBranch && (
               <p className="text-xs text-slate-400 mb-4 -mt-2">
-                A unique Branch ID and password will be generated for Flavor Expert login
+                The Branch Code will be used as Branch ID for Flavor Expert login
               </p>
             )}
 
@@ -455,6 +469,30 @@ export default function BranchesPage() {
                   className="bg-slate-700/50 border-slate-600 text-white placeholder:text-slate-500"
                 />
               </div>
+
+              {!selectedBranch && (
+                <div className="space-y-2">
+                  <Label htmlFor="password" className="text-slate-300">Password *</Label>
+                  <div className="relative">
+                    <Input
+                      id="password"
+                      type={showFormPassword ? 'text' : 'password'}
+                      placeholder="Set password for Flavor Expert login"
+                      value={formData.password}
+                      onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                      className="bg-slate-700/50 border-slate-600 text-white placeholder:text-slate-500 pr-10"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowFormPassword(!showFormPassword)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white"
+                    >
+                      {showFormPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </button>
+                  </div>
+                  <p className="text-xs text-slate-500">Min 6 characters. Branch Code will be used as Branch ID for login.</p>
+                </div>
+              )}
 
               <div className="space-y-2">
                 <Label htmlFor="territory" className="text-slate-300">Territory *</Label>
@@ -560,12 +598,12 @@ export default function BranchesPage() {
                 <div>
                   <p className="text-[10px] text-slate-500 uppercase tracking-wider mb-1">Branch ID</p>
                   <div className="flex items-center justify-between bg-slate-800/80 rounded-lg px-3 py-2">
-                    <code className="text-sm text-white font-mono">{createdCredentials.loginId}</code>
+                    <code className="text-sm text-white font-mono">{createdCredentials.branchCode}</code>
                     <button
-                      onClick={() => copyToClipboard(createdCredentials.loginId, 'loginId')}
+                      onClick={() => copyToClipboard(createdCredentials.branchCode, 'branchCode')}
                       className="p-1 rounded hover:bg-slate-600 transition-colors"
                     >
-                      {copiedField === 'loginId' ? (
+                      {copiedField === 'branchCode' ? (
                         <Check className="w-3.5 h-3.5 text-green-400" />
                       ) : (
                         <Copy className="w-3.5 h-3.5 text-slate-400" />

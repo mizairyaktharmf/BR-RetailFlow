@@ -136,18 +136,19 @@ async def create_branch(
     if not territory:
         raise HTTPException(status_code=400, detail="Territory not found")
 
-    # Generate unique Branch ID and password
-    branch_code_clean = data.code.replace('-', '').replace(' ', '').lower()
-    login_id = f"br_{branch_code_clean}"
-    raw_password = generate_password()
+    # Use branch code as login_id and HQ-provided password
+    login_id = data.code
+    raw_password = data.password
 
     # Ensure login_id is unique
     existing_login = db.query(Branch).filter(Branch.login_id == login_id).first()
     if existing_login:
-        login_id = f"br_{branch_code_clean}_{secrets.randbelow(99):02d}"
+        raise HTTPException(status_code=400, detail="Branch ID already exists")
 
+    # Exclude password from model_dump since it's not a Branch column
+    branch_data = data.model_dump(exclude={"password"})
     branch = Branch(
-        **data.model_dump(),
+        **branch_data,
         login_id=login_id,
         hashed_password=get_password_hash(raw_password)
     )
@@ -155,8 +156,8 @@ async def create_branch(
     db.commit()
     db.refresh(branch)
 
-    # Auto-create a linked staff user for API authentication
-    fe_email = f"{login_id}@branch.brretailflow.com"
+    # Auto-create a linked staff user for API authentication (internal, hidden from admin)
+    fe_email = f"{login_id.lower().replace('-', '').replace(' ', '')}@branch.brretailflow.com"
     fe_user = User(
         email=fe_email,
         username=login_id,
@@ -172,7 +173,6 @@ async def create_branch(
     db.commit()
 
     response = enrich_branch_response(branch, db)
-    # Return the raw password so admin can share it (only shown once)
     return {
         **response.model_dump(),
         "generated_password": raw_password

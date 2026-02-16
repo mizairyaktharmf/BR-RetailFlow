@@ -94,8 +94,10 @@ async def branch_login(credentials: BranchLoginRequest, db: Session = Depends(ge
     Authenticate a branch (Flavor Expert app) using Branch ID and password.
     Returns JWT tokens for the linked staff user.
     """
-    # Find branch by login_id
-    branch = db.query(Branch).filter(Branch.login_id == credentials.branch_id).first()
+    # Find branch by login_id (case-insensitive, since branch code may be entered in any case)
+    branch = db.query(Branch).filter(
+        Branch.login_id.ilike(credentials.branch_id)
+    ).first()
 
     if not branch:
         raise HTTPException(

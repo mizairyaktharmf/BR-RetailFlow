@@ -90,7 +90,7 @@ class BranchBase(BaseModel):
 
 class BranchCreate(BranchBase):
     """Schema for creating a branch"""
-    pass
+    password: str = Field(..., min_length=6, max_length=50)
 
 
 class BranchUpdate(BaseModel):
