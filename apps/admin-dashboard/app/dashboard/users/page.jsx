@@ -26,7 +26,8 @@ import {
   UserX,
   Shield,
   Copy,
-  Check
+  Check,
+  ArrowRight
 } from 'lucide-react'
 import api from '@/services/api'
 
@@ -34,7 +35,7 @@ const allRoleOptions = [
   { value: 'supreme_admin', label: 'HQ Admin', color: 'bg-purple-500/20 text-purple-300' },
   { value: 'super_admin', label: 'Territory Manager (TM)', color: 'bg-blue-500/20 text-blue-300' },
   { value: 'admin', label: 'Area Manager (AM)', color: 'bg-cyan-500/20 text-cyan-300' },
-  { value: 'staff', label: 'Flavor Expert', color: 'bg-green-500/20 text-green-300' },
+  { value: 'staff', label: 'Flavor Expert (FE)', color: 'bg-green-500/20 text-green-300' },
 ]
 
 const roleOptions = allRoleOptions.filter(r => r.value !== 'supreme_admin')
@@ -44,6 +45,11 @@ const roleColors = {
   super_admin: 'bg-blue-500/20 text-blue-300',
   admin: 'bg-cyan-500/20 text-cyan-300',
   staff: 'bg-green-500/20 text-green-300',
+}
+
+const roleBadge = (role) => {
+  const labels = { supreme_admin: 'HQ', super_admin: 'TM', admin: 'AM', staff: 'FE' }
+  return labels[role] || role
 }
 
 export default function UsersPage() {
@@ -70,11 +76,13 @@ function UsersContent() {
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false)
   const [isResetPasswordModalOpen, setIsResetPasswordModalOpen] = useState(false)
+  const [isAssignModalOpen, setIsAssignModalOpen] = useState(false)
   const [selectedUser, setSelectedUser] = useState(null)
   const [loading, setLoading] = useState(false)
   const [pageLoading, setPageLoading] = useState(true)
   const [showPassword, setShowPassword] = useState(false)
   const [copiedId, setCopiedId] = useState(null)
+  const [assignBranchId, setAssignBranchId] = useState('')
   const [formData, setFormData] = useState({
     username: '',
     full_name: '',
@@ -103,6 +111,11 @@ function UsersContent() {
 
       if (userData.role === 'supreme_admin') {
         loadPendingApprovals()
+      }
+
+      // TM defaults to AM tab
+      if (userData.role === 'super_admin' && !tabParam) {
+        setActiveTab('am')
       }
 
       loadData()
@@ -162,14 +175,31 @@ function UsersContent() {
     }
   }
 
-  const filteredUsers = users.filter(u => {
-    const matchesSearch = u.username?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      u.full_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      u.email?.toLowerCase().includes(searchTerm.toLowerCase())
-    const matchesRole = !filterRole || u.role === filterRole
-    const matchesTerritory = !filterTerritory || u.territory_id?.toString() === filterTerritory
-    return matchesSearch && matchesRole && matchesTerritory
-  })
+  // Filter users based on active tab and search/filters
+  const getFilteredUsers = () => {
+    let filtered = users.filter(u => {
+      const matchesSearch = u.username?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        u.full_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        u.email?.toLowerCase().includes(searchTerm.toLowerCase())
+      const matchesTerritory = !filterTerritory || u.territory_id?.toString() === filterTerritory
+      return matchesSearch && matchesTerritory
+    })
+
+    // Tab-based role filtering
+    if (activeTab === 'am') {
+      filtered = filtered.filter(u => u.role === 'admin')
+    } else if (activeTab === 'fe') {
+      filtered = filtered.filter(u => u.role === 'staff')
+    } else if (activeTab === 'all') {
+      if (filterRole) {
+        filtered = filtered.filter(u => u.role === filterRole)
+      }
+    }
+
+    return filtered
+  }
+
+  const filteredUsers = getFilteredUsers()
 
   const generatePassword = () => {
     const chars = 'ABCDEFGHJKMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789'
@@ -200,7 +230,7 @@ function UsersContent() {
         full_name: '',
         email: '',
         password: newPassword,
-        role: currentUser?.role === 'admin' ? 'staff' : 'staff',
+        role: currentUser?.role === 'super_admin' ? 'staff' : 'staff',
         territory_id: currentUser?.role === 'super_admin' ? currentUser.territory_id?.toString() : '',
         branch_id: '',
         is_active: true
@@ -221,11 +251,9 @@ function UsersContent() {
 
   const handleRoleChange = (role) => {
     let updates = { role }
-
     if (role === 'super_admin' || role === 'admin') {
       updates.branch_id = ''
     }
-
     setFormData({ ...formData, ...updates })
   }
 
@@ -256,15 +284,13 @@ function UsersContent() {
       return
     }
 
-    if ((formData.role === 'super_admin' || formData.role === 'admin') && !formData.territory_id) {
+    // Territory required for TM, AM, and FE
+    if ((formData.role === 'super_admin' || formData.role === 'admin' || formData.role === 'staff') && !formData.territory_id) {
       setError('Please select a territory')
       return
     }
 
-    if (formData.role === 'staff' && !formData.branch_id) {
-      setError('Please select a branch for Flavor Expert')
-      return
-    }
+    // Branch is OPTIONAL for FE at creation time (AM assigns later)
 
     setLoading(true)
 
@@ -349,16 +375,47 @@ function UsersContent() {
     setTimeout(() => setCopiedId(null), 2000)
   }
 
+  // Open assign-branch modal for a FE user
+  const handleAssignBranch = (user) => {
+    setSelectedUser(user)
+    setAssignBranchId(user.branch_id?.toString() || '')
+    setIsAssignModalOpen(true)
+  }
+
+  const confirmAssignBranch = async () => {
+    if (!assignBranchId) return
+    setLoading(true)
+    try {
+      const updated = await api.assignUser(selectedUser.id, { branch_id: parseInt(assignBranchId) })
+      setUsers(users.map(u => u.id === selectedUser.id ? updated : u))
+      setIsAssignModalOpen(false)
+      setSelectedUser(null)
+    } catch (err) {
+      alert(err.message || 'Failed to assign branch')
+    } finally {
+      setLoading(false)
+    }
+  }
+
   // Filter branches based on selected territory
   const filteredBranches = formData.territory_id
     ? branches.filter(b => b.territory_id?.toString() === formData.territory_id)
     : branches
 
+  // Branches available for assignment (filtered by user's territory)
+  const assignableBranches = selectedUser
+    ? branches.filter(b => b.territory_id === selectedUser.territory_id)
+    : []
+
   // Available roles based on current user
-  const availableRoles = currentUser?.role === 'supreme_admin'
+  const isHQ = currentUser?.role === 'supreme_admin'
+  const isTM = currentUser?.role === 'super_admin'
+  const isAM = currentUser?.role === 'admin'
+
+  const availableRoles = isHQ
     ? roleOptions
-    : currentUser?.role === 'super_admin'
-      ? roleOptions.filter(r => r.value !== 'super_admin')
+    : isTM
+      ? roleOptions.filter(r => r.value === 'admin' || r.value === 'staff')
       : roleOptions.filter(r => r.value === 'staff')
 
   if (!currentUser) return null
@@ -376,7 +433,7 @@ function UsersContent() {
             Manage users and assign them to territories and branches
           </p>
         </div>
-        {currentUser.role === 'supreme_admin' && (
+        {isHQ && (
           <Button
             onClick={() => handleOpenModal()}
             className="bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-500 hover:to-emerald-500"
@@ -387,39 +444,76 @@ function UsersContent() {
         )}
       </div>
 
-      {/* Tabs - HQ only */}
-      {currentUser.role === 'supreme_admin' && (
-        <div className="flex gap-1 p-1 bg-slate-800/50 rounded-lg w-fit">
-          <button
-            onClick={() => setActiveTab('all')}
-            className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
-              activeTab === 'all'
-                ? 'bg-slate-700 text-white'
-                : 'text-slate-400 hover:text-white'
-            }`}
-          >
-            All Users
-          </button>
-          <button
-            onClick={() => setActiveTab('pending')}
-            className={`px-4 py-2 rounded-md text-sm font-medium transition-colors flex items-center gap-2 ${
-              activeTab === 'pending'
-                ? 'bg-amber-600/80 text-white'
-                : 'text-slate-400 hover:text-white'
-            }`}
-          >
-            Pending Approval
-            {pendingUsers.length > 0 && (
-              <span className="px-1.5 py-0.5 rounded-full text-xs bg-amber-500/30 text-amber-200">
-                {pendingUsers.length}
+      {/* Tabs */}
+      <div className="flex gap-1 p-1 bg-slate-800/50 rounded-lg w-fit">
+        {/* HQ tabs: All Users | Pending Approval */}
+        {isHQ && (
+          <>
+            <button
+              onClick={() => setActiveTab('all')}
+              className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+                activeTab === 'all' ? 'bg-slate-700 text-white' : 'text-slate-400 hover:text-white'
+              }`}
+            >
+              All Users
+            </button>
+            <button
+              onClick={() => setActiveTab('pending')}
+              className={`px-4 py-2 rounded-md text-sm font-medium transition-colors flex items-center gap-2 ${
+                activeTab === 'pending' ? 'bg-amber-600/80 text-white' : 'text-slate-400 hover:text-white'
+              }`}
+            >
+              Pending Approval
+              {pendingUsers.length > 0 && (
+                <span className="px-1.5 py-0.5 rounded-full text-xs bg-amber-500/30 text-amber-200">
+                  {pendingUsers.length}
+                </span>
+              )}
+            </button>
+          </>
+        )}
+
+        {/* TM tabs: Area Managers | Flavor Experts */}
+        {isTM && (
+          <>
+            <button
+              onClick={() => setActiveTab('am')}
+              className={`px-4 py-2 rounded-md text-sm font-medium transition-colors flex items-center gap-2 ${
+                activeTab === 'am' ? 'bg-cyan-600/80 text-white' : 'text-slate-400 hover:text-white'
+              }`}
+            >
+              Area Managers
+              <span className="px-1.5 py-0.5 rounded-full text-xs bg-cyan-500/20 text-cyan-300">
+                {users.filter(u => u.role === 'admin').length}
               </span>
-            )}
+            </button>
+            <button
+              onClick={() => setActiveTab('fe')}
+              className={`px-4 py-2 rounded-md text-sm font-medium transition-colors flex items-center gap-2 ${
+                activeTab === 'fe' ? 'bg-green-600/80 text-white' : 'text-slate-400 hover:text-white'
+              }`}
+            >
+              Flavor Experts
+              <span className="px-1.5 py-0.5 rounded-full text-xs bg-green-500/20 text-green-300">
+                {users.filter(u => u.role === 'staff').length}
+              </span>
+            </button>
+          </>
+        )}
+
+        {/* AM sees FE list only */}
+        {isAM && (
+          <button className="px-4 py-2 rounded-md text-sm font-medium bg-green-600/80 text-white flex items-center gap-2">
+            Flavor Experts
+            <span className="px-1.5 py-0.5 rounded-full text-xs bg-green-500/20 text-green-300">
+              {users.filter(u => u.role === 'staff').length}
+            </span>
           </button>
-        </div>
-      )}
+        )}
+      </div>
 
       {/* Pending Approvals Section */}
-      {activeTab === 'pending' && currentUser.role === 'supreme_admin' && (
+      {activeTab === 'pending' && isHQ && (
         <div className="space-y-4">
           {pendingUsers.length === 0 ? (
             <div className="text-center py-12">
@@ -442,7 +536,7 @@ function UsersContent() {
                   </div>
                   <div className="flex items-center gap-3">
                     <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${roleColors[user.role]}`}>
-                      {user.role === 'supreme_admin' ? 'HQ' : user.role === 'super_admin' ? 'TM' : user.role === 'admin' ? 'AM' : 'Staff'}
+                      {roleBadge(user.role)}
                     </span>
                     <span className="text-xs text-slate-500">
                       {new Date(user.created_at).toLocaleDateString('en-AE', { month: 'short', day: 'numeric', year: 'numeric' })}
@@ -482,125 +576,126 @@ function UsersContent() {
         </div>
       )}
 
-      {/* Filters - only show on All Users tab */}
-      {activeTab === 'all' && <div className="flex flex-col sm:flex-row gap-4">
-        <div className="relative flex-1 max-w-md">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-          <Input
-            placeholder="Search users..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="pl-10 bg-slate-800/50 border-slate-700 text-white placeholder:text-slate-500"
-          />
-        </div>
+      {/* Filters */}
+      {activeTab !== 'pending' && (
+        <div className="flex flex-col sm:flex-row gap-4">
+          <div className="relative flex-1 max-w-md">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+            <Input
+              placeholder="Search users..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="pl-10 bg-slate-800/50 border-slate-700 text-white placeholder:text-slate-500"
+            />
+          </div>
 
-        <div className="relative">
-          <button
-            onClick={() => setShowRoleDropdown(!showRoleDropdown)}
-            className="flex items-center gap-2 px-4 py-2 rounded-lg bg-slate-800/50 border border-slate-700 text-slate-300 hover:bg-slate-700 transition-colors"
-          >
-            <Shield className="w-4 h-4 text-green-400" />
-            <span>
-              {filterRole
-                ? roleOptions.find(r => r.value === filterRole)?.label || 'All Roles'
-                : 'All Roles'
-              }
-            </span>
-            <ChevronDown className="w-4 h-4" />
-          </button>
+          {/* Role filter - only for HQ "All Users" tab */}
+          {isHQ && activeTab === 'all' && (
+            <div className="relative">
+              <button
+                onClick={() => setShowRoleDropdown(!showRoleDropdown)}
+                className="flex items-center gap-2 px-4 py-2 rounded-lg bg-slate-800/50 border border-slate-700 text-slate-300 hover:bg-slate-700 transition-colors"
+              >
+                <Shield className="w-4 h-4 text-green-400" />
+                <span>
+                  {filterRole
+                    ? allRoleOptions.find(r => r.value === filterRole)?.label || 'All Roles'
+                    : 'All Roles'
+                  }
+                </span>
+                <ChevronDown className="w-4 h-4" />
+              </button>
 
-          {showRoleDropdown && (
-            <>
-              <div className="fixed inset-0 z-10" onClick={() => setShowRoleDropdown(false)} />
-              <div className="absolute top-full left-0 mt-2 w-56 bg-slate-800 border border-slate-700 rounded-lg shadow-xl z-20 overflow-hidden">
-                <button
-                  onClick={() => {
-                    setFilterRole('')
-                    setShowRoleDropdown(false)
-                  }}
-                  className={`w-full px-4 py-2 text-left text-sm hover:bg-slate-700 transition-colors ${
-                    !filterRole ? 'text-green-300 bg-slate-700/50' : 'text-slate-300'
-                  }`}
-                >
-                  All Roles
-                </button>
-                {roleOptions.map((role) => (
-                  <button
-                    key={role.value}
-                    onClick={() => {
-                      setFilterRole(role.value)
-                      setShowRoleDropdown(false)
-                    }}
-                    className={`w-full px-4 py-2 text-left text-sm hover:bg-slate-700 transition-colors ${
-                      filterRole === role.value ? 'text-green-300 bg-slate-700/50' : 'text-slate-300'
-                    }`}
-                  >
-                    {role.label}
-                  </button>
-                ))}
-              </div>
-            </>
-          )}
-        </div>
-
-        {currentUser.role === 'supreme_admin' && (
-          <div className="relative">
-            <button
-              onClick={() => setShowTerritoryDropdown(!showTerritoryDropdown)}
-              className="flex items-center gap-2 px-4 py-2 rounded-lg bg-slate-800/50 border border-slate-700 text-slate-300 hover:bg-slate-700 transition-colors"
-            >
-              <Globe className="w-4 h-4 text-purple-400" />
-              <span>
-                {filterTerritory
-                  ? territories.find(t => t.id.toString() === filterTerritory)?.name
-                  : 'All Territories'
-                }
-              </span>
-              <ChevronDown className="w-4 h-4" />
-            </button>
-
-            {showTerritoryDropdown && (
-              <>
-                <div className="fixed inset-0 z-10" onClick={() => setShowTerritoryDropdown(false)} />
-                <div className="absolute top-full left-0 mt-2 w-48 bg-slate-800 border border-slate-700 rounded-lg shadow-xl z-20 overflow-hidden">
-                  <button
-                    onClick={() => {
-                      setFilterTerritory('')
-                      setShowTerritoryDropdown(false)
-                    }}
-                    className={`w-full px-4 py-2 text-left text-sm hover:bg-slate-700 transition-colors ${
-                      !filterTerritory ? 'text-purple-300 bg-slate-700/50' : 'text-slate-300'
-                    }`}
-                  >
-                    All Territories
-                  </button>
-                  {territories.map((territory) => (
+              {showRoleDropdown && (
+                <>
+                  <div className="fixed inset-0 z-10" onClick={() => setShowRoleDropdown(false)} />
+                  <div className="absolute top-full left-0 mt-2 w-56 bg-slate-800 border border-slate-700 rounded-lg shadow-xl z-20 overflow-hidden">
                     <button
-                      key={territory.id}
-                      onClick={() => {
-                        setFilterTerritory(territory.id.toString())
-                        setShowTerritoryDropdown(false)
-                      }}
+                      onClick={() => { setFilterRole(''); setShowRoleDropdown(false) }}
                       className={`w-full px-4 py-2 text-left text-sm hover:bg-slate-700 transition-colors ${
-                        filterTerritory === territory.id.toString() ? 'text-purple-300 bg-slate-700/50' : 'text-slate-300'
+                        !filterRole ? 'text-green-300 bg-slate-700/50' : 'text-slate-300'
                       }`}
                     >
-                      {territory.name}
+                      All Roles
                     </button>
-                  ))}
-                </div>
-              </>
-            )}
-          </div>
-        )}
-      </div>}
+                    {roleOptions.map((role) => (
+                      <button
+                        key={role.value}
+                        onClick={() => { setFilterRole(role.value); setShowRoleDropdown(false) }}
+                        className={`w-full px-4 py-2 text-left text-sm hover:bg-slate-700 transition-colors ${
+                          filterRole === role.value ? 'text-green-300 bg-slate-700/50' : 'text-slate-300'
+                        }`}
+                      >
+                        {role.label}
+                      </button>
+                    ))}
+                  </div>
+                </>
+              )}
+            </div>
+          )}
+
+          {isHQ && (
+            <div className="relative">
+              <button
+                onClick={() => setShowTerritoryDropdown(!showTerritoryDropdown)}
+                className="flex items-center gap-2 px-4 py-2 rounded-lg bg-slate-800/50 border border-slate-700 text-slate-300 hover:bg-slate-700 transition-colors"
+              >
+                <Globe className="w-4 h-4 text-purple-400" />
+                <span>
+                  {filterTerritory
+                    ? territories.find(t => t.id.toString() === filterTerritory)?.name
+                    : 'All Territories'
+                  }
+                </span>
+                <ChevronDown className="w-4 h-4" />
+              </button>
+
+              {showTerritoryDropdown && (
+                <>
+                  <div className="fixed inset-0 z-10" onClick={() => setShowTerritoryDropdown(false)} />
+                  <div className="absolute top-full left-0 mt-2 w-48 bg-slate-800 border border-slate-700 rounded-lg shadow-xl z-20 overflow-hidden">
+                    <button
+                      onClick={() => { setFilterTerritory(''); setShowTerritoryDropdown(false) }}
+                      className={`w-full px-4 py-2 text-left text-sm hover:bg-slate-700 transition-colors ${
+                        !filterTerritory ? 'text-purple-300 bg-slate-700/50' : 'text-slate-300'
+                      }`}
+                    >
+                      All Territories
+                    </button>
+                    {territories.map((territory) => (
+                      <button
+                        key={territory.id}
+                        onClick={() => { setFilterTerritory(territory.id.toString()); setShowTerritoryDropdown(false) }}
+                        className={`w-full px-4 py-2 text-left text-sm hover:bg-slate-700 transition-colors ${
+                          filterTerritory === territory.id.toString() ? 'text-purple-300 bg-slate-700/50' : 'text-slate-300'
+                        }`}
+                      >
+                        {territory.name}
+                      </button>
+                    ))}
+                  </div>
+                </>
+              )}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Users Table */}
-      {activeTab === 'all' && (
+      {activeTab !== 'pending' && (
         pageLoading ? (
           <div className="text-center py-12">
             <Loader2 className="w-8 h-8 mx-auto text-slate-400 animate-spin mb-4" />
             <p className="text-slate-400">Loading users...</p>
+          </div>
+        ) : filteredUsers.length === 0 ? (
+          <div className="text-center py-12">
+            <Users className="w-12 h-12 mx-auto text-slate-600 mb-4" />
+            <p className="text-slate-400">No users found</p>
+            {searchTerm && (
+              <p className="text-slate-500 text-sm mt-1">Try adjusting your search</p>
+            )}
           </div>
         ) : (
           <div className="overflow-x-auto">
@@ -620,7 +715,12 @@ function UsersContent() {
                   <tr key={user.id} className={`hover:bg-slate-800/30 transition-colors ${!user.is_active && 'opacity-60'}`}>
                     <td className="py-3 px-4">
                       <div className="flex items-center gap-3">
-                        <div className="w-9 h-9 rounded-full bg-gradient-to-br from-green-500 to-emerald-500 flex items-center justify-center text-white font-medium text-sm">
+                        <div className={`w-9 h-9 rounded-full flex items-center justify-center text-white font-medium text-sm ${
+                          user.role === 'admin' ? 'bg-gradient-to-br from-cyan-500 to-blue-500' :
+                          user.role === 'super_admin' ? 'bg-gradient-to-br from-blue-500 to-indigo-500' :
+                          user.role === 'staff' ? 'bg-gradient-to-br from-green-500 to-emerald-500' :
+                          'bg-gradient-to-br from-purple-500 to-pink-500'
+                        }`}>
                           {user.full_name?.split(' ').map(n => n[0]).join('').slice(0, 2)}
                         </div>
                         <div>
@@ -643,7 +743,7 @@ function UsersContent() {
                     </td>
                     <td className="py-3 px-4">
                       <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${roleColors[user.role]}`}>
-                        {user.role === 'supreme_admin' ? 'HQ' : user.role === 'super_admin' ? 'TM' : user.role === 'admin' ? 'AM' : 'Staff'}
+                        {roleBadge(user.role)}
                       </span>
                     </td>
                     <td className="py-3 px-4 hidden md:table-cell">
@@ -654,13 +754,15 @@ function UsersContent() {
                             {user.territory_name}
                           </div>
                         )}
-                        {user.branch_name && (
+                        {user.branch_name ? (
                           <div className="flex items-center gap-1 text-xs text-slate-500">
                             <Building2 className="w-3 h-3 text-cyan-400" />
                             {user.branch_name}
                           </div>
-                        )}
-                        {!user.territory_name && !user.branch_name && (
+                        ) : user.role === 'staff' ? (
+                          <span className="text-xs text-amber-400">No branch assigned</span>
+                        ) : null}
+                        {!user.territory_name && !user.branch_name && user.role !== 'staff' && (
                           <span className="text-xs text-slate-600">Not assigned</span>
                         )}
                       </div>
@@ -679,7 +781,7 @@ function UsersContent() {
                       </p>
                     </td>
                     <td className="py-3 px-4 text-center">
-                      {currentUser.role === 'supreme_admin' ? (
+                      {isHQ ? (
                         <button
                           onClick={() => toggleUserStatus(user)}
                           className={`p-1.5 rounded-lg transition-colors ${
@@ -701,33 +803,54 @@ function UsersContent() {
                       )}
                     </td>
                     <td className="py-3 px-4">
-                      {currentUser.role === 'supreme_admin' && (
-                        <div className="flex items-center justify-end gap-1">
+                      <div className="flex items-center justify-end gap-1">
+                        {/* Assign Branch - for TM/AM on FE users */}
+                        {user.role === 'staff' && (isTM || isAM) && (
                           <button
-                            onClick={() => handleResetPassword(user)}
-                            className="p-1.5 rounded-lg text-slate-400 hover:text-amber-400 hover:bg-amber-500/10 transition-colors"
-                            title="Reset Password"
+                            onClick={() => handleAssignBranch(user)}
+                            className="p-1.5 rounded-lg text-slate-400 hover:text-cyan-400 hover:bg-cyan-500/10 transition-colors"
+                            title={user.branch_id ? 'Change Branch' : 'Assign Branch'}
                           >
-                            <Key className="w-4 h-4" />
+                            <Building2 className="w-4 h-4" />
                           </button>
-                          <button
-                            onClick={() => handleOpenModal(user)}
-                            className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-700 transition-colors"
-                            title="Edit"
-                          >
-                            <Edit2 className="w-4 h-4" />
-                          </button>
-                          {user.role !== 'supreme_admin' && (
+                        )}
+                        {isHQ && (
+                          <>
+                            {user.role === 'staff' && (
+                              <button
+                                onClick={() => handleAssignBranch(user)}
+                                className="p-1.5 rounded-lg text-slate-400 hover:text-cyan-400 hover:bg-cyan-500/10 transition-colors"
+                                title={user.branch_id ? 'Change Branch' : 'Assign Branch'}
+                              >
+                                <Building2 className="w-4 h-4" />
+                              </button>
+                            )}
                             <button
-                              onClick={() => handleDelete(user)}
-                              className="p-1.5 rounded-lg text-slate-400 hover:text-red-400 hover:bg-red-500/10 transition-colors"
-                              title="Delete"
+                              onClick={() => handleResetPassword(user)}
+                              className="p-1.5 rounded-lg text-slate-400 hover:text-amber-400 hover:bg-amber-500/10 transition-colors"
+                              title="Reset Password"
                             >
-                              <Trash2 className="w-4 h-4" />
+                              <Key className="w-4 h-4" />
                             </button>
-                          )}
-                        </div>
-                      )}
+                            <button
+                              onClick={() => handleOpenModal(user)}
+                              className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-700 transition-colors"
+                              title="Edit"
+                            >
+                              <Edit2 className="w-4 h-4" />
+                            </button>
+                            {user.role !== 'supreme_admin' && (
+                              <button
+                                onClick={() => handleDelete(user)}
+                                className="p-1.5 rounded-lg text-slate-400 hover:text-red-400 hover:bg-red-500/10 transition-colors"
+                                title="Delete"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                            )}
+                          </>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -735,16 +858,6 @@ function UsersContent() {
             </table>
           </div>
         )
-      )}
-
-      {activeTab === 'all' && !pageLoading && filteredUsers.length === 0 && (
-        <div className="text-center py-12">
-          <Users className="w-12 h-12 mx-auto text-slate-600 mb-4" />
-          <p className="text-slate-400">No users found</p>
-          {searchTerm && (
-            <p className="text-slate-500 text-sm mt-1">Try adjusting your search</p>
-          )}
-        </div>
       )}
 
       {/* Add/Edit Modal */}
@@ -785,15 +898,15 @@ function UsersContent() {
                 </select>
               </div>
 
-              {/* Territory - show for TM role or when HQ creates AM/Staff */}
-              {(formData.role === 'super_admin' || ((formData.role === 'admin' || formData.role === 'staff') && currentUser.role === 'supreme_admin')) && (
+              {/* Territory - required for TM, AM, FE */}
+              {(formData.role === 'super_admin' || formData.role === 'admin' || formData.role === 'staff') && (
                 <div className="space-y-2">
                   <Label htmlFor="territory" className="text-slate-300">Territory *</Label>
                   <select
                     id="territory"
                     value={formData.territory_id}
                     onChange={(e) => setFormData({ ...formData, territory_id: e.target.value, branch_id: '' })}
-                    disabled={currentUser.role !== 'supreme_admin'}
+                    disabled={isTM}
                     className="w-full px-3 py-2 rounded-lg bg-slate-700/50 border border-slate-600 text-white focus:outline-none focus:ring-2 focus:ring-green-500 disabled:opacity-50"
                   >
                     <option value="">Select territory</option>
@@ -804,17 +917,19 @@ function UsersContent() {
                 </div>
               )}
 
-              {/* Branch - show for Staff role */}
+              {/* Branch - optional for FE at creation */}
               {formData.role === 'staff' && (
                 <div className="space-y-2">
-                  <Label htmlFor="branch" className="text-slate-300">Branch *</Label>
+                  <Label htmlFor="branch" className="text-slate-300">
+                    Branch <span className="text-slate-500 text-xs">(optional - AM assigns later)</span>
+                  </Label>
                   <select
                     id="branch"
                     value={formData.branch_id}
                     onChange={(e) => handleBranchSelect(e.target.value)}
                     className="w-full px-3 py-2 rounded-lg bg-slate-700/50 border border-slate-600 text-white focus:outline-none focus:ring-2 focus:ring-green-500"
                   >
-                    <option value="">Select branch</option>
+                    <option value="">No branch (assign later)</option>
                     {filteredBranches.map((branch) => (
                       <option key={branch.id} value={branch.id.toString()}>
                         {branch.name} ({branch.code})
@@ -829,7 +944,7 @@ function UsersContent() {
                   <Label htmlFor="username" className="text-slate-300">Username *</Label>
                   <Input
                     id="username"
-                    placeholder={formData.role === 'staff' ? 'e.g., staff_ahmed' : 'e.g., tm_dubai'}
+                    placeholder={formData.role === 'staff' ? 'e.g., fe_ahmed' : formData.role === 'admin' ? 'e.g., am_dubai' : 'e.g., tm_dubai'}
                     value={formData.username}
                     onChange={(e) => setFormData({ ...formData, username: e.target.value })}
                     className="bg-slate-700/50 border-slate-600 text-white placeholder:text-slate-500 font-mono"
@@ -948,6 +1063,83 @@ function UsersContent() {
                 </Button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Assign Branch Modal */}
+      {isAssignModalOpen && selectedUser && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setIsAssignModalOpen(false)} />
+          <div className="relative bg-slate-800 rounded-xl border border-slate-700 p-6 w-full max-w-md mx-4 shadow-2xl">
+            <button
+              onClick={() => setIsAssignModalOpen(false)}
+              className="absolute top-4 right-4 p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-700"
+            >
+              <X className="w-4 h-4" />
+            </button>
+
+            <div className="text-center mb-4">
+              <div className="w-12 h-12 mx-auto mb-3 rounded-full bg-cyan-500/20 flex items-center justify-center">
+                <Building2 className="w-6 h-6 text-cyan-400" />
+              </div>
+              <h2 className="text-lg font-semibold text-white">Assign Branch</h2>
+              <p className="text-sm text-slate-400 mt-1">
+                Assign <span className="text-white font-medium">{selectedUser.full_name}</span> to a branch
+              </p>
+            </div>
+
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label className="text-slate-300">Select Branch</Label>
+                <select
+                  value={assignBranchId}
+                  onChange={(e) => setAssignBranchId(e.target.value)}
+                  className="w-full px-3 py-2 rounded-lg bg-slate-700/50 border border-slate-600 text-white focus:outline-none focus:ring-2 focus:ring-cyan-500"
+                >
+                  <option value="">Select a branch</option>
+                  {assignableBranches.map((branch) => (
+                    <option key={branch.id} value={branch.id.toString()}>
+                      {branch.name} ({branch.code}) {branch.manager_name ? `- AM: ${branch.manager_name}` : ''}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {selectedUser.branch_name && (
+                <p className="text-xs text-slate-500">
+                  Currently assigned to: <span className="text-slate-300">{selectedUser.branch_name}</span>
+                </p>
+              )}
+
+              <div className="flex gap-3">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setIsAssignModalOpen(false)}
+                  className="flex-1 border-slate-600 text-slate-300 hover:bg-slate-700"
+                >
+                  Cancel
+                </Button>
+                <Button
+                  onClick={confirmAssignBranch}
+                  disabled={loading || !assignBranchId}
+                  className="flex-1 bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500"
+                >
+                  {loading ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      Assigning...
+                    </>
+                  ) : (
+                    <>
+                      <ArrowRight className="w-4 h-4 mr-2" />
+                      Assign
+                    </>
+                  )}
+                </Button>
+              </div>
+            </div>
           </div>
         </div>
       )}

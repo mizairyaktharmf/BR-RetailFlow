@@ -117,10 +117,11 @@ async def branch_login(credentials: BranchLoginRequest, db: Session = Depends(ge
             detail="This branch is currently inactive"
         )
 
-    # Find the linked staff user for this branch
+    # Find the linked system staff user for this branch (not a real FE user)
     staff_user = db.query(User).filter(
         User.branch_id == branch.id,
         User.role == UserRole.STAFF,
+        User.email.like('%@branch.brretailflow.com'),
         User.is_active == True
     ).first()
 

@@ -60,7 +60,8 @@ async def get_pending_approvals(
     users = db.query(User).filter(
         User.is_verified == True,
         User.is_approved == False,
-        User.is_active == True
+        User.is_active == True,
+        ~User.email.like('%@branch.brretailflow.com')
     ).all()
     return [enrich_user_response(u, db) for u in users]
 
@@ -87,9 +88,14 @@ async def list_users(
     """
     query = db.query(User)
 
+    # Exclude system accounts (auto-created for branch login)
+    query = query.filter(~User.email.like('%@branch.brretailflow.com'))
+
     # Filter based on current user's role
     if current_user.role == UserRole.ADMIN:
-        query = query.filter(User.area_id == current_user.area_id)
+        # AM sees only FE users assigned to branches they manage
+        managed_branch_ids = [b.id for b in db.query(Branch).filter(Branch.manager_id == current_user.id).all()]
+        query = query.filter(User.branch_id.in_(managed_branch_ids) if managed_branch_ids else User.id == -1)
     elif current_user.role == UserRole.SUPER_ADMIN:
         query = query.filter(User.territory_id == current_user.territory_id)
 
@@ -170,13 +176,17 @@ async def create_user(
                 detail="This territory already has a Territory Manager. Only one TM per territory is allowed."
             )
 
-    # Auto-cascade location IDs
-    branch_id, area_id, territory_id = cascade_location_ids(
-        db,
-        branch_id=user_data.branch_id,
-        area_id=user_data.area_id,
-        territory_id=user_data.territory_id
-    )
+    # Validate territory exists
+    if user_data.territory_id:
+        territory = db.query(Territory).filter(Territory.id == user_data.territory_id).first()
+        if not territory:
+            raise HTTPException(status_code=400, detail="Territory not found")
+
+    # Validate branch if provided
+    if user_data.branch_id:
+        branch = db.query(Branch).filter(Branch.id == user_data.branch_id).first()
+        if not branch:
+            raise HTTPException(status_code=400, detail="Branch not found")
 
     # Create user (admin-created users are pre-approved and pre-verified)
     user = User(
@@ -186,9 +196,9 @@ async def create_user(
         full_name=user_data.full_name,
         phone=user_data.phone,
         role=user_data.role,
-        branch_id=branch_id,
-        area_id=area_id,
-        territory_id=territory_id,
+        branch_id=user_data.branch_id,
+        area_id=user_data.area_id,
+        territory_id=user_data.territory_id,
         is_verified=True,
         is_approved=True
     )
@@ -219,7 +229,9 @@ async def update_user(
         raise HTTPException(status_code=404, detail="User not found")
 
     if current_user.role == UserRole.ADMIN:
-        if user.area_id != current_user.area_id:
+        # AM can only update FE users in branches they manage
+        managed_branch_ids = [b.id for b in db.query(Branch).filter(Branch.manager_id == current_user.id).all()]
+        if user.branch_id not in managed_branch_ids:
             raise HTTPException(status_code=403, detail="Access denied")
         if user_data.role and user_data.role != UserRole.STAFF:
             raise HTTPException(status_code=403, detail="Cannot change role")
@@ -228,16 +240,6 @@ async def update_user(
             raise HTTPException(status_code=403, detail="Access denied")
 
     update_data = user_data.model_dump(exclude_unset=True)
-
-    # Auto-cascade if location changed
-    if 'branch_id' in update_data or 'area_id' in update_data or 'territory_id' in update_data:
-        b_id = update_data.get('branch_id', user.branch_id)
-        a_id = update_data.get('area_id', user.area_id)
-        t_id = update_data.get('territory_id', user.territory_id)
-        b_id, a_id, t_id = cascade_location_ids(db, branch_id=b_id, area_id=a_id, territory_id=t_id)
-        update_data['branch_id'] = b_id
-        update_data['area_id'] = a_id
-        update_data['territory_id'] = t_id
 
     for field, value in update_data.items():
         setattr(user, field, value)
@@ -267,33 +269,46 @@ async def assign_user(
     db: Session = Depends(get_db)
 ):
     """
-    Assign a user to territory/area/branch with auto-cascading.
+    Assign a user to territory/branch.
     - HQ: Can assign anyone anywhere
-    - TM: Can assign within own territory
-    - AM: Can assign staff to branches within own area
+    - TM: Can assign FE users within own territory to any branch in territory
+    - AM: Can assign FE users to branches they manage
     """
     user = db.query(User).filter(User.id == user_id).first()
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
 
-    # Auto-cascade location IDs
-    branch_id, area_id, territory_id = cascade_location_ids(
-        db, branch_id=data.branch_id, area_id=data.area_id, territory_id=data.territory_id
-    )
+    # Validate branch if provided
+    if data.branch_id:
+        branch = db.query(Branch).filter(Branch.id == data.branch_id).first()
+        if not branch:
+            raise HTTPException(status_code=400, detail="Branch not found")
 
     # Permission checks
     if current_user.role == UserRole.SUPER_ADMIN:
-        if territory_id != current_user.territory_id:
-            raise HTTPException(status_code=403, detail="Cannot assign to location outside your territory")
+        # TM can assign FE users within their territory
+        if user.territory_id != current_user.territory_id:
+            raise HTTPException(status_code=403, detail="Cannot assign users outside your territory")
+        if data.branch_id:
+            branch = db.query(Branch).filter(Branch.id == data.branch_id).first()
+            if branch and branch.territory_id != current_user.territory_id:
+                raise HTTPException(status_code=403, detail="Cannot assign to branch outside your territory")
     elif current_user.role == UserRole.ADMIN:
+        # AM can only assign FE users to branches they manage
         if user.role != UserRole.STAFF:
-            raise HTTPException(status_code=403, detail="Can only assign staff users")
-        if area_id != current_user.area_id:
-            raise HTTPException(status_code=403, detail="Cannot assign to location outside your area")
+            raise HTTPException(status_code=403, detail="Can only assign Flavor Expert users")
+        if data.branch_id:
+            branch = db.query(Branch).filter(Branch.id == data.branch_id).first()
+            if branch and branch.manager_id != current_user.id:
+                raise HTTPException(status_code=403, detail="Cannot assign to a branch you don't manage")
 
-    user.branch_id = branch_id
-    user.area_id = area_id
-    user.territory_id = territory_id
+    # Update assignment fields
+    if data.territory_id is not None:
+        user.territory_id = data.territory_id
+    if data.area_id is not None:
+        user.area_id = data.area_id
+    if data.branch_id is not None:
+        user.branch_id = data.branch_id
 
     db.commit()
     db.refresh(user)

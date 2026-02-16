@@ -23,11 +23,8 @@ import {
   XCircle,
   Phone,
   MapPinned,
-  Copy,
-  Check,
   Eye,
-  EyeOff,
-  Key
+  EyeOff
 } from 'lucide-react'
 import api from '@/services/api'
 
@@ -55,11 +52,6 @@ export default function BranchesPage() {
   const [error, setError] = useState('')
   const [showTerritoryDropdown, setShowTerritoryDropdown] = useState(false)
 
-  // Flavor Expert credentials after branch creation
-  const [isCredentialsModalOpen, setIsCredentialsModalOpen] = useState(false)
-  const [createdCredentials, setCreatedCredentials] = useState(null)
-  const [showCredsPassword, setShowCredsPassword] = useState(false)
-  const [copiedField, setCopiedField] = useState(null)
 
   useEffect(() => {
     const storedUser = localStorage.getItem('br_admin_user')
@@ -162,22 +154,9 @@ export default function BranchesPage() {
         setBranches(branches.map(b => b.id === selectedBranch.id ? updated : b))
         handleCloseModal()
       } else {
-        // Create branch - backend auto-generates login_id + password
         const created = await api.createBranch(apiData)
         setBranches([...branches, created])
         handleCloseModal()
-
-        // Show branch credentials modal (branch code = Branch ID, password from form)
-        if (created.code) {
-          setCreatedCredentials({
-            branchName: created.name,
-            branchCode: created.code,
-            password: formData.password,
-          })
-          setShowCredsPassword(false)
-          setCopiedField(null)
-          setIsCredentialsModalOpen(true)
-        }
       }
     } catch (err) {
       setError(err.message || 'Failed to save branch')
@@ -212,12 +191,6 @@ export default function BranchesPage() {
     } catch (err) {
       alert(err.message || 'Failed to update branch status')
     }
-  }
-
-  const copyToClipboard = (text, field) => {
-    navigator.clipboard.writeText(text)
-    setCopiedField(field)
-    setTimeout(() => setCopiedField(null), 2000)
   }
 
   if (!user) return null
@@ -569,95 +542,6 @@ export default function BranchesPage() {
                 </Button>
               </div>
             </form>
-          </div>
-        </div>
-      )}
-
-      {/* Flavor Expert Credentials Modal - shown after branch creation */}
-      {isCredentialsModalOpen && createdCredentials && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center">
-          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
-          <div className="relative bg-slate-800 rounded-xl border border-slate-700 p-6 w-full max-w-md mx-4 shadow-2xl">
-            <div className="text-center mb-4">
-              <div className="w-12 h-12 mx-auto mb-3 rounded-full bg-green-500/20 flex items-center justify-center">
-                <CheckCircle className="w-6 h-6 text-green-400" />
-              </div>
-              <h2 className="text-lg font-semibold text-white">Branch Created</h2>
-              <p className="text-sm text-slate-400 mt-1">
-                <span className="text-white font-medium">{createdCredentials.branchName}</span> ({createdCredentials.branchCode})
-              </p>
-            </div>
-
-            <div className="bg-slate-700/50 rounded-lg p-4 mb-4">
-              <div className="flex items-center gap-2 mb-3">
-                <Key className="w-4 h-4 text-green-400" />
-                <p className="text-sm font-medium text-green-300">Flavor Expert Login</p>
-              </div>
-
-              <div className="space-y-3">
-                <div>
-                  <p className="text-[10px] text-slate-500 uppercase tracking-wider mb-1">Branch ID</p>
-                  <div className="flex items-center justify-between bg-slate-800/80 rounded-lg px-3 py-2">
-                    <code className="text-sm text-white font-mono">{createdCredentials.branchCode}</code>
-                    <button
-                      onClick={() => copyToClipboard(createdCredentials.branchCode, 'branchCode')}
-                      className="p-1 rounded hover:bg-slate-600 transition-colors"
-                    >
-                      {copiedField === 'branchCode' ? (
-                        <Check className="w-3.5 h-3.5 text-green-400" />
-                      ) : (
-                        <Copy className="w-3.5 h-3.5 text-slate-400" />
-                      )}
-                    </button>
-                  </div>
-                </div>
-
-                <div>
-                  <p className="text-[10px] text-slate-500 uppercase tracking-wider mb-1">Password</p>
-                  <div className="flex items-center justify-between bg-slate-800/80 rounded-lg px-3 py-2">
-                    <code className="text-sm text-white font-mono">
-                      {showCredsPassword ? createdCredentials.password : '••••••••••'}
-                    </code>
-                    <div className="flex items-center gap-1">
-                      <button
-                        onClick={() => setShowCredsPassword(!showCredsPassword)}
-                        className="p-1 rounded hover:bg-slate-600 transition-colors"
-                      >
-                        {showCredsPassword ? (
-                          <EyeOff className="w-3.5 h-3.5 text-slate-400" />
-                        ) : (
-                          <Eye className="w-3.5 h-3.5 text-slate-400" />
-                        )}
-                      </button>
-                      <button
-                        onClick={() => copyToClipboard(createdCredentials.password, 'password')}
-                        className="p-1 rounded hover:bg-slate-600 transition-colors"
-                      >
-                        {copiedField === 'password' ? (
-                          <Check className="w-3.5 h-3.5 text-green-400" />
-                        ) : (
-                          <Copy className="w-3.5 h-3.5 text-slate-400" />
-                        )}
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <p className="text-xs text-amber-400/70 text-center mb-4">
-              Save these credentials. The password cannot be retrieved later.
-            </p>
-
-            <Button
-              onClick={() => {
-                setIsCredentialsModalOpen(false)
-                setCreatedCredentials(null)
-              }}
-              className="w-full bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-500 hover:to-emerald-500"
-            >
-              Done
-            </Button>
           </div>
         </div>
       )}
