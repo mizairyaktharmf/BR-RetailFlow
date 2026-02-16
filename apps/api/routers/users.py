@@ -171,6 +171,19 @@ async def create_user(
             raise HTTPException(status_code=403, detail="Can only create staff or admin users")
         user_data.territory_id = current_user.territory_id
 
+    # Enforce: only one TM (super_admin) per territory
+    if user_data.role == UserRole.SUPER_ADMIN and user_data.territory_id:
+        existing_tm = db.query(User).filter(
+            User.role == UserRole.SUPER_ADMIN,
+            User.territory_id == user_data.territory_id,
+            User.is_active == True
+        ).first()
+        if existing_tm:
+            raise HTTPException(
+                status_code=400,
+                detail="This territory already has a Territory Manager. Only one TM per territory is allowed."
+            )
+
     # Auto-cascade location IDs
     branch_id, area_id, territory_id = cascade_location_ids(
         db,

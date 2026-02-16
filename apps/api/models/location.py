@@ -82,7 +82,8 @@ class Branch(Base):
 
     # Foreign keys
     territory_id = Column(Integer, ForeignKey("territories.id"), nullable=False)
-    area_id = Column(Integer, ForeignKey("areas.id"), nullable=True)  # Set when TM assigns to AM
+    area_id = Column(Integer, ForeignKey("areas.id"), nullable=True)
+    manager_id = Column(Integer, ForeignKey("users.id"), nullable=True)  # AM who manages this branch
 
     # Timestamps
     created_at = Column(DateTime(timezone=True), server_default=func.now())
@@ -91,7 +92,8 @@ class Branch(Base):
     # Relationships
     territory = relationship("Territory")
     area = relationship("Area", back_populates="branches")
-    staff = relationship("User", back_populates="branch")
+    manager = relationship("User", foreign_keys=[manager_id])
+    staff = relationship("User", back_populates="branch", foreign_keys="User.branch_id")
     daily_inventory = relationship("DailyInventory", back_populates="branch", cascade="all, delete-orphan")
     tub_receipts = relationship("TubReceipt", back_populates="branch", cascade="all, delete-orphan")
     cake_stocks = relationship("CakeStock", back_populates="branch", cascade="all, delete-orphan")

@@ -41,6 +41,13 @@ def run_migrations():
             except Exception:
                 conn.rollback()  # Already nullable, ignore
 
+            # Add manager_id to branches if missing
+            if 'manager_id' not in columns:
+                logger.info("Migration: Adding manager_id to branches table")
+                conn.execute(text("ALTER TABLE branches ADD COLUMN manager_id INTEGER REFERENCES users(id)"))
+                conn.commit()
+                logger.info("Migration: manager_id added successfully")
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
