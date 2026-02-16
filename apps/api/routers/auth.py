@@ -19,7 +19,9 @@ from utils.security import (
     get_password_hash
 )
 from models.user import User, UserRole
+from models.location import Branch
 from schemas.user import UserLogin, TokenResponse, UserResponse, UserCreate, VerifyAccount, PasswordChange
+from pydantic import BaseModel as PydanticBaseModel
 
 router = APIRouter()
 
@@ -79,6 +81,74 @@ async def login(credentials: UserLogin, db: Session = Depends(get_db)):
         refresh_token=refresh_token,
         user=UserResponse.model_validate(user)
     )
+
+
+class BranchLoginRequest(PydanticBaseModel):
+    branch_id: str  # The login_id of the branch
+    password: str
+
+
+@router.post("/branch-login")
+async def branch_login(credentials: BranchLoginRequest, db: Session = Depends(get_db)):
+    """
+    Authenticate a branch (Flavor Expert app) using Branch ID and password.
+    Returns JWT tokens for the linked staff user.
+    """
+    # Find branch by login_id
+    branch = db.query(Branch).filter(Branch.login_id == credentials.branch_id).first()
+
+    if not branch:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid Branch ID or password"
+        )
+
+    if not branch.hashed_password or not verify_password(credentials.password, branch.hashed_password):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid Branch ID or password"
+        )
+
+    if not branch.is_active:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="This branch is currently inactive"
+        )
+
+    # Find the linked staff user for this branch
+    staff_user = db.query(User).filter(
+        User.branch_id == branch.id,
+        User.role == UserRole.STAFF,
+        User.is_active == True
+    ).first()
+
+    if not staff_user:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Branch account not properly configured. Contact HQ."
+        )
+
+    # Update last login
+    staff_user.last_login = datetime.now(timezone.utc)
+    db.commit()
+
+    # Create tokens for the staff user
+    access_token = create_access_token(data={"sub": str(staff_user.id)})
+    refresh_token = create_refresh_token(data={"sub": str(staff_user.id)})
+
+    return {
+        "access_token": access_token,
+        "refresh_token": refresh_token,
+        "token_type": "bearer",
+        "branch": {
+            "id": branch.id,
+            "name": branch.name,
+            "code": branch.code,
+            "login_id": branch.login_id,
+            "territory_id": branch.territory_id,
+        },
+        "user": UserResponse.model_validate(staff_user).model_dump()
+    }
 
 
 @router.post("/register", status_code=status.HTTP_201_CREATED)

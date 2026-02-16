@@ -40,6 +40,7 @@ class ApiService {
     if (typeof window !== 'undefined') {
       localStorage.removeItem('br_token')
       localStorage.removeItem('br_user')
+      localStorage.removeItem('br_branch')
     }
   }
 
@@ -88,14 +89,15 @@ class ApiService {
 
   // ============== AUTH ==============
 
-  async login(username, password) {
-    const data = await this.request('/auth/login', {
+  async login(branchId, password) {
+    const data = await this.request('/auth/branch-login', {
       method: 'POST',
-      body: JSON.stringify({ username, password }),
+      body: JSON.stringify({ branch_id: branchId, password }),
     })
     this.setToken(data.access_token)
     if (typeof window !== 'undefined') {
       localStorage.setItem('br_user', JSON.stringify(data.user))
+      localStorage.setItem('br_branch', JSON.stringify(data.branch))
     }
     return data
   }

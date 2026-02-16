@@ -26,20 +26,10 @@ export default function LoginPage() {
     setLoading(true)
 
     try {
-      const response = await api.login(credentials.branchId, credentials.password)
-
-      // Check if user is a flavor expert (staff role)
-      if (response.user.role !== 'staff') {
-        setError('This app is only for Flavor Experts. Please use the admin dashboard.')
-        api.clearToken()
-        setLoading(false)
-        return
-      }
-
-      // Redirect to dashboard
+      await api.login(credentials.branchId, credentials.password)
       router.push('/dashboard')
     } catch (err) {
-      setError(err.message || 'Invalid credentials. Please try again.')
+      setError(err.message || 'Invalid Branch ID or password. Please try again.')
     } finally {
       setLoading(false)
     }

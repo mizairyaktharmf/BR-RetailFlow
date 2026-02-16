@@ -7,9 +7,11 @@ from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.orm import Session
 from typing import List, Optional
 from pydantic import BaseModel
+import secrets
+import string
 
 from utils.database import get_db
-from utils.security import get_current_user, require_role
+from utils.security import get_current_user, require_role, get_password_hash
 from models.user import User, UserRole
 from models.location import Territory, Area, Branch
 from schemas.location import (
@@ -107,7 +109,13 @@ async def get_branch(
     return enrich_branch_response(branch, db)
 
 
-@router.post("/", response_model=BranchResponse, status_code=status.HTTP_201_CREATED)
+def generate_password(length=10):
+    """Generate a random password excluding ambiguous characters"""
+    chars = 'ABCDEFGHJKMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789'
+    return ''.join(secrets.choice(chars) for _ in range(length))
+
+
+@router.post("/", status_code=status.HTTP_201_CREATED)
 async def create_branch(
     data: BranchCreate,
     current_user: User = Depends(require_role([UserRole.SUPREME_ADMIN])),
@@ -115,7 +123,8 @@ async def create_branch(
 ):
     """
     Create a new branch under a territory (Supreme Admin / HQ only).
-    TM will later assign the branch to an Area Manager via manager_id.
+    Auto-generates a unique Branch ID and password for Flavor Expert login.
+    Also creates a linked staff user internally for API auth.
     """
     # Check for duplicate code
     existing = db.query(Branch).filter(Branch.code == data.code).first()
@@ -127,12 +136,47 @@ async def create_branch(
     if not territory:
         raise HTTPException(status_code=400, detail="Territory not found")
 
-    branch = Branch(**data.model_dump())
+    # Generate unique Branch ID and password
+    branch_code_clean = data.code.replace('-', '').replace(' ', '').lower()
+    login_id = f"br_{branch_code_clean}"
+    raw_password = generate_password()
+
+    # Ensure login_id is unique
+    existing_login = db.query(Branch).filter(Branch.login_id == login_id).first()
+    if existing_login:
+        login_id = f"br_{branch_code_clean}_{secrets.randbelow(99):02d}"
+
+    branch = Branch(
+        **data.model_dump(),
+        login_id=login_id,
+        hashed_password=get_password_hash(raw_password)
+    )
     db.add(branch)
     db.commit()
     db.refresh(branch)
 
-    return enrich_branch_response(branch, db)
+    # Auto-create a linked staff user for API authentication
+    fe_email = f"{login_id}@branch.brretailflow.com"
+    fe_user = User(
+        email=fe_email,
+        username=login_id,
+        hashed_password=get_password_hash(raw_password),
+        full_name=f"Flavor Expert - {data.name}",
+        role=UserRole.STAFF,
+        branch_id=branch.id,
+        territory_id=data.territory_id,
+        is_verified=True,
+        is_approved=True,
+    )
+    db.add(fe_user)
+    db.commit()
+
+    response = enrich_branch_response(branch, db)
+    # Return the raw password so admin can share it (only shown once)
+    return {
+        **response.model_dump(),
+        "generated_password": raw_password
+    }
 
 
 @router.post("/{branch_id}/assign", response_model=BranchResponse)

@@ -109,6 +109,7 @@ class BranchResponse(BranchBase):
     id: int
     is_active: bool
     created_at: datetime
+    login_id: Optional[str] = None
     manager_id: Optional[int] = None
     area_name: Optional[str] = None
     territory_name: Optional[str] = None

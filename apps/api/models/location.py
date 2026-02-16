@@ -80,6 +80,10 @@ class Branch(Base):
     phone = Column(String(20), nullable=True)
     is_active = Column(Boolean, default=True)
 
+    # Branch login credentials (for Flavor Expert app)
+    login_id = Column(String(100), unique=True, nullable=True)
+    hashed_password = Column(String(255), nullable=True)
+
     # Foreign keys
     territory_id = Column(Integer, ForeignKey("territories.id"), nullable=False)
     area_id = Column(Integer, ForeignKey("areas.id"), nullable=True)

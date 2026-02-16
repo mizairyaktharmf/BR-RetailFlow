@@ -48,6 +48,18 @@ def run_migrations():
                 conn.commit()
                 logger.info("Migration: manager_id added successfully")
 
+            # Add login_id and hashed_password to branches if missing
+            if 'login_id' not in columns:
+                logger.info("Migration: Adding login_id to branches table")
+                conn.execute(text("ALTER TABLE branches ADD COLUMN login_id VARCHAR(100) UNIQUE"))
+                conn.commit()
+                logger.info("Migration: login_id added successfully")
+            if 'hashed_password' not in columns:
+                logger.info("Migration: Adding hashed_password to branches table")
+                conn.execute(text("ALTER TABLE branches ADD COLUMN hashed_password VARCHAR(255)"))
+                conn.commit()
+                logger.info("Migration: hashed_password added successfully")
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):

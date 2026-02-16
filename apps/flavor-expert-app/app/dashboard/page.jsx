@@ -30,6 +30,7 @@ import offlineStore from '@/store/offline-store'
 export default function DashboardPage() {
   const router = useRouter()
   const [user, setUser] = useState(null)
+  const [branch, setBranch] = useState(null)
   const [isOnline, setIsOnline] = useState(true)
   const [pendingSync, setPendingSync] = useState({ total: 0 })
   const [currentWindow, setCurrentWindow] = useState(null)
@@ -45,6 +46,8 @@ export default function DashboardPage() {
       return
     }
     setUser(JSON.parse(userData))
+    const branchData = localStorage.getItem('br_branch')
+    if (branchData) setBranch(JSON.parse(branchData))
 
     // Set today's date
     setTodayDate(formatDate(new Date()))
@@ -189,7 +192,7 @@ export default function DashboardPage() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-pink-100 text-xs">Branch</p>
-                <p className="font-medium">{user.branch_name || user.full_name?.replace('Flavor Expert - ', '') || 'My Branch'}</p>
+                <p className="font-medium">{branch?.name || user.branch_name || 'My Branch'}</p>
               </div>
               <div className="text-right">
                 <p className="text-pink-100 text-xs">Today</p>
