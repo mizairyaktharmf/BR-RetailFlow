@@ -207,7 +207,7 @@ export default function CakeStockPage() {
                 Set up your initial cake inventory to get started.
               </p>
               <Button
-                onClick={() => router.push('/cake-receive')}
+                onClick={() => router.push('/cake/receive')}
                 className="bg-orange-500 hover:bg-orange-600"
               >
                 <Package className="w-4 h-4 mr-2" />

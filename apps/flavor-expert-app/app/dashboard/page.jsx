@@ -139,7 +139,7 @@ export default function DashboardPage() {
         ? `${cakeAlerts.length} low stock alert${cakeAlerts.length > 1 ? 's' : ''}!`
         : 'View and record cake sales',
       icon: Cake,
-      href: '/cake-stock',
+      href: '/cake/stock',
       color: cakeAlerts.length > 0 ? 'bg-red-500' : 'bg-orange-500',
       info: 'Track cake inventory and record sales in real-time',
       highlight: cakeAlerts.length > 0
@@ -148,7 +148,7 @@ export default function DashboardPage() {
       title: 'Receive Cakes',
       description: 'Record cakes from warehouse',
       icon: PackagePlus,
-      href: '/cake-receive',
+      href: '/cake/receive',
       color: 'bg-emerald-500',
       info: 'Log incoming cake deliveries from warehouse'
     },
@@ -227,7 +227,7 @@ export default function DashboardPage() {
 
       {/* Cake Low Stock Alerts */}
       {cakeAlerts.length > 0 && (
-        <Alert className="mx-4 mt-4 border-red-500 bg-red-50 cursor-pointer" onClick={() => router.push('/cake-stock')}>
+        <Alert className="mx-4 mt-4 border-red-500 bg-red-50 cursor-pointer" onClick={() => router.push('/cake/stock')}>
           <AlertCircle className="h-4 w-4 text-red-600" />
           <AlertTitle className="text-red-800">
             Low Cake Stock! ({cakeAlerts.length} item{cakeAlerts.length > 1 ? 's' : ''})
