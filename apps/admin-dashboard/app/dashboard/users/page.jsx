@@ -679,43 +679,55 @@ function UsersContent() {
                       </p>
                     </td>
                     <td className="py-3 px-4 text-center">
-                      <button
-                        onClick={() => toggleUserStatus(user)}
-                        className={`p-1.5 rounded-lg transition-colors ${
+                      {currentUser.role === 'supreme_admin' ? (
+                        <button
+                          onClick={() => toggleUserStatus(user)}
+                          className={`p-1.5 rounded-lg transition-colors ${
+                            user.is_active
+                              ? 'bg-green-500/20 text-green-400 hover:bg-green-500/30'
+                              : 'bg-red-500/20 text-red-400 hover:bg-red-500/30'
+                          }`}
+                        >
+                          {user.is_active ? <UserCheck className="w-4 h-4" /> : <UserX className="w-4 h-4" />}
+                        </button>
+                      ) : (
+                        <span className={`inline-flex p-1.5 rounded-lg ${
                           user.is_active
-                            ? 'bg-green-500/20 text-green-400 hover:bg-green-500/30'
-                            : 'bg-red-500/20 text-red-400 hover:bg-red-500/30'
-                        }`}
-                      >
-                        {user.is_active ? <UserCheck className="w-4 h-4" /> : <UserX className="w-4 h-4" />}
-                      </button>
+                            ? 'bg-green-500/20 text-green-400'
+                            : 'bg-red-500/20 text-red-400'
+                        }`}>
+                          {user.is_active ? <UserCheck className="w-4 h-4" /> : <UserX className="w-4 h-4" />}
+                        </span>
+                      )}
                     </td>
                     <td className="py-3 px-4">
-                      <div className="flex items-center justify-end gap-1">
-                        <button
-                          onClick={() => handleResetPassword(user)}
-                          className="p-1.5 rounded-lg text-slate-400 hover:text-amber-400 hover:bg-amber-500/10 transition-colors"
-                          title="Reset Password"
-                        >
-                          <Key className="w-4 h-4" />
-                        </button>
-                        <button
-                          onClick={() => handleOpenModal(user)}
-                          className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-700 transition-colors"
-                          title="Edit"
-                        >
-                          <Edit2 className="w-4 h-4" />
-                        </button>
-                        {user.role !== 'supreme_admin' && (
+                      {currentUser.role === 'supreme_admin' && (
+                        <div className="flex items-center justify-end gap-1">
                           <button
-                            onClick={() => handleDelete(user)}
-                            className="p-1.5 rounded-lg text-slate-400 hover:text-red-400 hover:bg-red-500/10 transition-colors"
-                            title="Delete"
+                            onClick={() => handleResetPassword(user)}
+                            className="p-1.5 rounded-lg text-slate-400 hover:text-amber-400 hover:bg-amber-500/10 transition-colors"
+                            title="Reset Password"
                           >
-                            <Trash2 className="w-4 h-4" />
+                            <Key className="w-4 h-4" />
                           </button>
-                        )}
-                      </div>
+                          <button
+                            onClick={() => handleOpenModal(user)}
+                            className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-700 transition-colors"
+                            title="Edit"
+                          >
+                            <Edit2 className="w-4 h-4" />
+                          </button>
+                          {user.role !== 'supreme_admin' && (
+                            <button
+                              onClick={() => handleDelete(user)}
+                              className="p-1.5 rounded-lg text-slate-400 hover:text-red-400 hover:bg-red-500/10 transition-colors"
+                              title="Delete"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          )}
+                        </div>
+                      )}
                     </td>
                   </tr>
                 ))}
