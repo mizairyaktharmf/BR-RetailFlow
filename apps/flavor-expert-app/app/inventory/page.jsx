@@ -20,44 +20,10 @@ import { formatDate } from '@/lib/utils'
 import api from '@/services/api'
 import offlineStore from '@/store/offline-store'
 
-// Standard Baskin Robbins flavors (will be fetched from API later)
-const SAMPLE_FLAVORS = [
-  { id: 1, name: 'Blackberry Caramel', code: 'BCAR' },
-  { id: 2, name: 'Cup of Cocoa', code: 'COC' },
-  { id: 3, name: 'Love Potion 31™', code: 'LP31' },
-  { id: 4, name: 'Citrus Twist Ice', code: 'CTI' },
-  { id: 5, name: 'It Takes Two to Mango', code: 'ITTM' },
-  { id: 6, name: 'World Class™ Chocolate', code: 'WCC' },
-  { id: 7, name: 'Golden Toffee Chocolate Chunk', code: 'GTCC' },
-  { id: 8, name: 'Summer Seal Salt', code: 'SSS' },
-  { id: 9, name: 'Summer Sunset', code: 'SSUN' },
-  { id: 10, name: 'Mint Chocolate Chip', code: 'MCC' },
-  { id: 11, name: 'Vanilla', code: 'VAN' },
-  { id: 12, name: 'Very Berry Strawberry', code: 'VBS' },
-  { id: 13, name: 'Strawberry Cheesecake', code: 'SC' },
-  { id: 14, name: 'Cotton Candy', code: 'CCAN' },
-  { id: 15, name: 'Cookies and Cream', code: 'CAC' },
-  { id: 16, name: 'Chocolate Chip', code: 'CC' },
-  { id: 17, name: 'Chocolate Chip NSA', code: 'CC-NSA' },
-  { id: 18, name: 'Caramel Turtle Truffle NSA', code: 'CTT-NSA' },
-  { id: 19, name: 'Chocolate Cookie Crackle', code: 'CCC' },
-  { id: 20, name: 'Gold Medal Ribbon', code: 'GMR' },
-  { id: 21, name: 'Jamoca Almond Fudge', code: 'JAF' },
-  { id: 22, name: 'Chocolate', code: 'CHOC' },
-  { id: 23, name: 'Pralines and Cream', code: 'PAC' },
-  { id: 24, name: 'Rainbow Sherbet', code: 'RS' },
-  { id: 25, name: 'Tiramisu Cold Brew', code: 'TCB' },
-  { id: 26, name: 'Pistachio Almond', code: 'PA' },
-  { id: 27, name: 'Peanut Butter and Chocolate', code: 'PBC' },
-  { id: 28, name: 'Chocolate Chip Cookie Dough', code: 'CCCD' },
-  { id: 29, name: 'Mango Passion Fruit', code: 'MPF' },
-  { id: 30, name: 'Caramel Churro Espresso', code: 'CCE' },
-  { id: 31, name: 'Blueberry Crumble', code: 'BC' },
-]
-
 export default function InventoryPage() {
   const router = useRouter()
-  const [flavors, setFlavors] = useState(SAMPLE_FLAVORS)
+  const [flavors, setFlavors] = useState([])
+  const [loading, setLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState('')
   const [saving, setSaving] = useState(false)
   const [inventory, setInventory] = useState({})
@@ -74,29 +40,38 @@ export default function InventoryPage() {
     }
     setUser(JSON.parse(userData))
 
-    // Initialize inventory state
-    const initialInventory = {}
-    SAMPLE_FLAVORS.forEach(flavor => {
-      initialInventory[flavor.id] = ''
-    })
-    setInventory(initialInventory)
-
     // Fetch flavors from API or cache
     loadFlavors()
   }, [router])
 
   const loadFlavors = async () => {
+    setLoading(true)
     try {
       // Try to get from API
       const flavorsData = await api.getFlavors()
-      setFlavors(flavorsData)
-      await offlineStore.cacheFlavors(flavorsData)
+      if (flavorsData && flavorsData.length > 0) {
+        setFlavors(flavorsData)
+        await offlineStore.cacheFlavors(flavorsData)
+        // Initialize inventory state from fetched flavors
+        const initialInventory = {}
+        flavorsData.forEach(flavor => {
+          initialInventory[flavor.id] = ''
+        })
+        setInventory(initialInventory)
+      }
     } catch (error) {
       // Fall back to cached data
       const cached = await offlineStore.getCachedFlavors()
       if (cached.length > 0) {
         setFlavors(cached)
+        const initialInventory = {}
+        cached.forEach(flavor => {
+          initialInventory[flavor.id] = ''
+        })
+        setInventory(initialInventory)
       }
+    } finally {
+      setLoading(false)
     }
   }
 
@@ -196,6 +171,22 @@ export default function InventoryPage() {
 
       {/* Content */}
       <div className="px-4">
+        {loading ? (
+          <div className="flex items-center justify-center py-20">
+            <Loader2 className="w-8 h-8 animate-spin text-pink-500" />
+          </div>
+        ) : flavors.length === 0 ? (
+          <Card>
+            <CardContent className="p-8 text-center">
+              <IceCream className="w-16 h-16 mx-auto text-gray-300 mb-4" />
+              <h3 className="text-lg font-semibold text-gray-900 mb-2">No Flavors Found</h3>
+              <p className="text-gray-500">
+                Ice cream flavors haven't been added yet. Please ask HQ to add flavors from the admin dashboard.
+              </p>
+            </CardContent>
+          </Card>
+        ) : (
+        <>
         {/* Search */}
         <div className="mb-4 relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
@@ -282,6 +273,8 @@ export default function InventoryPage() {
             )}
           </CardContent>
         </Card>
+        </>
+        )}
       </div>
     </div>
   )

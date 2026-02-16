@@ -25,24 +25,11 @@ import { formatDate } from '@/lib/utils'
 import api from '@/services/api'
 import offlineStore from '@/store/offline-store'
 
-// Sample flavors data
-const SAMPLE_FLAVORS = [
-  { id: 1, name: 'Vanilla', code: 'VANILLA' },
-  { id: 2, name: 'Chocolate', code: 'CHOCOLATE' },
-  { id: 3, name: 'Strawberry', code: 'STRAWBERRY' },
-  { id: 4, name: 'Pralines and Cream', code: 'PRALINES' },
-  { id: 5, name: 'Mint Chocolate Chip', code: 'MINT-CHOC' },
-  { id: 6, name: 'Cookies and Cream', code: 'COOKIES-CREAM' },
-  { id: 7, name: 'Mango', code: 'MANGO' },
-  { id: 8, name: 'Rainbow Sherbet', code: 'RAINBOW-SHERBET' },
-  { id: 9, name: 'Gold Medal Ribbon', code: 'GOLD-MEDAL' },
-  { id: 10, name: 'Saffron Pistachio', code: 'SAFFRON-PIST' },
-]
-
 export default function ReceivePage() {
   const router = useRouter()
   const [user, setUser] = useState(null)
-  const [flavors, setFlavors] = useState(SAMPLE_FLAVORS)
+  const [flavors, setFlavors] = useState([])
+  const [loading, setLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState('')
   const [saving, setSaving] = useState(false)
   const [receipts, setReceipts] = useState([])
@@ -63,13 +50,21 @@ export default function ReceivePage() {
   }, [router])
 
   const loadFlavors = async () => {
+    setLoading(true)
     try {
+      const flavorsData = await api.getFlavors()
+      if (flavorsData && flavorsData.length > 0) {
+        setFlavors(flavorsData)
+        await offlineStore.cacheFlavors(flavorsData)
+      }
+    } catch (error) {
+      // Fall back to cached data
       const cached = await offlineStore.getCachedFlavors()
       if (cached.length > 0) {
         setFlavors(cached)
       }
-    } catch (error) {
-      console.log('Using default flavors')
+    } finally {
+      setLoading(false)
     }
   }
 
@@ -205,6 +200,22 @@ export default function ReceivePage() {
 
       {/* Main Content */}
       <div className="px-4">
+        {loading ? (
+          <div className="flex items-center justify-center py-20">
+            <Loader2 className="w-8 h-8 animate-spin text-blue-500" />
+          </div>
+        ) : flavors.length === 0 ? (
+          <Card>
+            <CardContent className="p-8 text-center">
+              <IceCream className="w-16 h-16 mx-auto text-gray-300 mb-4" />
+              <h3 className="text-lg font-semibold text-gray-900 mb-2">No Flavors Found</h3>
+              <p className="text-gray-500">
+                Ice cream flavors haven't been added yet. Please ask HQ to add flavors from the admin dashboard.
+              </p>
+            </CardContent>
+          </Card>
+        ) : (
+        <>
         {/* Search & Add */}
         <Card className="mb-4">
           <CardHeader className="pb-2">
@@ -413,6 +424,8 @@ export default function ReceivePage() {
             </ul>
           </CardContent>
         </Card>
+        </>
+        )}
       </div>
     </div>
   )
