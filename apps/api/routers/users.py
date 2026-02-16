@@ -141,15 +141,11 @@ async def get_user(
 @router.post("/", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
 async def create_user(
     user_data: UserCreate,
-    current_user: User = Depends(require_role([
-        UserRole.SUPREME_ADMIN,
-        UserRole.SUPER_ADMIN,
-        UserRole.ADMIN
-    ])),
+    current_user: User = Depends(require_role([UserRole.SUPREME_ADMIN])),
     db: Session = Depends(get_db)
 ):
     """
-    Create a new user with auto-cascading location assignment
+    Create a new user (Supreme Admin / HQ only)
     """
     # Check if username or email already exists
     existing = db.query(User).filter(
@@ -160,16 +156,6 @@ async def create_user(
             status_code=400,
             detail="Username or email already registered"
         )
-
-    # Validate role creation permissions
-    if current_user.role == UserRole.ADMIN:
-        if user_data.role != UserRole.STAFF:
-            raise HTTPException(status_code=403, detail="Can only create staff users")
-        user_data.area_id = current_user.area_id
-    elif current_user.role == UserRole.SUPER_ADMIN:
-        if user_data.role not in [UserRole.STAFF, UserRole.ADMIN]:
-            raise HTTPException(status_code=403, detail="Can only create staff or admin users")
-        user_data.territory_id = current_user.territory_id
 
     # Enforce: only one TM (super_admin) per territory
     if user_data.role == UserRole.SUPER_ADMIN and user_data.territory_id:

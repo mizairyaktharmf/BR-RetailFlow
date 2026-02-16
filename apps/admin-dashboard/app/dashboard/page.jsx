@@ -49,16 +49,16 @@ export default function DashboardPage() {
       const userData = storedUser ? JSON.parse(storedUser) : null
 
       // Fetch real counts from API in parallel
-      const [territoriesData, areasData, branchesData, usersData] = await Promise.all([
+      const [territoriesData, amData, branchesData, usersData] = await Promise.all([
         api.getTerritories().catch(() => []),
-        api.getAreas().catch(() => []),
+        api.getUsers({ role: 'admin' }).catch(() => []),
         api.getBranches().catch(() => []),
         api.getUsers().catch(() => []),
       ])
 
       setStats({
         territories: territoriesData.length,
-        areas: areasData.length,
+        areaManagers: amData.length,
         branches: branchesData.length,
         users: usersData.length,
       })
@@ -141,7 +141,7 @@ export default function DashboardPage() {
                   {statsLoading ? (
                     <Loader2 className="w-5 h-5 text-slate-500 animate-spin mt-2" />
                   ) : (
-                    <p className="text-2xl font-bold text-white mt-1">{stats?.areas || 0}</p>
+                    <p className="text-2xl font-bold text-white mt-1">{stats?.areaManagers || 0}</p>
                   )}
                 </div>
                 <div className="w-10 h-10 rounded-lg bg-blue-500/20 flex items-center justify-center">
@@ -275,7 +275,7 @@ export default function DashboardPage() {
                 </div>
                 <div>
                   <p className="text-sm font-medium text-white">Manage Area Managers</p>
-                  <p className="text-xs text-slate-400">Add, assign, or manage area managers</p>
+                  <p className="text-xs text-slate-400">View area managers and assign branches</p>
                 </div>
               </a>
             )}

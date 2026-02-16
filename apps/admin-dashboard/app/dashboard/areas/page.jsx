@@ -5,20 +5,15 @@ import { useRouter } from 'next/navigation'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import {
-  MapPin,
-  Plus,
   Search,
   Building2,
   Users,
   X,
   Loader2,
-  AlertCircle,
   Globe,
   ChevronDown,
-  UserPlus,
   UserCheck,
   Mail,
   Phone,
@@ -39,17 +34,6 @@ export default function AreaManagersPage() {
   const [loading, setLoading] = useState(false)
   const [pageLoading, setPageLoading] = useState(true)
   const [error, setError] = useState('')
-
-  // Create AM modal
-  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false)
-  const [amFormData, setAmFormData] = useState({
-    full_name: '',
-    email: '',
-    username: '',
-    password: '',
-    phone: '',
-    territory_id: '',
-  })
 
   // Assign branch modal
   const [isAssignModalOpen, setIsAssignModalOpen] = useState(false)
@@ -107,51 +91,6 @@ export default function AreaManagersPage() {
     return matchesSearch && matchesTerritory
   })
 
-  // ---- Create AM User ----
-  const handleOpenCreateAM = () => {
-    setAmFormData({
-      full_name: '',
-      email: '',
-      username: '',
-      password: '',
-      phone: '',
-      territory_id: user?.role === 'super_admin' ? user.territory_id?.toString() : '',
-    })
-    setError('')
-    setIsCreateModalOpen(true)
-  }
-
-  const handleCreateAM = async (e) => {
-    e.preventDefault()
-    setError('')
-
-    if (!amFormData.full_name.trim() || !amFormData.email.trim() || !amFormData.username.trim() || !amFormData.password.trim() || !amFormData.territory_id) {
-      setError('Please fill in all required fields')
-      return
-    }
-
-    setLoading(true)
-    try {
-      const payload = {
-        full_name: amFormData.full_name,
-        email: amFormData.email,
-        username: amFormData.username,
-        password: amFormData.password,
-        phone: amFormData.phone || null,
-        role: 'admin',
-        territory_id: parseInt(amFormData.territory_id),
-      }
-
-      const created = await api.createUser(payload)
-      setAmUsers([...amUsers, created])
-      setIsCreateModalOpen(false)
-    } catch (err) {
-      setError(err.message || 'Failed to create Area Manager')
-    } finally {
-      setLoading(false)
-    }
-  }
-
   // ---- Assign Branch to AM ----
   const handleOpenAssign = (am) => {
     setAssignTargetAM(am)
@@ -205,18 +144,11 @@ export default function AreaManagersPage() {
           </h1>
           <p className="text-slate-400 text-sm mt-1">
             {user.role === 'supreme_admin'
-              ? 'Manage area managers and assign branches across territories'
-              : `Manage area managers in ${user.territory_name || 'your territory'}`
+              ? 'View area managers and assign branches across territories'
+              : `View area managers in ${user.territory_name || 'your territory'}`
             }
           </p>
         </div>
-        <Button
-          onClick={handleOpenCreateAM}
-          className="bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-500 hover:to-cyan-500"
-        >
-          <UserPlus className="w-4 h-4 mr-2" />
-          Add Area Manager
-        </Button>
       </div>
 
       {/* Filters */}
@@ -414,132 +346,10 @@ export default function AreaManagersPage() {
             <div className="text-center py-12">
               <Users className="w-12 h-12 mx-auto text-slate-600 mb-4" />
               <p className="text-slate-400">No area managers found</p>
-              <p className="text-slate-500 text-sm mt-1">Create an Area Manager to get started</p>
+              <p className="text-slate-500 text-sm mt-1">Area managers are created from the Users page by HQ</p>
             </div>
           )}
         </>
-      )}
-
-      {/* ====== CREATE AM MODAL ====== */}
-      {isCreateModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center">
-          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setIsCreateModalOpen(false)} />
-          <div className="relative bg-slate-800 rounded-xl border border-slate-700 p-6 w-full max-w-md mx-4 shadow-2xl max-h-[90vh] overflow-y-auto">
-            <button
-              onClick={() => setIsCreateModalOpen(false)}
-              className="absolute top-4 right-4 p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-700"
-            >
-              <X className="w-4 h-4" />
-            </button>
-
-            <h2 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
-              <UserPlus className="w-5 h-5 text-cyan-400" />
-              Add Area Manager
-            </h2>
-
-            <form onSubmit={handleCreateAM} className="space-y-4">
-              {error && (
-                <Alert variant="destructive" className="bg-red-500/10 border-red-500/50">
-                  <AlertDescription className="text-red-300 text-sm">{error}</AlertDescription>
-                </Alert>
-              )}
-
-              <div className="space-y-2">
-                <Label className="text-slate-300">Full Name *</Label>
-                <Input
-                  placeholder="e.g., Ahmed Hassan"
-                  value={amFormData.full_name}
-                  onChange={(e) => setAmFormData({ ...amFormData, full_name: e.target.value })}
-                  className="bg-slate-700/50 border-slate-600 text-white placeholder:text-slate-500"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label className="text-slate-300">Email *</Label>
-                <Input
-                  type="email"
-                  placeholder="e.g., ahmed@example.com"
-                  value={amFormData.email}
-                  onChange={(e) => setAmFormData({ ...amFormData, email: e.target.value })}
-                  className="bg-slate-700/50 border-slate-600 text-white placeholder:text-slate-500"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label className="text-slate-300">Username *</Label>
-                <Input
-                  placeholder="e.g., ahmed.hassan"
-                  value={amFormData.username}
-                  onChange={(e) => setAmFormData({ ...amFormData, username: e.target.value })}
-                  className="bg-slate-700/50 border-slate-600 text-white placeholder:text-slate-500"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label className="text-slate-300">Password *</Label>
-                <Input
-                  type="password"
-                  placeholder="Initial password"
-                  value={amFormData.password}
-                  onChange={(e) => setAmFormData({ ...amFormData, password: e.target.value })}
-                  className="bg-slate-700/50 border-slate-600 text-white placeholder:text-slate-500"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label className="text-slate-300">Phone</Label>
-                <Input
-                  placeholder="e.g., +971 50 123 4567"
-                  value={amFormData.phone}
-                  onChange={(e) => setAmFormData({ ...amFormData, phone: e.target.value })}
-                  className="bg-slate-700/50 border-slate-600 text-white placeholder:text-slate-500"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label className="text-slate-300">Territory *</Label>
-                <select
-                  value={amFormData.territory_id}
-                  onChange={(e) => setAmFormData({ ...amFormData, territory_id: e.target.value })}
-                  disabled={user.role === 'super_admin'}
-                  className="w-full px-3 py-2 rounded-lg bg-slate-700/50 border border-slate-600 text-white focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
-                >
-                  <option value="">Select territory</option>
-                  {territories.map((t) => (
-                    <option key={t.id} value={t.id.toString()}>
-                      {t.name} ({t.code})
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div className="flex gap-3 pt-2">
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => setIsCreateModalOpen(false)}
-                  className="flex-1 border-slate-600 text-slate-300 hover:bg-slate-700"
-                >
-                  Cancel
-                </Button>
-                <Button
-                  type="submit"
-                  disabled={loading}
-                  className="flex-1 bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-500 hover:to-cyan-500"
-                >
-                  {loading ? (
-                    <>
-                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                      Creating...
-                    </>
-                  ) : (
-                    'Create AM'
-                  )}
-                </Button>
-              </div>
-            </form>
-          </div>
-        </div>
       )}
 
       {/* ====== ASSIGN BRANCH MODAL ====== */}
