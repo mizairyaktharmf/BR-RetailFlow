@@ -17,7 +17,6 @@ import {
   Loader2,
   AlertCircle,
   Globe,
-  MapPin,
   Building2,
   ChevronDown,
   Eye,
@@ -61,7 +60,6 @@ function UsersContent() {
   const [currentUser, setCurrentUser] = useState(null)
   const [users, setUsers] = useState([])
   const [branches, setBranches] = useState([])
-  const [areas, setAreas] = useState([])
   const [territories, setTerritories] = useState([])
   const [searchTerm, setSearchTerm] = useState('')
   const [filterRole, setFilterRole] = useState('')
@@ -84,7 +82,6 @@ function UsersContent() {
     password: '',
     role: 'staff',
     territory_id: '',
-    area_id: '',
     branch_id: '',
     is_active: true
   })
@@ -115,15 +112,13 @@ function UsersContent() {
   const loadData = async () => {
     setPageLoading(true)
     try {
-      const [usersData, territoriesData, areasData, branchesData] = await Promise.all([
+      const [usersData, territoriesData, branchesData] = await Promise.all([
         api.getUsers().catch(() => []),
         api.getTerritories().catch(() => []),
-        api.getAreas().catch(() => []),
         api.getBranches().catch(() => []),
       ])
       setUsers(usersData)
       setTerritories(territoriesData)
-      setAreas(areasData)
       setBranches(branchesData)
     } catch (err) {
       // Silently fail
@@ -195,7 +190,6 @@ function UsersContent() {
         password: '',
         role: user.role,
         territory_id: user.territory_id?.toString() || '',
-        area_id: user.area_id?.toString() || '',
         branch_id: user.branch_id?.toString() || '',
         is_active: user.is_active
       })
@@ -208,7 +202,6 @@ function UsersContent() {
         password: newPassword,
         role: currentUser?.role === 'admin' ? 'staff' : 'staff',
         territory_id: currentUser?.role === 'super_admin' ? currentUser.territory_id?.toString() : '',
-        area_id: currentUser?.role === 'admin' ? currentUser.area_id?.toString() : '',
         branch_id: '',
         is_active: true
       })
@@ -221,7 +214,7 @@ function UsersContent() {
   const handleCloseModal = () => {
     setIsModalOpen(false)
     setSelectedUser(null)
-    setFormData({ username: '', full_name: '', email: '', password: '', role: 'staff', territory_id: '', area_id: '', branch_id: '', is_active: true })
+    setFormData({ username: '', full_name: '', email: '', password: '', role: 'staff', territory_id: '', branch_id: '', is_active: true })
     setError('')
     setShowPassword(false)
   }
@@ -229,10 +222,7 @@ function UsersContent() {
   const handleRoleChange = (role) => {
     let updates = { role }
 
-    if (role === 'super_admin') {
-      updates.area_id = ''
-      updates.branch_id = ''
-    } else if (role === 'admin') {
+    if (role === 'super_admin' || role === 'admin') {
       updates.branch_id = ''
     }
 
@@ -242,12 +232,10 @@ function UsersContent() {
   const handleBranchSelect = (branchId) => {
     const branch = branches.find(b => b.id.toString() === branchId)
     if (branch) {
-      const area = areas.find(a => a.id === branch.area_id)
       setFormData({
         ...formData,
         branch_id: branchId,
-        area_id: branch.area_id?.toString() || '',
-        territory_id: area?.territory_id?.toString() || formData.territory_id
+        territory_id: branch.territory_id?.toString() || formData.territory_id
       })
     } else {
       setFormData({ ...formData, branch_id: branchId })
@@ -268,13 +256,8 @@ function UsersContent() {
       return
     }
 
-    if (formData.role === 'super_admin' && !formData.territory_id) {
-      setError('Please select a territory for Territory Manager')
-      return
-    }
-
-    if (formData.role === 'admin' && !formData.area_id) {
-      setError('Please select an area for Area Manager')
+    if ((formData.role === 'super_admin' || formData.role === 'admin') && !formData.territory_id) {
+      setError('Please select a territory')
       return
     }
 
@@ -292,7 +275,6 @@ function UsersContent() {
         email: formData.email,
         role: formData.role,
         territory_id: formData.territory_id ? parseInt(formData.territory_id) : null,
-        area_id: formData.area_id ? parseInt(formData.area_id) : null,
         branch_id: formData.branch_id ? parseInt(formData.branch_id) : null,
         is_active: formData.is_active,
       }
@@ -367,14 +349,9 @@ function UsersContent() {
     setTimeout(() => setCopiedId(null), 2000)
   }
 
-  // Filter areas based on selected territory
-  const filteredAreas = formData.territory_id
-    ? areas.filter(a => a.territory_id?.toString() === formData.territory_id)
-    : areas
-
-  // Filter branches based on selected area
-  const filteredBranches = formData.area_id
-    ? branches.filter(b => b.area_id?.toString() === formData.area_id)
+  // Filter branches based on selected territory
+  const filteredBranches = formData.territory_id
+    ? branches.filter(b => b.territory_id?.toString() === formData.territory_id)
     : branches
 
   // Available roles based on current user
@@ -396,7 +373,7 @@ function UsersContent() {
             Users
           </h1>
           <p className="text-slate-400 text-sm mt-1">
-            Manage users and assign them to territories, areas, and branches
+            Manage users and assign them to territories and branches
           </p>
         </div>
         <Button
@@ -675,19 +652,13 @@ function UsersContent() {
                             {user.territory_name}
                           </div>
                         )}
-                        {user.area_name && (
-                          <div className="flex items-center gap-1 text-xs text-slate-500">
-                            <MapPin className="w-3 h-3 text-blue-400" />
-                            {user.area_name}
-                          </div>
-                        )}
                         {user.branch_name && (
                           <div className="flex items-center gap-1 text-xs text-slate-500">
                             <Building2 className="w-3 h-3 text-cyan-400" />
                             {user.branch_name}
                           </div>
                         )}
-                        {!user.territory_name && !user.area_name && !user.branch_name && (
+                        {!user.territory_name && !user.branch_name && (
                           <span className="text-xs text-slate-600">Not assigned</span>
                         )}
                       </div>
@@ -807,32 +778,13 @@ function UsersContent() {
                   <select
                     id="territory"
                     value={formData.territory_id}
-                    onChange={(e) => setFormData({ ...formData, territory_id: e.target.value, area_id: '', branch_id: '' })}
+                    onChange={(e) => setFormData({ ...formData, territory_id: e.target.value, branch_id: '' })}
                     disabled={currentUser.role !== 'supreme_admin'}
                     className="w-full px-3 py-2 rounded-lg bg-slate-700/50 border border-slate-600 text-white focus:outline-none focus:ring-2 focus:ring-green-500 disabled:opacity-50"
                   >
                     <option value="">Select territory</option>
                     {territories.map((territory) => (
                       <option key={territory.id} value={territory.id.toString()}>{territory.name} ({territory.code})</option>
-                    ))}
-                  </select>
-                </div>
-              )}
-
-              {/* Area - show for AM and Staff roles */}
-              {(formData.role === 'admin' || formData.role === 'staff') && (
-                <div className="space-y-2">
-                  <Label htmlFor="area" className="text-slate-300">Area *</Label>
-                  <select
-                    id="area"
-                    value={formData.area_id}
-                    onChange={(e) => setFormData({ ...formData, area_id: e.target.value, branch_id: '' })}
-                    disabled={currentUser.role === 'admin'}
-                    className="w-full px-3 py-2 rounded-lg bg-slate-700/50 border border-slate-600 text-white focus:outline-none focus:ring-2 focus:ring-green-500 disabled:opacity-50"
-                  >
-                    <option value="">Select area</option>
-                    {filteredAreas.map((area) => (
-                      <option key={area.id} value={area.id.toString()}>{area.name} ({area.code})</option>
                     ))}
                   </select>
                 </div>

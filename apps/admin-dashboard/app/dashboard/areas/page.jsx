@@ -94,9 +94,9 @@ export default function AreaManagersPage() {
     return branches.filter(b => b.manager_id === amId)
   }
 
-  // Get unassigned branches for a territory
-  const getUnassignedBranches = (territoryId) => {
-    return branches.filter(b => !b.manager_id && b.territory_id === territoryId)
+  // Get all branches in territory that are NOT already assigned to a specific AM
+  const getAssignableBranches = (territoryId, amId) => {
+    return branches.filter(b => b.territory_id === territoryId && b.manager_id !== amId)
   }
 
   const filteredAMs = amUsers.filter(u => {
@@ -299,7 +299,6 @@ export default function AreaManagersPage() {
           <div className="grid lg:grid-cols-2 gap-4">
             {filteredAMs.map((am) => {
               const assignedBranches = getBranchesForAM(am.id)
-              const unassignedInTerritory = getUnassignedBranches(am.territory_id)
               return (
                 <Card key={am.id} className="bg-slate-800/50 border-slate-700 hover:border-slate-600 transition-colors">
                   <CardHeader className="pb-3">
@@ -354,15 +353,13 @@ export default function AreaManagersPage() {
                         <p className="text-xs font-medium text-slate-400 uppercase tracking-wider">
                           Assigned Branches ({assignedBranches.length})
                         </p>
-                        {unassignedInTerritory.length > 0 && (
-                          <button
-                            onClick={() => handleOpenAssign(am)}
-                            className="flex items-center gap-1 px-2 py-1 rounded text-xs text-cyan-300 hover:bg-cyan-500/10 transition-colors"
-                          >
-                            <Link2 className="w-3 h-3" />
-                            Assign Branch
-                          </button>
-                        )}
+                        <button
+                          onClick={() => handleOpenAssign(am)}
+                          className="flex items-center gap-1 px-2 py-1 rounded text-xs text-cyan-300 hover:bg-cyan-500/10 transition-colors"
+                        >
+                          <Link2 className="w-3 h-3" />
+                          Assign Branch
+                        </button>
                       </div>
 
                       {assignedBranches.length > 0 ? (
@@ -573,34 +570,42 @@ export default function AreaManagersPage() {
             )}
 
             {(() => {
-              const available = getUnassignedBranches(assignTargetAM.territory_id)
+              const available = getAssignableBranches(assignTargetAM.territory_id, assignTargetAM.id)
               return available.length > 0 ? (
                 <div className="space-y-2 mb-4 max-h-60 overflow-y-auto">
-                  {available.map((branch) => (
-                    <button
-                      key={branch.id}
-                      onClick={() => setSelectedBranchId(branch.id.toString())}
-                      className={`w-full p-3 rounded-lg border transition-colors text-left flex items-center gap-3 ${
-                        selectedBranchId === branch.id.toString()
-                          ? 'border-cyan-500 bg-cyan-500/10'
-                          : 'border-slate-600 hover:border-slate-500 hover:bg-slate-700/50'
-                      }`}
-                    >
-                      <Building2 className="w-5 h-5 text-blue-400 flex-shrink-0" />
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium text-white">{branch.name}</p>
-                        <p className="text-[10px] text-slate-400">{branch.code}{branch.address ? ` - ${branch.address}` : ''}</p>
-                      </div>
-                      {selectedBranchId === branch.id.toString() && (
-                        <UserCheck className="w-4 h-4 text-cyan-400 flex-shrink-0" />
-                      )}
-                    </button>
-                  ))}
+                  {available.map((branch) => {
+                    const currentManager = branch.manager_id
+                      ? amUsers.find(u => u.id === branch.manager_id)
+                      : null
+                    return (
+                      <button
+                        key={branch.id}
+                        onClick={() => setSelectedBranchId(branch.id.toString())}
+                        className={`w-full p-3 rounded-lg border transition-colors text-left flex items-center gap-3 ${
+                          selectedBranchId === branch.id.toString()
+                            ? 'border-cyan-500 bg-cyan-500/10'
+                            : 'border-slate-600 hover:border-slate-500 hover:bg-slate-700/50'
+                        }`}
+                      >
+                        <Building2 className="w-5 h-5 text-blue-400 flex-shrink-0" />
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium text-white">{branch.name}</p>
+                          <p className="text-[10px] text-slate-400">{branch.code}{branch.address ? ` - ${branch.address}` : ''}</p>
+                          {currentManager && (
+                            <p className="text-[10px] text-amber-400 mt-0.5">Currently assigned to {currentManager.full_name}</p>
+                          )}
+                        </div>
+                        {selectedBranchId === branch.id.toString() && (
+                          <UserCheck className="w-4 h-4 text-cyan-400 flex-shrink-0" />
+                        )}
+                      </button>
+                    )
+                  })}
                 </div>
               ) : (
                 <div className="p-4 rounded-lg bg-amber-500/10 border border-amber-500/20 mb-4">
-                  <p className="text-sm text-amber-300">No unassigned branches available in this territory.</p>
-                  <p className="text-xs text-amber-400/70 mt-1">All branches are already assigned or create a new branch first.</p>
+                  <p className="text-sm text-amber-300">No branches available in this territory.</p>
+                  <p className="text-xs text-amber-400/70 mt-1">Create a new branch first.</p>
                 </div>
               )
             })()}

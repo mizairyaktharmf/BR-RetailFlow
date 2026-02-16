@@ -18,7 +18,6 @@ import {
   Loader2,
   AlertCircle,
   Globe,
-  MapPin,
   ChevronDown,
   Clock,
   CheckCircle,
@@ -32,10 +31,8 @@ export default function BranchesPage() {
   const router = useRouter()
   const [user, setUser] = useState(null)
   const [branches, setBranches] = useState([])
-  const [areas, setAreas] = useState([])
   const [territories, setTerritories] = useState([])
   const [searchTerm, setSearchTerm] = useState('')
-  const [filterArea, setFilterArea] = useState('')
   const [filterTerritory, setFilterTerritory] = useState('')
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false)
@@ -50,7 +47,6 @@ export default function BranchesPage() {
     is_active: true
   })
   const [error, setError] = useState('')
-  const [showAreaDropdown, setShowAreaDropdown] = useState(false)
   const [showTerritoryDropdown, setShowTerritoryDropdown] = useState(false)
 
   useEffect(() => {
@@ -66,13 +62,11 @@ export default function BranchesPage() {
 
   const loadData = async () => {
     try {
-      const [branchesData, areasData, territoriesData] = await Promise.all([
+      const [branchesData, territoriesData] = await Promise.all([
         api.getBranches().catch(() => []),
-        api.getAreas().catch(() => []),
         api.getTerritories().catch(() => []),
       ])
       setBranches(branchesData)
-      setAreas(areasData)
       setTerritories(territoriesData)
     } catch (err) {
       // Silently fail
@@ -82,9 +76,8 @@ export default function BranchesPage() {
   const filteredBranches = branches.filter(b => {
     const matchesSearch = b.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       b.code?.toLowerCase().includes(searchTerm.toLowerCase())
-    const matchesArea = !filterArea || b.area_id?.toString() === filterArea
     const matchesTerritory = !filterTerritory || b.territory_id?.toString() === filterTerritory
-    return matchesSearch && matchesArea && matchesTerritory
+    return matchesSearch && matchesTerritory
   })
 
   const handleOpenModal = (branch = null) => {
@@ -183,11 +176,6 @@ export default function BranchesPage() {
     }
   }
 
-  // Filter areas based on selected territory (for HQ)
-  const displayAreas = user?.role === 'supreme_admin' && filterTerritory
-    ? areas.filter(a => a.territory_id?.toString() === filterTerritory)
-    : areas
-
   if (!user) return null
 
   return (
@@ -202,9 +190,7 @@ export default function BranchesPage() {
           <p className="text-slate-400 text-sm mt-1">
             {user.role === 'supreme_admin'
               ? 'Manage all branches across the network'
-              : user.role === 'super_admin'
-                ? `Manage branches in ${user.territory_name}`
-                : `Manage branches in ${user.area_name}`
+              : `Manage branches in ${user.territory_name || 'your territory'}`
             }
           </p>
         </div>
@@ -254,7 +240,6 @@ export default function BranchesPage() {
                   <button
                     onClick={() => {
                       setFilterTerritory('')
-                      setFilterArea('')
                       setShowTerritoryDropdown(false)
                     }}
                     className={`w-full px-4 py-2 text-left text-sm hover:bg-slate-700 transition-colors ${
@@ -268,7 +253,6 @@ export default function BranchesPage() {
                       key={territory.id}
                       onClick={() => {
                         setFilterTerritory(territory.id.toString())
-                        setFilterArea('')
                         setShowTerritoryDropdown(false)
                       }}
                       className={`w-full px-4 py-2 text-left text-sm hover:bg-slate-700 transition-colors ${
@@ -284,56 +268,6 @@ export default function BranchesPage() {
           </div>
         )}
 
-        {(user.role === 'supreme_admin' || user.role === 'super_admin') && (
-          <div className="relative">
-            <button
-              onClick={() => setShowAreaDropdown(!showAreaDropdown)}
-              className="flex items-center gap-2 px-4 py-2 rounded-lg bg-slate-800/50 border border-slate-700 text-slate-300 hover:bg-slate-700 transition-colors"
-            >
-              <MapPin className="w-4 h-4 text-blue-400" />
-              <span>
-                {filterArea
-                  ? displayAreas.find(a => a.id.toString() === filterArea)?.name
-                  : 'All Areas'
-                }
-              </span>
-              <ChevronDown className="w-4 h-4" />
-            </button>
-
-            {showAreaDropdown && (
-              <>
-                <div className="fixed inset-0 z-10" onClick={() => setShowAreaDropdown(false)} />
-                <div className="absolute top-full left-0 mt-2 w-48 bg-slate-800 border border-slate-700 rounded-lg shadow-xl z-20 overflow-hidden max-h-64 overflow-y-auto">
-                  <button
-                    onClick={() => {
-                      setFilterArea('')
-                      setShowAreaDropdown(false)
-                    }}
-                    className={`w-full px-4 py-2 text-left text-sm hover:bg-slate-700 transition-colors ${
-                      !filterArea ? 'text-blue-300 bg-slate-700/50' : 'text-slate-300'
-                    }`}
-                  >
-                    All Areas
-                  </button>
-                  {displayAreas.map((area) => (
-                    <button
-                      key={area.id}
-                      onClick={() => {
-                        setFilterArea(area.id.toString())
-                        setShowAreaDropdown(false)
-                      }}
-                      className={`w-full px-4 py-2 text-left text-sm hover:bg-slate-700 transition-colors ${
-                        filterArea === area.id.toString() ? 'text-blue-300 bg-slate-700/50' : 'text-slate-300'
-                      }`}
-                    >
-                      {area.name}
-                    </button>
-                  ))}
-                </div>
-              </>
-            )}
-          </div>
-        )}
       </div>
 
       {/* Branches Grid */}
@@ -377,21 +311,21 @@ export default function BranchesPage() {
               </div>
             </CardHeader>
             <CardContent className="pt-0 space-y-3">
-              {/* Location Badges */}
+              {/* Location & Manager Badges */}
               <div className="flex flex-wrap gap-2">
                 <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-purple-500/20 text-purple-300 text-xs">
                   <Globe className="w-3 h-3" />
                   {branch.territory_name || 'Unknown'}
                 </span>
-                {branch.area_name ? (
-                  <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-blue-500/20 text-blue-300 text-xs">
-                    <MapPin className="w-3 h-3" />
-                    {branch.area_name}
+                {branch.manager_name ? (
+                  <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-cyan-500/20 text-cyan-300 text-xs">
+                    <Users className="w-3 h-3" />
+                    {branch.manager_name}
                   </span>
                 ) : (
                   <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-amber-500/20 text-amber-300 text-xs">
-                    <MapPin className="w-3 h-3" />
-                    Not assigned to AM
+                    <Users className="w-3 h-3" />
+                    No AM assigned
                   </span>
                 )}
               </div>
@@ -472,7 +406,6 @@ export default function BranchesPage() {
                   placeholder="e.g., KRM-01"
                   value={formData.code}
                   onChange={(e) => setFormData({ ...formData, code: e.target.value.toUpperCase() })}
-                  maxLength={10}
                   className="bg-slate-700/50 border-slate-600 text-white placeholder:text-slate-500 uppercase"
                 />
               </div>

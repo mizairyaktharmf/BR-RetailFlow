@@ -50,7 +50,7 @@ class User(Base):
     last_login = Column(DateTime(timezone=True), nullable=True)
 
     # Relationships
-    branch = relationship("Branch", back_populates="staff")
+    branch = relationship("Branch", back_populates="staff", foreign_keys=[branch_id])
     area = relationship("Area", back_populates="managers")
     territory = relationship("Territory", back_populates="managers")
 
