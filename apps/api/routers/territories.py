@@ -48,13 +48,26 @@ async def list_territories(
     result = []
     for t in territories:
         resp = TerritoryResponse.model_validate(t)
-        resp.areas_count = len(t.areas) if hasattr(t, 'areas') and t.areas else 0
-        branch_total = 0
-        if hasattr(t, 'areas') and t.areas:
-            for a in t.areas:
-                branch_total += len(a.branches) if hasattr(a, 'branches') and a.branches else 0
-        resp.branches_count = branch_total
-        resp.users_count = db.query(sa_func.count(User.id)).filter(User.territory_id == t.id).scalar() or 0
+
+        # Find Territory Manager
+        tm = db.query(User).filter(
+            User.territory_id == t.id,
+            User.role == UserRole.SUPER_ADMIN,
+            User.is_active == True
+        ).first()
+        resp.tm_name = tm.full_name if tm else None
+
+        # Count branches directly by territory_id
+        resp.branches_count = db.query(sa_func.count(Branch.id)).filter(
+            Branch.territory_id == t.id
+        ).scalar() or 0
+
+        # Count users (exclude system branch accounts)
+        resp.users_count = db.query(sa_func.count(User.id)).filter(
+            User.territory_id == t.id,
+            ~User.email.like('%@branch.brretailflow.com')
+        ).scalar() or 0
+
         result.append(resp)
     return result
 

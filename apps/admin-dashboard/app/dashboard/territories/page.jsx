@@ -13,7 +13,7 @@ import {
   Search,
   Edit2,
   Trash2,
-  MapPin,
+  Shield,
   Building2,
   Users,
   X,
@@ -200,11 +200,13 @@ export default function TerritoriesPage() {
             <CardContent className="pt-0">
               <div className="grid grid-cols-3 gap-2 text-center">
                 <div className="p-2 rounded-lg bg-slate-700/30">
-                  <div className="flex items-center justify-center gap-1 text-blue-400 mb-1">
-                    <MapPin className="w-3 h-3" />
+                  <div className="flex items-center justify-center gap-1 text-purple-400 mb-1">
+                    <Shield className="w-3 h-3" />
                   </div>
-                  <p className="text-sm font-semibold text-white">{territory.areas_count || 0}</p>
-                  <p className="text-[10px] text-slate-500">Areas</p>
+                  <p className="text-xs font-semibold text-white truncate" title={territory.tm_name || 'Not Assigned'}>
+                    {territory.tm_name || '—'}
+                  </p>
+                  <p className="text-[10px] text-slate-500">TM</p>
                 </div>
                 <div className="p-2 rounded-lg bg-slate-700/30">
                   <div className="flex items-center justify-center gap-1 text-cyan-400 mb-1">

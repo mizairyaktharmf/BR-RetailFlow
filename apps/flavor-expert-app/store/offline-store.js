@@ -6,7 +6,7 @@
 import { openDB } from 'idb'
 
 const DB_NAME = 'br-retailflow-flavor-expert'
-const DB_VERSION = 1
+const DB_VERSION = 2
 
 // Store names
 const STORES = {
@@ -22,7 +22,7 @@ const STORES = {
  */
 async function initDB() {
   return openDB(DB_NAME, DB_VERSION, {
-    upgrade(db) {
+    upgrade(db, oldVersion) {
       // Pending inventory entries
       if (!db.objectStoreNames.contains(STORES.PENDING_INVENTORY)) {
         const store = db.createObjectStore(STORES.PENDING_INVENTORY, {
@@ -72,6 +72,7 @@ async function initDB() {
 
 /**
  * Offline Store Class
+ * Uses 0/1 instead of false/true for synced field (IndexedDB doesn't support boolean keys)
  */
 class OfflineStore {
   constructor() {
@@ -91,7 +92,7 @@ class OfflineStore {
     const db = await this.getDB()
     return db.add(STORES.PENDING_INVENTORY, {
       ...entry,
-      synced: false,
+      synced: 0,
       createdAt: new Date().toISOString(),
     })
   }
@@ -99,14 +100,14 @@ class OfflineStore {
   async getPendingInventoryEntries() {
     const db = await this.getDB()
     const index = db.transaction(STORES.PENDING_INVENTORY).store.index('synced')
-    return index.getAll(false)
+    return index.getAll(0)
   }
 
   async markInventoryEntrySynced(id) {
     const db = await this.getDB()
     const entry = await db.get(STORES.PENDING_INVENTORY, id)
     if (entry) {
-      entry.synced = true
+      entry.synced = 1
       await db.put(STORES.PENDING_INVENTORY, entry)
     }
   }
@@ -115,7 +116,7 @@ class OfflineStore {
     const db = await this.getDB()
     const tx = db.transaction(STORES.PENDING_INVENTORY, 'readwrite')
     const index = tx.store.index('synced')
-    const synced = await index.getAllKeys(true)
+    const synced = await index.getAllKeys(1)
     for (const key of synced) {
       await tx.store.delete(key)
     }
@@ -127,7 +128,7 @@ class OfflineStore {
     const db = await this.getDB()
     return db.add(STORES.PENDING_SALES, {
       ...entry,
-      synced: false,
+      synced: 0,
       createdAt: new Date().toISOString(),
     })
   }
@@ -135,14 +136,14 @@ class OfflineStore {
   async getPendingSalesEntries() {
     const db = await this.getDB()
     const index = db.transaction(STORES.PENDING_SALES).store.index('synced')
-    return index.getAll(false)
+    return index.getAll(0)
   }
 
   async markSalesEntrySynced(id) {
     const db = await this.getDB()
     const entry = await db.get(STORES.PENDING_SALES, id)
     if (entry) {
-      entry.synced = true
+      entry.synced = 1
       await db.put(STORES.PENDING_SALES, entry)
     }
   }
@@ -153,7 +154,7 @@ class OfflineStore {
     const db = await this.getDB()
     return db.add(STORES.PENDING_RECEIPTS, {
       ...receipt,
-      synced: false,
+      synced: 0,
       createdAt: new Date().toISOString(),
     })
   }
@@ -161,14 +162,14 @@ class OfflineStore {
   async getPendingTubReceipts() {
     const db = await this.getDB()
     const index = db.transaction(STORES.PENDING_RECEIPTS).store.index('synced')
-    return index.getAll(false)
+    return index.getAll(0)
   }
 
   async markTubReceiptSynced(id) {
     const db = await this.getDB()
     const receipt = await db.get(STORES.PENDING_RECEIPTS, id)
     if (receipt) {
-      receipt.synced = true
+      receipt.synced = 1
       await db.put(STORES.PENDING_RECEIPTS, receipt)
     }
   }
@@ -215,13 +216,13 @@ class OfflineStore {
     const db = await this.getDB()
 
     const inventoryIndex = db.transaction(STORES.PENDING_INVENTORY).store.index('synced')
-    const inventoryCount = await inventoryIndex.count(false)
+    const inventoryCount = await inventoryIndex.count(0)
 
     const salesIndex = db.transaction(STORES.PENDING_SALES).store.index('synced')
-    const salesCount = await salesIndex.count(false)
+    const salesCount = await salesIndex.count(0)
 
     const receiptsIndex = db.transaction(STORES.PENDING_RECEIPTS).store.index('synced')
-    const receiptsCount = await receiptsIndex.count(false)
+    const receiptsCount = await receiptsIndex.count(0)
 
     return {
       inventory: inventoryCount,
