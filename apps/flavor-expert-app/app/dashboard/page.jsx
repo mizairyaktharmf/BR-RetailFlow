@@ -189,7 +189,7 @@ export default function DashboardPage() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-pink-100 text-xs">Branch</p>
-                <p className="font-medium">Karama Centre</p>
+                <p className="font-medium">{user.branch_name || user.full_name?.replace('Flavor Expert - ', '') || 'My Branch'}</p>
               </div>
               <div className="text-right">
                 <p className="text-pink-100 text-xs">Today</p>
