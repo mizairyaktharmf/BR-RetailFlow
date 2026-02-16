@@ -15,7 +15,8 @@ import {
   Shield,
   Menu,
   X,
-  Cake
+  Cake,
+  IceCream
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 
@@ -25,7 +26,8 @@ const navigation = [
   { name: 'Area Managers', href: '/dashboard/areas', icon: MapPin, roles: ['supreme_admin', 'super_admin'] },
   { name: 'Branches', href: '/dashboard/branches', icon: Building2, roles: ['supreme_admin', 'super_admin', 'admin'] },
   { name: 'Users', href: '/dashboard/users', icon: Users, roles: ['supreme_admin', 'super_admin', 'admin'] },
-  { name: 'Cake Alerts', href: '/dashboard/cake-alerts', icon: Cake, roles: ['supreme_admin', 'super_admin', 'admin'] },
+  { name: 'Ice Cream Flavors', href: '/dashboard/flavors', icon: IceCream, roles: ['supreme_admin'] },
+  { name: 'Cake Products', href: '/dashboard/cake-products', icon: Cake, roles: ['supreme_admin'] },
 ]
 
 const roleLabels = {
