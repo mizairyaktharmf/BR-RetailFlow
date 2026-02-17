@@ -375,6 +375,11 @@ class ApiService {
     return this.request(`/reports/branch/${branchId}${query}`)
   }
 
+  // ============ SALES ============
+  async getDailySales(branchId, date) {
+    return this.request(`/sales/daily?branch_id=${branchId}&date=${date}`)
+  }
+
   // ============ CAKE INVENTORY ============
   async getCakeProducts() {
     return this.request('/cake/cake-products')
