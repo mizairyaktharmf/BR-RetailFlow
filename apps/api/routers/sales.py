@@ -203,66 +203,96 @@ async def upload_sales_photo(
 # ============== OCR EXTRACTION ==============
 
 def extract_branch_name(text: str) -> Optional[str]:
-    """Extract branch name from BR POS receipt header"""
+    """Extract branch name from BR POS receipt header.
+    OCR often misreads IBQ as 1BQ, 1B, lBQ etc. Handle all variants.
+    """
     lines = text.split('\n')
 
-    # Strategy 1: Look for "IBQ" pattern anywhere in the first 20 lines
-    for line in lines[:20]:
-        # Clean the line - remove non-ASCII characters (Arabic text etc.)
+    # Strategy 1: Look for IBQ/1BQ/1B pattern followed by branch name
+    for line in lines[:25]:
         cleaned = re.sub(r'[^\x20-\x7E]', '', line).strip()
         if not cleaned or len(cleaned) < 3:
             continue
 
-        # Match IBQ followed by branch name (e.g. "IBQ LAMCY RESIDENCE")
-        ibq_match = re.search(r'IBQ\s+(.+)', cleaned, re.IGNORECASE)
+        # Match IBQ/1BQ/1B/lBQ followed by branch name
+        # OCR reads "IBQ" as "1BQ", "1B", "lBQ", "IBQ" etc.
+        ibq_match = re.search(r'(?:IBQ|1BQ|1B|lBQ|iB[Q0O])\s+(.+)', cleaned, re.IGNORECASE)
         if ibq_match:
+            # Return the full match including prefix for branch matching
             branch = ibq_match.group(0).strip()
+            # Clean trailing OCR noise (random chars after branch name)
+            branch = re.sub(r'\s+[a-z]{1,3}\s*$', '', branch)  # remove trailing short lowercase words
             logger.info(f"Branch name extracted (IBQ pattern): {branch}")
             return branch
 
-    # Strategy 2: Look for clean uppercase lines that aren't headers/separators
-    for line in lines[:15]:
+    # Strategy 2: Search all lines for known location keywords
+    # Common BR UAE branch location names
+    location_keywords = [
+        'lamcy', 'lancy', 'residence', 'karama', 'deira', 'marina',
+        'mall', 'plaza', 'center', 'centre', 'city', 'tower',
+        'trade', 'jumeirah', 'barsha', 'nahda', 'sharjah', 'ajman',
+        'fujairah', 'khalifa', 'reem', 'musaffah', 'corniche',
+        'mirdif', 'silicon', 'springs', 'meadows', 'jlt', 'jbr',
+        'motor', 'festival', 'ibn battuta', 'battuta', 'outlet',
+    ]
+    for line in lines[:20]:
         cleaned = re.sub(r'[^\x20-\x7E]', '', line).strip()
-        if not cleaned or len(cleaned) < 4:
+        if not cleaned or len(cleaned) < 5:
             continue
         lower = cleaned.lower()
-        # Skip BR logo, separators, date lines, report type lines
+        # Skip header/data lines
+        if any(skip in lower for skip in [
+            'baskin', 'robbins', 'date:', 'tm:', 'spot sales',
+            '====', '****', '----', 'cash', 'gross', 'net ',
+            'sales summary', 'returns', 'discount', 'total',
+        ]):
+            continue
+        # Check if line contains a location keyword
+        for kw in location_keywords:
+            if kw in lower and len(cleaned) > 5:
+                # Extract just the meaningful uppercase part
+                # Remove leading noise characters
+                name = re.sub(r'^[^A-Z]*', '', cleaned).strip()
+                if name and len(name) > 4:
+                    name = re.sub(r'\s+[a-z]{1,3}\s*$', '', name)  # clean trailing noise
+                    logger.info(f"Branch name extracted (location keyword '{kw}'): {name}")
+                    return name
+
+    # Strategy 3: Look for clean uppercase lines that aren't headers
+    for line in lines[:15]:
+        cleaned = re.sub(r'[^\x20-\x7E]', '', line).strip()
+        if not cleaned or len(cleaned) < 6:
+            continue
+        lower = cleaned.lower()
         if any(skip in lower for skip in [
             'baskin', 'robbins', 'date:', 'tm:', 'spot sales',
             '====', '****', '----', 'cash', 'gross', 'net ',
         ]):
             continue
-        # Check for uppercase location name (at least 2 words)
-        if re.match(r'^[A-Z][A-Z\s/&\-\.]{3,}$', cleaned) and ' ' in cleaned:
+        if re.match(r'^[A-Z][A-Z\s/&\-\.]{4,}$', cleaned) and ' ' in cleaned:
             logger.info(f"Branch name extracted (uppercase pattern): {cleaned}")
             return cleaned
 
-    # Strategy 3: Look for "BR " prefix
-    for line in lines[:15]:
-        cleaned = re.sub(r'[^\x20-\x7E]', '', line).strip()
-        lower = cleaned.lower()
-        if lower.startswith('br ') and len(cleaned) > 5:
-            logger.info(f"Branch name extracted (BR prefix): {cleaned}")
-            return cleaned
-
-    logger.warning(f"Could not extract branch name. First 10 lines: {lines[:10]}")
+    logger.warning(f"Could not extract branch name. First 15 lines: {lines[:15]}")
     return None
 
 
 def check_branch_match(receipt_name: str, db_branch_name: str) -> bool:
-    """Fuzzy match branch name from receipt against database branch name"""
+    """Fuzzy match branch name from receipt against database branch name.
+    Handles OCR typos like LANCY vs LAMCY using character similarity.
+    """
     if not receipt_name or not db_branch_name:
         return False
 
     receipt_clean = receipt_name.lower().strip()
     db_clean = db_branch_name.lower().strip()
 
-    # Remove common prefixes
-    for prefix in ['ibq ', 'br ', 'baskin robbins ']:
+    # Remove common prefixes (including OCR variants of IBQ)
+    for prefix in ['ibq ', '1bq ', '1b ', 'lbq ', 'br ', 'baskin robbins ']:
         receipt_clean = receipt_clean.replace(prefix, '')
         db_clean = db_clean.replace(prefix, '')
 
-    # Remove extra whitespace
+    # Remove extra whitespace and non-alpha noise
     receipt_clean = ' '.join(receipt_clean.split())
     db_clean = ' '.join(db_clean.split())
 
@@ -285,6 +315,21 @@ def check_branch_match(receipt_name: str, db_branch_name: str) -> bool:
         overlap = receipt_words & db_words
         if len(overlap) >= 1:
             return True
+
+    # Fuzzy character match: handle OCR typos (LANCY vs LAMCY)
+    # Check if any word pair is very similar (1-2 char difference)
+    for rw in receipt_words:
+        for dw in db_words:
+            if len(rw) >= 4 and len(dw) >= 4:
+                # Simple edit distance check: count matching chars
+                if len(rw) == len(dw):
+                    diff = sum(1 for a, b in zip(rw, dw) if a != b)
+                    if diff <= 2:
+                        return True
+                # Check if one is substring of other (off by 1-2 chars)
+                shorter, longer = (rw, dw) if len(rw) <= len(dw) else (dw, rw)
+                if len(longer) - len(shorter) <= 2 and shorter[:3] == longer[:3]:
+                    return True
 
     return False
 
