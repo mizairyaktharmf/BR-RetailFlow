@@ -191,14 +191,6 @@ export default function DashboardPage() {
           iconColor: currentWindow ? 'text-green-600' : 'text-gray-600',
           highlight: !!currentWindow,
         },
-        {
-          title: 'Daily Summary',
-          description: 'View today\'s complete overview',
-          icon: ClipboardList,
-          href: '/summary',
-          iconBg: 'bg-purple-100',
-          iconColor: 'text-purple-600',
-        },
       ],
     },
   ]
@@ -408,47 +400,6 @@ export default function DashboardPage() {
           })}
         </div>
 
-        {/* Sales Windows Info */}
-        <div className="mt-8">
-          <h2 className="text-lg font-semibold text-gray-900 mb-3">Sales Reporting Windows</h2>
-          <Card>
-            <CardContent className="p-4">
-              <p className="text-sm text-gray-600 mb-4">
-                Submit your sales report during these time windows. Each window is open for 1 hour.
-              </p>
-              <div className="space-y-3">
-                {SALES_WINDOWS.map((window) => {
-                  const isActive = currentWindow === window.id
-                  return (
-                    <div
-                      key={window.id}
-                      className={`flex items-center justify-between p-3 rounded-lg ${
-                        isActive
-                          ? 'bg-green-50 border border-green-200'
-                          : 'bg-gray-50'
-                      }`}
-                    >
-                      <div>
-                        <p className={`font-medium ${isActive ? 'text-green-700' : 'text-gray-900'}`}>
-                          {window.label}
-                        </p>
-                        <p className={`text-sm ${isActive ? 'text-green-600' : 'text-gray-500'}`}>
-                          {window.time}
-                        </p>
-                      </div>
-                      {isActive && (
-                        <span className="px-2 py-1 bg-green-500 text-white text-xs font-medium rounded-full">
-                          OPEN
-                        </span>
-                      )}
-                    </div>
-                  )
-                })}
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-
         {/* Help Section */}
         <div className="mt-8">
           <Card className="bg-gradient-to-br from-gray-50 to-white">
@@ -485,7 +436,7 @@ export default function DashboardPage() {
 
       {/* Bottom Navigation */}
       <div className="fixed bottom-0 left-0 right-0 bg-white border-t safe-area-bottom">
-        <div className="grid grid-cols-4 gap-1 p-2">
+        <div className="grid grid-cols-3 gap-1 p-2">
           <button
             onClick={() => router.push('/dashboard')}
             className="flex flex-col items-center p-2 text-pink-500"
@@ -494,25 +445,23 @@ export default function DashboardPage() {
             <span className="text-xs mt-1">Home</span>
           </button>
           <button
-            onClick={() => router.push('/inventory')}
-            className="flex flex-col items-center p-2 text-gray-400 hover:text-pink-500"
-          >
-            <ClipboardList className="w-5 h-5" />
-            <span className="text-xs mt-1">Inventory</span>
-          </button>
-          <button
-            onClick={() => router.push('/sales')}
+            onClick={() => router.push('/sales-dashboard')}
             className="flex flex-col items-center p-2 text-gray-400 hover:text-pink-500"
           >
             <TrendingUp className="w-5 h-5" />
             <span className="text-xs mt-1">Sales</span>
           </button>
           <button
-            onClick={() => router.push('/receive')}
-            className="flex flex-col items-center p-2 text-gray-400 hover:text-pink-500"
+            onClick={() => router.push('/cake/stock')}
+            className="flex flex-col items-center p-2 text-gray-400 hover:text-pink-500 relative"
           >
-            <Package className="w-5 h-5" />
-            <span className="text-xs mt-1">Receive</span>
+            <Cake className="w-5 h-5" />
+            <span className="text-xs mt-1">Cake Alerts</span>
+            {cakeAlerts.length > 0 && (
+              <span className="absolute top-1 right-1/4 w-4 h-4 rounded-full bg-red-500 text-white text-[9px] font-bold flex items-center justify-center">
+                {cakeAlerts.length}
+              </span>
+            )}
           </button>
         </div>
       </div>

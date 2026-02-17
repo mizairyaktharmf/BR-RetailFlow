@@ -5,19 +5,13 @@ import { useRouter } from 'next/navigation'
 import {
   ArrowLeft,
   Camera,
-  Upload,
-  Clock,
   DollarSign,
   ShoppingCart,
   IceCream,
-  Coffee,
   Cake,
   Save,
   Loader2,
   CheckCircle2,
-  Lock,
-  AlertCircle,
-  Image as ImageIcon,
   X
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -26,8 +20,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { Label } from '@/components/ui/label'
 import { Separator } from '@/components/ui/separator'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { formatDate, formatCurrency, getCurrentSalesWindow, SALES_WINDOWS, isWindowOpen } from '@/lib/utils'
+import { formatDate, SALES_WINDOWS } from '@/lib/utils'
 import api from '@/services/api'
 import offlineStore from '@/store/offline-store'
 
@@ -35,13 +28,11 @@ export default function SalesPage() {
   const router = useRouter()
   const fileInputRef = useRef(null)
   const [user, setUser] = useState(null)
-  const [currentWindow, setCurrentWindow] = useState(null)
-  const [selectedWindow, setSelectedWindow] = useState(null)
+  const [selectedWindow, setSelectedWindow] = useState(SALES_WINDOWS[0]?.id || '3pm')
   const [saving, setSaving] = useState(false)
   const [photoPreview, setPhotoPreview] = useState(null)
   const [photoFile, setPhotoFile] = useState(null)
   const [submittedWindows, setSubmittedWindows] = useState([])
-  const [currentTime, setCurrentTime] = useState(new Date())
 
   const [salesData, setSalesData] = useState({
     total_sales: '',
@@ -58,29 +49,13 @@ export default function SalesPage() {
   })
 
   useEffect(() => {
-    // Load user data
     const userData = localStorage.getItem('br_user')
     if (!userData) {
       router.push('/login')
       return
     }
     setUser(JSON.parse(userData))
-
-    // Check current sales window
-    const checkWindow = () => {
-      const window = getCurrentSalesWindow()
-      setCurrentWindow(window)
-      if (window && !selectedWindow) {
-        setSelectedWindow(window)
-      }
-      setCurrentTime(new Date())
-    }
-    checkWindow()
-
-    // Update every minute
-    const interval = setInterval(checkWindow, 60000)
-    return () => clearInterval(interval)
-  }, [router, selectedWindow])
+  }, [router])
 
   const handlePhotoCapture = (e) => {
     const file = e.target.files[0]
@@ -110,7 +85,6 @@ export default function SalesPage() {
   }
 
   const handleSubmit = async () => {
-    // Validate required fields
     if (!salesData.total_sales || !salesData.transaction_count) {
       alert('Please enter total sales and transaction count')
       return
@@ -121,15 +95,9 @@ export default function SalesPage() {
       return
     }
 
-    if (!currentWindow) {
-      alert('Sales submission is only allowed during designated windows')
-      return
-    }
-
     setSaving(true)
 
     try {
-      // Upload photo first
       let photoUrl = null
       try {
         const uploadResult = await api.uploadSalesPhoto(photoFile)
@@ -141,7 +109,7 @@ export default function SalesPage() {
       const submitData = {
         branch_id: user.branch_id || 1,
         date: new Date().toISOString().split('T')[0],
-        sales_window: currentWindow,
+        sales_window: selectedWindow,
         total_sales: parseFloat(salesData.total_sales),
         transaction_count: parseInt(salesData.transaction_count),
         kids_scoop_count: parseInt(salesData.kids_scoop_count) || 0,
@@ -156,21 +124,17 @@ export default function SalesPage() {
         notes: salesData.notes,
       }
 
-      // Try to submit to API
       try {
         await api.submitSales(submitData)
       } catch (error) {
-        // Save offline
         await offlineStore.saveSalesEntry({
           ...submitData,
-          photo_base64: photoPreview, // Store photo locally
+          photo_base64: photoPreview,
         })
       }
 
-      // Mark window as submitted
-      setSubmittedWindows(prev => [...prev, currentWindow])
+      setSubmittedWindows(prev => [...prev, selectedWindow])
 
-      // Reset form
       setSalesData({
         total_sales: '',
         transaction_count: '',
@@ -197,9 +161,6 @@ export default function SalesPage() {
     }
   }
 
-  const isWindowSubmitted = (windowId) => submittedWindows.includes(windowId)
-  const canSubmit = currentWindow && !isWindowSubmitted(currentWindow)
-
   return (
     <div className="min-h-screen bg-gray-50 pb-24">
       {/* Header */}
@@ -215,110 +176,57 @@ export default function SalesPage() {
               <ArrowLeft className="w-5 h-5" />
             </Button>
             <div>
-              <h1 className="font-bold text-lg">Sales Report</h1>
+              <h1 className="font-bold text-lg">Submit Sales Report</h1>
               <p className="text-orange-100 text-sm">{formatDate(new Date())}</p>
             </div>
           </div>
         </div>
       </div>
 
-      {/* Current Time & Window Status */}
+      {/* Window Selector */}
       <div className="px-4 py-4">
-        <Card className={currentWindow ? 'border-green-500 bg-green-50' : 'border-gray-200'}>
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className={`w-12 h-12 rounded-full flex items-center justify-center ${
-                  currentWindow ? 'bg-green-500' : 'bg-gray-300'
-                }`}>
-                  {currentWindow ? (
-                    <Clock className="w-6 h-6 text-white" />
-                  ) : (
-                    <Lock className="w-6 h-6 text-white" />
-                  )}
-                </div>
-                <div>
-                  <p className="text-sm text-gray-500">Current Time</p>
-                  <p className="text-xl font-bold">
-                    {currentTime.toLocaleTimeString('en-AE', { hour: '2-digit', minute: '2-digit' })}
-                  </p>
-                </div>
-              </div>
-              <div className="text-right">
-                <p className="text-sm text-gray-500">Window Status</p>
-                {currentWindow ? (
-                  <span className="inline-flex items-center px-3 py-1 bg-green-500 text-white text-sm font-medium rounded-full">
-                    {currentWindow.toUpperCase()} OPEN
-                  </span>
-                ) : (
-                  <span className="inline-flex items-center px-3 py-1 bg-gray-400 text-white text-sm font-medium rounded-full">
-                    CLOSED
-                  </span>
-                )}
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Sales Windows Overview */}
-      <div className="px-4 mb-4">
-        <h2 className="text-sm font-semibold text-gray-600 mb-2">Today's Windows</h2>
+        <h2 className="text-sm font-semibold text-gray-600 mb-2">Select Window</h2>
         <div className="grid grid-cols-4 gap-2">
           {SALES_WINDOWS.map((window) => {
-            const isActive = currentWindow === window.id
-            const isSubmitted = isWindowSubmitted(window.id)
+            const isSelected = selectedWindow === window.id
+            const isSubmitted = submittedWindows.includes(window.id)
 
             return (
-              <div
+              <button
                 key={window.id}
-                className={`p-2 rounded-lg text-center ${
+                onClick={() => !isSubmitted && setSelectedWindow(window.id)}
+                className={`p-3 rounded-xl text-center transition-all ${
                   isSubmitted
-                    ? 'bg-green-100 border border-green-300'
-                    : isActive
-                      ? 'bg-orange-100 border border-orange-300'
-                      : 'bg-gray-100 border border-gray-200'
+                    ? 'bg-green-100 border-2 border-green-300'
+                    : isSelected
+                      ? 'bg-orange-100 border-2 border-orange-400 shadow-sm'
+                      : 'bg-white border-2 border-gray-200 hover:border-orange-200'
                 }`}
               >
-                <p className="text-xs font-medium text-gray-600">{window.id.toUpperCase()}</p>
+                <p className={`text-xs font-bold ${
+                  isSubmitted ? 'text-green-600' : isSelected ? 'text-orange-600' : 'text-gray-600'
+                }`}>{window.label.split(' ')[0]}</p>
                 {isSubmitted ? (
                   <CheckCircle2 className="w-5 h-5 mx-auto mt-1 text-green-600" />
-                ) : isActive ? (
-                  <span className="text-xs text-orange-600 font-medium">NOW</span>
                 ) : (
-                  <Lock className="w-4 h-4 mx-auto mt-1 text-gray-400" />
+                  <p className={`text-[10px] mt-0.5 ${isSelected ? 'text-orange-500' : 'text-gray-400'}`}>
+                    {window.time.split('-')[0].trim()}
+                  </p>
                 )}
-              </div>
+              </button>
             )
           })}
         </div>
       </div>
 
-      {/* Main Content */}
+      {/* Main Form */}
       <div className="px-4">
-        {!currentWindow ? (
-          <Alert variant="warning" className="bg-yellow-50 border-yellow-200">
-            <AlertCircle className="h-4 w-4 text-yellow-600" />
-            <AlertTitle className="text-yellow-800">Window Closed</AlertTitle>
-            <AlertDescription className="text-yellow-700">
-              Sales reporting is only available during designated windows:
-              <ul className="mt-2 space-y-1">
-                {SALES_WINDOWS.map(w => (
-                  <li key={w.id} className="flex items-center gap-2">
-                    <span className="font-medium">{w.label}:</span>
-                    <span>{w.time}</span>
-                  </li>
-                ))}
-              </ul>
-            </AlertDescription>
-          </Alert>
-        ) : isWindowSubmitted(currentWindow) ? (
+        {submittedWindows.includes(selectedWindow) ? (
           <Alert variant="success" className="bg-green-50 border-green-200">
             <CheckCircle2 className="h-4 w-4 text-green-600" />
             <AlertTitle className="text-green-800">Already Submitted!</AlertTitle>
             <AlertDescription className="text-green-700">
-              You have already submitted the {currentWindow.toUpperCase()} sales report.
-              Wait for the next window to submit again.
+              You've submitted the {selectedWindow.toUpperCase()} report. Select another window or go back.
             </AlertDescription>
           </Alert>
         ) : (
@@ -326,11 +234,10 @@ export default function SalesPage() {
             <CardHeader>
               <CardTitle className="text-lg flex items-center gap-2">
                 <Camera className="w-5 h-5 text-orange-500" />
-                {currentWindow.toUpperCase()} Sales Report
+                {SALES_WINDOWS.find(w => w.id === selectedWindow)?.label || 'Sales'} Report
               </CardTitle>
               <CardDescription>
                 Enter your sales data and take a photo of your POS screen.
-                This window closes at {SALES_WINDOWS.find(w => w.id === currentWindow)?.time.split('-')[1] || ''}.
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
@@ -544,7 +451,7 @@ export default function SalesPage() {
                 ) : (
                   <>
                     <Save className="w-5 h-5 mr-2" />
-                    Submit {currentWindow?.toUpperCase()} Report
+                    Submit {SALES_WINDOWS.find(w => w.id === selectedWindow)?.label || ''} Report
                   </>
                 )}
               </Button>
