@@ -31,18 +31,49 @@ import offlineStore from '@/store/offline-store'
 
 const MAX_PHOTOS = 4
 
+// ============================================================
+// SALES WINDOW TIME RULES (commented out — enable when ready)
+// Each window has an open/close time. Outside that range, the
+// window is locked and the user cannot submit for it.
+//
+// const WINDOW_TIME_RULES = {
+//   '3pm':     { openHour: 15, closeHour: 19 },   // 3 PM → 7 PM
+//   '7pm':     { openHour: 19, closeHour: 21 },   // 7 PM → 9 PM
+//   '9pm':     { openHour: 21, closeHour: 22 },   // 9 PM → 10 PM (closing)
+//   'closing': { openHour: 22, closeHour: 6 },     // 10 PM → 6 AM next day
+// }
+//
+// function isWindowAvailable(windowId) {
+//   const rule = WINDOW_TIME_RULES[windowId]
+//   if (!rule) return false
+//   const hour = new Date().getHours()
+//   if (rule.openHour < rule.closeHour) {
+//     // Normal range (e.g. 15→19)
+//     return hour >= rule.openHour && hour < rule.closeHour
+//   } else {
+//     // Overnight range (e.g. 22→6) — closing window
+//     return hour >= rule.openHour || hour < rule.closeHour
+//   }
+// }
+//
+// To enforce: replace `isLocked` in the window selector with:
+//   const isLocked = !isWindowAvailable(window.id)
+// and disable the button when isLocked is true.
+// ============================================================
+
 export default function SalesPage() {
   const router = useRouter()
   const fileInputRef = useRef(null)
   const [user, setUser] = useState(null)
   const [branch, setBranch] = useState(null)
-  const [selectedWindow, setSelectedWindow] = useState(SALES_WINDOWS[0]?.id || '3pm')
+  const [selectedWindow, setSelectedWindow] = useState(null)
   const [saving, setSaving] = useState(false)
   const [photos, setPhotos] = useState([])
   const [extractedData, setExtractedData] = useState(null)
   const [processing, setProcessing] = useState(false)
   const [submittedWindows, setSubmittedWindows] = useState([])
   const [extractionError, setExtractionError] = useState(null)
+  const [loadingWindows, setLoadingWindows] = useState(true)
 
   useEffect(() => {
     const userData = localStorage.getItem('br_user')
@@ -50,11 +81,47 @@ export default function SalesPage() {
       router.push('/login')
       return
     }
-    setUser(JSON.parse(userData))
+    const parsedUser = JSON.parse(userData)
+    setUser(parsedUser)
 
     const branchData = localStorage.getItem('br_branch')
     if (branchData) setBranch(JSON.parse(branchData))
+
+    // Load already-submitted windows for today
+    loadSubmittedWindows(parsedUser)
   }, [router])
+
+  const loadSubmittedWindows = async (userData) => {
+    setLoadingWindows(true)
+    try {
+      const branchData = localStorage.getItem('br_branch')
+      const branchInfo = branchData ? JSON.parse(branchData) : null
+      if (branchInfo?.id) {
+        const today = new Date().toISOString().split('T')[0]
+        const sales = await api.getDailySales(branchInfo.id, today)
+        const submitted = Array.isArray(sales) ? sales.map(s => s.sales_window) : []
+        setSubmittedWindows(submitted)
+        // Auto-select first unsubmitted window
+        const firstOpen = SALES_WINDOWS.find(w => !submitted.includes(w.id))
+        setSelectedWindow(firstOpen?.id || SALES_WINDOWS[0]?.id || '3pm')
+      } else {
+        setSelectedWindow(SALES_WINDOWS[0]?.id || '3pm')
+      }
+    } catch {
+      setSelectedWindow(SALES_WINDOWS[0]?.id || '3pm')
+    } finally {
+      setLoadingWindows(false)
+    }
+  }
+
+  // Reset form when switching windows — each window is independent
+  const handleWindowSelect = (windowId) => {
+    if (submittedWindows.includes(windowId)) return
+    setSelectedWindow(windowId)
+    setPhotos([])
+    setExtractedData(null)
+    setExtractionError(null)
+  }
 
   const readFileAsDataURL = (file) => {
     return new Promise((resolve) => {
@@ -189,12 +256,20 @@ export default function SalesPage() {
         })
       }
 
-      setSubmittedWindows(prev => [...prev, selectedWindow])
+      const updatedSubmitted = [...submittedWindows, selectedWindow]
+      setSubmittedWindows(updatedSubmitted)
       setPhotos([])
       setExtractedData(null)
       setExtractionError(null)
 
-      alert('Sales report submitted successfully!')
+      // Auto-advance to next unsubmitted window
+      const nextWindow = SALES_WINDOWS.find(w => !updatedSubmitted.includes(w.id))
+      if (nextWindow) {
+        setSelectedWindow(nextWindow.id)
+        alert(`${SALES_WINDOWS.find(w => w.id === selectedWindow)?.label} submitted! Moving to ${nextWindow.label}.`)
+      } else {
+        alert('All sales windows submitted for today!')
+      }
 
     } catch (error) {
       console.error('Error submitting sales:', error)
@@ -229,41 +304,53 @@ export default function SalesPage() {
       {/* Window Selector */}
       <div className="px-4 py-4">
         <h2 className="text-sm font-semibold text-gray-600 mb-2">Select Window</h2>
-        <div className="grid grid-cols-4 gap-2">
-          {SALES_WINDOWS.map((window) => {
-            const isSelected = selectedWindow === window.id
-            const isSubmitted = submittedWindows.includes(window.id)
-            return (
-              <button
-                key={window.id}
-                onClick={() => !isSubmitted && setSelectedWindow(window.id)}
-                className={`p-3 rounded-xl text-center transition-all ${
-                  isSubmitted
-                    ? 'bg-green-100 border-2 border-green-300'
-                    : isSelected
-                      ? 'bg-orange-100 border-2 border-orange-400 shadow-sm'
-                      : 'bg-white border-2 border-gray-200 hover:border-orange-200'
-                }`}
-              >
-                <p className={`text-xs font-bold ${
-                  isSubmitted ? 'text-green-600' : isSelected ? 'text-orange-600' : 'text-gray-600'
-                }`}>{window.label.split(' ')[0]}</p>
-                {isSubmitted ? (
-                  <CheckCircle2 className="w-5 h-5 mx-auto mt-1 text-green-600" />
-                ) : (
-                  <p className={`text-[10px] mt-0.5 ${isSelected ? 'text-orange-500' : 'text-gray-400'}`}>
-                    {window.time.split('-')[0].trim()}
-                  </p>
-                )}
-              </button>
-            )
-          })}
-        </div>
+        {loadingWindows ? (
+          <div className="flex items-center justify-center py-6">
+            <Loader2 className="w-5 h-5 animate-spin text-orange-400" />
+          </div>
+        ) : (
+          <div className="grid grid-cols-4 gap-2">
+            {SALES_WINDOWS.map((window) => {
+              const isSelected = selectedWindow === window.id
+              const isSubmitted = submittedWindows.includes(window.id)
+              // For now all windows are open. To enforce time rules,
+              // replace false with: !isWindowAvailable(window.id)
+              const isLocked = false
+              return (
+                <button
+                  key={window.id}
+                  onClick={() => handleWindowSelect(window.id)}
+                  disabled={isSubmitted || isLocked}
+                  className={`p-3 rounded-xl text-center transition-all ${
+                    isSubmitted
+                      ? 'bg-green-100 border-2 border-green-300 opacity-80'
+                      : isLocked
+                        ? 'bg-gray-100 border-2 border-gray-200 opacity-50 cursor-not-allowed'
+                        : isSelected
+                          ? 'bg-orange-100 border-2 border-orange-400 shadow-sm'
+                          : 'bg-white border-2 border-gray-200 hover:border-orange-200'
+                  }`}
+                >
+                  <p className={`text-xs font-bold ${
+                    isSubmitted ? 'text-green-600' : isLocked ? 'text-gray-400' : isSelected ? 'text-orange-600' : 'text-gray-600'
+                  }`}>{window.label.split(' ')[0]}</p>
+                  {isSubmitted ? (
+                    <CheckCircle2 className="w-5 h-5 mx-auto mt-1 text-green-600" />
+                  ) : (
+                    <p className={`text-[10px] mt-0.5 ${isSelected ? 'text-orange-500' : 'text-gray-400'}`}>
+                      {window.time.split('-')[0].trim()}
+                    </p>
+                  )}
+                </button>
+              )
+            })}
+          </div>
+        )}
       </div>
 
       {/* Main Form */}
       <div className="px-4">
-        {submittedWindows.includes(selectedWindow) ? (
+        {!selectedWindow || loadingWindows ? null : submittedWindows.includes(selectedWindow) ? (
           <Alert variant="success" className="bg-green-50 border-green-200">
             <CheckCircle2 className="h-4 w-4 text-green-600" />
             <AlertTitle className="text-green-800">Already Submitted!</AlertTitle>
