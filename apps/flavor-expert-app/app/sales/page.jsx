@@ -5,48 +5,44 @@ import { useRouter } from 'next/navigation'
 import {
   ArrowLeft,
   Camera,
-  DollarSign,
-  ShoppingCart,
-  IceCream,
-  Cake,
   Save,
   Loader2,
   CheckCircle2,
-  X
+  X,
+  Plus,
+  ScanLine,
+  DollarSign,
+  Users,
+  AlertCircle,
+  Edit3,
+  ShieldCheck,
+  ShieldAlert,
+  Banknote,
+  BarChart3
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { Label } from '@/components/ui/label'
-import { Separator } from '@/components/ui/separator'
 import { formatDate, SALES_WINDOWS } from '@/lib/utils'
 import api from '@/services/api'
 import offlineStore from '@/store/offline-store'
+
+const MAX_PHOTOS = 4
 
 export default function SalesPage() {
   const router = useRouter()
   const fileInputRef = useRef(null)
   const [user, setUser] = useState(null)
+  const [branch, setBranch] = useState(null)
   const [selectedWindow, setSelectedWindow] = useState(SALES_WINDOWS[0]?.id || '3pm')
   const [saving, setSaving] = useState(false)
-  const [photoPreview, setPhotoPreview] = useState(null)
-  const [photoFile, setPhotoFile] = useState(null)
+  const [photos, setPhotos] = useState([])
+  const [extractedData, setExtractedData] = useState(null)
+  const [processing, setProcessing] = useState(false)
   const [submittedWindows, setSubmittedWindows] = useState([])
-
-  const [salesData, setSalesData] = useState({
-    total_sales: '',
-    transaction_count: '',
-    kids_scoop_count: '',
-    single_scoop_count: '',
-    double_scoop_count: '',
-    triple_scoop_count: '',
-    sundae_count: '',
-    shake_count: '',
-    cake_count: '',
-    take_home_count: '',
-    notes: '',
-  })
+  const [extractionError, setExtractionError] = useState(null)
 
   useEffect(() => {
     const userData = localStorage.getItem('br_user')
@@ -55,73 +51,133 @@ export default function SalesPage() {
       return
     }
     setUser(JSON.parse(userData))
+
+    const branchData = localStorage.getItem('br_branch')
+    if (branchData) setBranch(JSON.parse(branchData))
   }, [router])
 
-  const handlePhotoCapture = (e) => {
-    const file = e.target.files[0]
-    if (file) {
-      setPhotoFile(file)
+  const readFileAsDataURL = (file) => {
+    return new Promise((resolve) => {
       const reader = new FileReader()
-      reader.onloadend = () => {
-        setPhotoPreview(reader.result)
-      }
+      reader.onloadend = () => resolve(reader.result)
       reader.readAsDataURL(file)
+    })
+  }
+
+  const handlePhotoCapture = async (e) => {
+    const files = Array.from(e.target.files)
+    if (!files.length) return
+
+    const newPhotos = []
+    for (const file of files) {
+      if (photos.length + newPhotos.length >= MAX_PHOTOS) break
+      const preview = await readFileAsDataURL(file)
+      newPhotos.push({ file, preview })
+    }
+
+    const updatedPhotos = [...photos, ...newPhotos]
+    setPhotos(updatedPhotos)
+
+    if (fileInputRef.current) fileInputRef.current.value = ''
+
+    await extractDataFromPhotos(updatedPhotos)
+  }
+
+  const removePhoto = (index) => {
+    const updated = photos.filter((_, i) => i !== index)
+    setPhotos(updated)
+    if (updated.length === 0) {
+      setExtractedData(null)
+      setExtractionError(null)
     }
   }
 
-  const removePhoto = () => {
-    setPhotoPreview(null)
-    setPhotoFile(null)
-    if (fileInputRef.current) {
-      fileInputRef.current.value = ''
+  const extractDataFromPhotos = async (photoList) => {
+    setProcessing(true)
+    setExtractionError(null)
+    try {
+      const result = await api.extractSalesFromPhotos(
+        photoList.map(p => p.file),
+        branch?.name || ''
+      )
+      setExtractedData({
+        branch_name: result.branch_name || '',
+        branch_match: result.branch_match || false,
+        gross_sales: result.gross_sales || '',
+        net_sales: result.net_sales || '',
+        guest_count: result.guest_count || '',
+        cash_sales: result.cash_sales || '',
+        categories: result.categories || [],
+        confidence: result.confidence || 'low',
+      })
+    } catch (error) {
+      console.error('Extraction failed:', error)
+      setExtractionError('Could not auto-extract. Please enter values manually.')
+      if (!extractedData) {
+        setExtractedData({
+          branch_name: '',
+          branch_match: true,
+          gross_sales: '',
+          net_sales: '',
+          guest_count: '',
+          cash_sales: '',
+          categories: [],
+          confidence: 'none',
+        })
+      }
+    } finally {
+      setProcessing(false)
     }
   }
 
-  const handleInputChange = (field, value) => {
-    setSalesData(prev => ({
+  const handleExtractedChange = (field, value) => {
+    setExtractedData(prev => ({
       ...prev,
-      [field]: value
+      [field]: value,
     }))
   }
 
   const handleSubmit = async () => {
-    if (!salesData.total_sales || !salesData.transaction_count) {
-      alert('Please enter total sales and transaction count')
+    if (photos.length === 0) {
+      alert('Please upload at least one POS photo')
       return
     }
 
-    if (!photoFile) {
-      alert('Please take a photo of your POS screen as proof')
+    if (!extractedData?.branch_match) {
+      alert('Branch name on receipt does not match your branch. Cannot submit.')
+      return
+    }
+
+    if (!extractedData?.gross_sales && !extractedData?.net_sales) {
+      alert('Please enter sales data or wait for photo processing')
       return
     }
 
     setSaving(true)
 
     try {
-      let photoUrl = null
-      try {
-        const uploadResult = await api.uploadSalesPhoto(photoFile)
-        photoUrl = uploadResult.url
-      } catch (error) {
-        console.log('Photo upload failed, will store locally')
+      const photoUrls = []
+      for (const photo of photos) {
+        try {
+          const uploadResult = await api.uploadSalesPhoto(photo.file)
+          photoUrls.push(uploadResult.url)
+        } catch (error) {
+          console.log('Photo upload failed, will store locally')
+        }
       }
 
       const submitData = {
         branch_id: user.branch_id || 1,
         date: new Date().toISOString().split('T')[0],
         sales_window: selectedWindow,
-        total_sales: parseFloat(salesData.total_sales),
-        transaction_count: parseInt(salesData.transaction_count),
-        kids_scoop_count: parseInt(salesData.kids_scoop_count) || 0,
-        single_scoop_count: parseInt(salesData.single_scoop_count) || 0,
-        double_scoop_count: parseInt(salesData.double_scoop_count) || 0,
-        triple_scoop_count: parseInt(salesData.triple_scoop_count) || 0,
-        sundae_count: parseInt(salesData.sundae_count) || 0,
-        shake_count: parseInt(salesData.shake_count) || 0,
-        cake_count: parseInt(salesData.cake_count) || 0,
-        take_home_count: parseInt(salesData.take_home_count) || 0,
-        photo_url: photoUrl,
-        notes: salesData.notes,
+        gross_sales: parseFloat(extractedData.gross_sales) || 0,
+        total_sales: parseFloat(extractedData.net_sales) || 0,
+        transaction_count: parseInt(extractedData.guest_count) || 0,
+        cash_sales: parseFloat(extractedData.cash_sales) || 0,
+        category_data: extractedData.categories.length > 0
+          ? JSON.stringify(extractedData.categories)
+          : null,
+        photo_url: photoUrls.length > 0 ? photoUrls.join(',') : null,
       }
 
       try {
@@ -129,27 +185,14 @@ export default function SalesPage() {
       } catch (error) {
         await offlineStore.saveSalesEntry({
           ...submitData,
-          photo_base64: photoPreview,
+          photos_base64: photos.map(p => p.preview),
         })
       }
 
       setSubmittedWindows(prev => [...prev, selectedWindow])
-
-      setSalesData({
-        total_sales: '',
-        transaction_count: '',
-        kids_scoop_count: '',
-        single_scoop_count: '',
-        double_scoop_count: '',
-        triple_scoop_count: '',
-        sundae_count: '',
-        shake_count: '',
-        cake_count: '',
-        take_home_count: '',
-        notes: '',
-      })
-      setPhotoPreview(null)
-      setPhotoFile(null)
+      setPhotos([])
+      setExtractedData(null)
+      setExtractionError(null)
 
       alert('Sales report submitted successfully!')
 
@@ -190,7 +233,6 @@ export default function SalesPage() {
           {SALES_WINDOWS.map((window) => {
             const isSelected = selectedWindow === window.id
             const isSubmitted = submittedWindows.includes(window.id)
-
             return (
               <button
                 key={window.id}
@@ -230,48 +272,55 @@ export default function SalesPage() {
             </AlertDescription>
           </Alert>
         ) : (
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-lg flex items-center gap-2">
-                <Camera className="w-5 h-5 text-orange-500" />
-                {SALES_WINDOWS.find(w => w.id === selectedWindow)?.label || 'Sales'} Report
-              </CardTitle>
-              <CardDescription>
-                Enter your sales data and take a photo of your POS screen.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              {/* Photo Upload */}
-              <div className="space-y-2">
-                <Label className="text-base font-medium">POS Photo (Required)</Label>
-                <p className="text-sm text-gray-500 mb-2">
-                  Take a clear photo of your POS screen showing today's sales
-                </p>
-
-                {photoPreview ? (
-                  <div className="relative">
-                    <img
-                      src={photoPreview}
-                      alt="POS Preview"
-                      className="w-full h-48 object-cover rounded-lg"
-                    />
-                    <Button
-                      variant="destructive"
-                      size="icon"
-                      className="absolute top-2 right-2"
-                      onClick={removePhoto}
-                    >
-                      <X className="w-4 h-4" />
-                    </Button>
-                  </div>
-                ) : (
-                  <div
+          <div className="space-y-3">
+            {/* Photo Upload */}
+            <Card>
+              <CardContent className="p-4">
+                {photos.length === 0 ? (
+                  <button
                     onClick={() => fileInputRef.current?.click()}
-                    className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center cursor-pointer hover:border-orange-400 hover:bg-orange-50 transition-colors"
+                    className="w-full flex items-center gap-4 p-4 rounded-xl border-2 border-dashed border-gray-300 hover:border-orange-400 hover:bg-orange-50 transition-colors"
                   >
-                    <Camera className="w-12 h-12 mx-auto text-gray-400 mb-2" />
-                    <p className="text-gray-600 font-medium">Tap to take photo</p>
-                    <p className="text-sm text-gray-400">or upload from gallery</p>
+                    <div className="w-12 h-12 rounded-xl bg-orange-100 flex items-center justify-center flex-shrink-0">
+                      <Camera className="w-6 h-6 text-orange-500" />
+                    </div>
+                    <div className="text-left">
+                      <p className="font-medium text-gray-800">Upload POS Photos</p>
+                      <p className="text-xs text-gray-500">Take or upload up to {MAX_PHOTOS} photos for auto-extraction</p>
+                    </div>
+                    <Plus className="w-5 h-5 text-gray-400 ml-auto" />
+                  </button>
+                ) : (
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <p className="text-sm font-medium text-gray-700">{photos.length} of {MAX_PHOTOS} photos</p>
+                      {photos.length < MAX_PHOTOS && (
+                        <button
+                          onClick={() => fileInputRef.current?.click()}
+                          className="text-xs font-medium text-orange-600 hover:text-orange-700 flex items-center gap-1"
+                        >
+                          <Plus className="w-3.5 h-3.5" />
+                          Add more
+                        </button>
+                      )}
+                    </div>
+                    <div className="grid grid-cols-4 gap-2">
+                      {photos.map((photo, index) => (
+                        <div key={index} className="relative aspect-square rounded-lg overflow-hidden border border-gray-200">
+                          <img
+                            src={photo.preview}
+                            alt={`POS ${index + 1}`}
+                            className="w-full h-full object-cover"
+                          />
+                          <button
+                            onClick={() => removePhoto(index)}
+                            className="absolute top-1 right-1 w-5 h-5 rounded-full bg-red-500 text-white flex items-center justify-center shadow"
+                          >
+                            <X className="w-3 h-3" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
                   </div>
                 )}
 
@@ -283,170 +332,191 @@ export default function SalesPage() {
                   onChange={handlePhotoCapture}
                   className="hidden"
                 />
-              </div>
+              </CardContent>
+            </Card>
 
-              <Separator />
-
-              {/* Sales Figures */}
-              <div className="space-y-4">
-                <h3 className="font-medium flex items-center gap-2">
-                  <DollarSign className="w-4 h-4 text-green-600" />
-                  Sales Figures
-                </h3>
-
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label>Total Sales (AED) *</Label>
-                    <Input
-                      type="number"
-                      inputMode="decimal"
-                      placeholder="0.00"
-                      value={salesData.total_sales}
-                      onChange={(e) => handleInputChange('total_sales', e.target.value)}
-                    />
+            {/* Processing */}
+            {processing && (
+              <Card className="border-orange-200 bg-orange-50">
+                <CardContent className="p-4 flex items-center gap-3">
+                  <Loader2 className="w-5 h-5 animate-spin text-orange-500" />
+                  <div>
+                    <p className="font-medium text-orange-800">Processing photos...</p>
+                    <p className="text-sm text-orange-600">Verifying branch & extracting sales data</p>
                   </div>
-                  <div className="space-y-2">
-                    <Label>Transactions *</Label>
-                    <Input
-                      type="number"
-                      inputMode="numeric"
-                      placeholder="0"
-                      value={salesData.transaction_count}
-                      onChange={(e) => handleInputChange('transaction_count', e.target.value)}
-                    />
-                  </div>
-                </div>
-              </div>
+                </CardContent>
+              </Card>
+            )}
 
-              <Separator />
+            {/* Extraction Error */}
+            {extractionError && (
+              <Alert className="bg-amber-50 border-amber-200">
+                <AlertCircle className="h-4 w-4 text-amber-600" />
+                <AlertDescription className="text-amber-700">{extractionError}</AlertDescription>
+              </Alert>
+            )}
 
-              {/* Scoop Counts */}
-              <div className="space-y-4">
-                <h3 className="font-medium flex items-center gap-2">
-                  <IceCream className="w-4 h-4 text-pink-500" />
-                  Scoop Counts
-                </h3>
-
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label>Kids Scoop</Label>
-                    <Input
-                      type="number"
-                      inputMode="numeric"
-                      placeholder="0"
-                      value={salesData.kids_scoop_count}
-                      onChange={(e) => handleInputChange('kids_scoop_count', e.target.value)}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Single Scoop</Label>
-                    <Input
-                      type="number"
-                      inputMode="numeric"
-                      placeholder="0"
-                      value={salesData.single_scoop_count}
-                      onChange={(e) => handleInputChange('single_scoop_count', e.target.value)}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Double Scoop</Label>
-                    <Input
-                      type="number"
-                      inputMode="numeric"
-                      placeholder="0"
-                      value={salesData.double_scoop_count}
-                      onChange={(e) => handleInputChange('double_scoop_count', e.target.value)}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Triple Scoop</Label>
-                    <Input
-                      type="number"
-                      inputMode="numeric"
-                      placeholder="0"
-                      value={salesData.triple_scoop_count}
-                      onChange={(e) => handleInputChange('triple_scoop_count', e.target.value)}
-                    />
+            {/* Branch Verification */}
+            {extractedData && !processing && (
+              extractedData.branch_match ? (
+                <div className="flex items-center gap-3 p-3 rounded-xl bg-green-50 border border-green-200">
+                  <ShieldCheck className="w-5 h-5 text-green-600 flex-shrink-0" />
+                  <div>
+                    <p className="text-sm font-medium text-green-800">Branch Verified</p>
+                    <p className="text-xs text-green-600">{extractedData.branch_name || branch?.name}</p>
                   </div>
                 </div>
-              </div>
-
-              <Separator />
-
-              {/* Other Products */}
-              <div className="space-y-4">
-                <h3 className="font-medium flex items-center gap-2">
-                  <ShoppingCart className="w-4 h-4 text-blue-500" />
-                  Other Products
-                </h3>
-
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label>Sundaes</Label>
-                    <Input
-                      type="number"
-                      inputMode="numeric"
-                      placeholder="0"
-                      value={salesData.sundae_count}
-                      onChange={(e) => handleInputChange('sundae_count', e.target.value)}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Shakes</Label>
-                    <Input
-                      type="number"
-                      inputMode="numeric"
-                      placeholder="0"
-                      value={salesData.shake_count}
-                      onChange={(e) => handleInputChange('shake_count', e.target.value)}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Cakes</Label>
-                    <Input
-                      type="number"
-                      inputMode="numeric"
-                      placeholder="0"
-                      value={salesData.cake_count}
-                      onChange={(e) => handleInputChange('cake_count', e.target.value)}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Take Home</Label>
-                    <Input
-                      type="number"
-                      inputMode="numeric"
-                      placeholder="0"
-                      value={salesData.take_home_count}
-                      onChange={(e) => handleInputChange('take_home_count', e.target.value)}
-                    />
+              ) : (
+                <div className="flex items-center gap-3 p-3 rounded-xl bg-red-50 border border-red-200">
+                  <ShieldAlert className="w-5 h-5 text-red-600 flex-shrink-0" />
+                  <div>
+                    <p className="text-sm font-medium text-red-800">Branch Mismatch!</p>
+                    <p className="text-xs text-red-600">
+                      Receipt: <span className="font-semibold">{extractedData.branch_name || 'Unknown'}</span>
+                      {' | '}Your branch: <span className="font-semibold">{branch?.name || 'Unknown'}</span>
+                    </p>
                   </div>
                 </div>
-              </div>
+              )
+            )}
 
-              <Separator />
+            {/* Extracted Sales Data */}
+            {extractedData && !processing && (
+              <Card>
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-base flex items-center gap-2">
+                    <ScanLine className="w-4 h-4 text-green-500" />
+                    Sales Data
+                  </CardTitle>
+                  <CardDescription className="text-xs flex items-center gap-1">
+                    <Edit3 className="w-3 h-3" />
+                    Verify and edit if needed
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-3 pt-0">
+                  {/* Gross & Net Sales */}
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="p-3 rounded-lg bg-blue-50 border border-blue-100">
+                      <div className="flex items-center gap-1.5 mb-1.5">
+                        <DollarSign className="w-3.5 h-3.5 text-blue-600" />
+                        <Label className="text-xs font-semibold text-blue-800">Gross Sales</Label>
+                      </div>
+                      <Input
+                        type="number"
+                        inputMode="decimal"
+                        placeholder="0.00"
+                        value={extractedData.gross_sales}
+                        onChange={(e) => handleExtractedChange('gross_sales', e.target.value)}
+                        className="h-9 text-sm font-bold bg-white border-blue-200"
+                      />
+                    </div>
+                    <div className="p-3 rounded-lg bg-green-50 border border-green-100">
+                      <div className="flex items-center gap-1.5 mb-1.5">
+                        <DollarSign className="w-3.5 h-3.5 text-green-600" />
+                        <Label className="text-xs font-semibold text-green-800">Net Sales</Label>
+                      </div>
+                      <Input
+                        type="number"
+                        inputMode="decimal"
+                        placeholder="0.00"
+                        value={extractedData.net_sales}
+                        onChange={(e) => handleExtractedChange('net_sales', e.target.value)}
+                        className="h-9 text-sm font-bold bg-white border-green-200"
+                      />
+                    </div>
+                  </div>
 
-              {/* Notes */}
-              <div className="space-y-2">
-                <Label>Notes (Optional)</Label>
-                <Input
-                  placeholder="Any additional notes..."
-                  value={salesData.notes}
-                  onChange={(e) => handleInputChange('notes', e.target.value)}
-                />
-              </div>
+                  {/* Guest Count & Cash Sales */}
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="p-3 rounded-lg bg-purple-50 border border-purple-100">
+                      <div className="flex items-center gap-1.5 mb-1.5">
+                        <Users className="w-3.5 h-3.5 text-purple-600" />
+                        <Label className="text-xs font-semibold text-purple-800">Guest Count</Label>
+                      </div>
+                      <Input
+                        type="number"
+                        inputMode="numeric"
+                        placeholder="0"
+                        value={extractedData.guest_count}
+                        onChange={(e) => handleExtractedChange('guest_count', e.target.value)}
+                        className="h-9 text-sm font-bold bg-white border-purple-200"
+                      />
+                    </div>
+                    <div className="p-3 rounded-lg bg-amber-50 border border-amber-100">
+                      <div className="flex items-center gap-1.5 mb-1.5">
+                        <Banknote className="w-3.5 h-3.5 text-amber-600" />
+                        <Label className="text-xs font-semibold text-amber-800">Cash Sales</Label>
+                      </div>
+                      <Input
+                        type="number"
+                        inputMode="decimal"
+                        placeholder="0.00"
+                        value={extractedData.cash_sales}
+                        onChange={(e) => handleExtractedChange('cash_sales', e.target.value)}
+                        className="h-9 text-sm font-bold bg-white border-amber-200"
+                      />
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
 
-              {/* Submit Button */}
+            {/* Category Sales Breakdown */}
+            {extractedData && !processing && extractedData.categories.length > 0 && (
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-base flex items-center gap-2">
+                    <BarChart3 className="w-4 h-4 text-orange-500" />
+                    Category Breakdown
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="pt-0">
+                  {/* Table Header */}
+                  <div className="grid grid-cols-12 gap-1 px-2 py-1.5 text-[10px] font-semibold text-gray-500 uppercase border-b border-gray-100">
+                    <div className="col-span-5">Category</div>
+                    <div className="col-span-2 text-right">QTY</div>
+                    <div className="col-span-3 text-right">Sales</div>
+                    <div className="col-span-2 text-right">%</div>
+                  </div>
+                  {/* Table Rows */}
+                  {extractedData.categories.map((cat, idx) => (
+                    <div
+                      key={idx}
+                      className={`grid grid-cols-12 gap-1 px-2 py-2 text-sm ${
+                        idx < extractedData.categories.length - 1 ? 'border-b border-gray-50' : ''
+                      } ${
+                        cat.name.toLowerCase().includes('cup') || cat.name.toLowerCase().includes('sundae')
+                          ? 'bg-orange-50/50'
+                          : ''
+                      }`}
+                    >
+                      <div className="col-span-5 font-medium text-gray-800 truncate">{cat.name}</div>
+                      <div className="col-span-2 text-right text-gray-600">{cat.qty}</div>
+                      <div className="col-span-3 text-right font-medium text-gray-800">{cat.sales.toFixed(2)}</div>
+                      <div className="col-span-2 text-right text-gray-500">{cat.pct}%</div>
+                    </div>
+                  ))}
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Submit Button */}
+            {extractedData && !processing && (
               <Button
                 onClick={handleSubmit}
-                disabled={saving || !photoFile}
-                className="w-full h-14 text-base bg-orange-500 hover:bg-orange-600"
+                disabled={saving || photos.length === 0 || !extractedData.branch_match}
+                className="w-full h-14 text-base bg-orange-500 hover:bg-orange-600 disabled:bg-gray-300"
                 size="lg"
               >
                 {saving ? (
                   <>
                     <Loader2 className="w-5 h-5 mr-2 animate-spin" />
                     Submitting...
+                  </>
+                ) : !extractedData.branch_match ? (
+                  <>
+                    <ShieldAlert className="w-5 h-5 mr-2" />
+                    Branch Mismatch - Cannot Submit
                   </>
                 ) : (
                   <>
@@ -455,19 +525,22 @@ export default function SalesPage() {
                   </>
                 )}
               </Button>
-            </CardContent>
-          </Card>
+            )}
+          </div>
         )}
 
         {/* Help Info */}
         <Card className="mt-6 bg-gray-50">
           <CardContent className="p-4">
-            <h3 className="font-medium text-gray-900 mb-2">Why take a photo?</h3>
-            <p className="text-sm text-gray-600">
-              The POS photo serves as verification for your sales report. This helps maintain
-              accuracy and allows managers to cross-check the figures if needed.
-              Make sure the photo clearly shows the sales total and transaction count.
-            </p>
+            <h3 className="font-medium text-gray-900 mb-2">How it works</h3>
+            <div className="space-y-2 text-sm text-gray-600">
+              <p>1. Select the sales window you are reporting for</p>
+              <p>2. Upload up to {MAX_PHOTOS} photos of your POS receipt</p>
+              <p>3. System verifies branch name and extracts sales data</p>
+              <p>4. Review Gross Sales, Net Sales, Guest Count, Cash Sales</p>
+              <p>5. Check category breakdown (Cups & Cones, Sundaes, etc.)</p>
+              <p>6. Submit your report</p>
+            </div>
           </CardContent>
         </Card>
       </div>

@@ -8,7 +8,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 import logging
 
-from routers import auth, users, territories, areas, branches, flavors, inventory, analytics, cake
+from routers import auth, users, territories, areas, branches, flavors, inventory, analytics, cake, sales
 from utils.database import engine, Base
 from utils.config import settings
 
@@ -60,6 +60,25 @@ def run_migrations():
                 conn.commit()
                 logger.info("Migration: hashed_password added successfully")
 
+        # Add new columns to daily_sales if table exists
+        if 'daily_sales' in inspector.get_table_names():
+            ds_columns = [c['name'] for c in inspector.get_columns('daily_sales')]
+            if 'gross_sales' not in ds_columns:
+                logger.info("Migration: Adding gross_sales to daily_sales table")
+                conn.execute(text("ALTER TABLE daily_sales ADD COLUMN gross_sales FLOAT DEFAULT 0"))
+                conn.commit()
+                logger.info("Migration: gross_sales added successfully")
+            if 'cash_sales' not in ds_columns:
+                logger.info("Migration: Adding cash_sales to daily_sales table")
+                conn.execute(text("ALTER TABLE daily_sales ADD COLUMN cash_sales FLOAT DEFAULT 0"))
+                conn.commit()
+                logger.info("Migration: cash_sales added successfully")
+            if 'category_data' not in ds_columns:
+                logger.info("Migration: Adding category_data to daily_sales table")
+                conn.execute(text("ALTER TABLE daily_sales ADD COLUMN category_data TEXT"))
+                conn.commit()
+                logger.info("Migration: category_data added successfully")
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -107,6 +126,7 @@ app.include_router(flavors.router, prefix="/api/v1/flavors", tags=["Flavors"])
 app.include_router(inventory.router, prefix="/api/v1/inventory", tags=["Inventory"])
 app.include_router(analytics.router, prefix="/api/v1/analytics", tags=["Analytics"])
 app.include_router(cake.router, prefix="/api/v1/cake", tags=["Cake Inventory"])
+app.include_router(sales.router, prefix="/api/v1/sales", tags=["Sales"])
 
 
 @app.get("/")

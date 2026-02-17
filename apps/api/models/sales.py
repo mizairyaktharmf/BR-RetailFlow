@@ -36,22 +36,27 @@ class DailySales(Base):
     sales_window = Column(Enum(SalesWindowType), nullable=False)
 
     # Sales figures
-    total_sales = Column(Float, nullable=False, default=0)  # Total sales amount in AED
-    transaction_count = Column(Integer, nullable=False, default=0)  # Number of transactions
+    gross_sales = Column(Float, nullable=True, default=0)  # Gross sales before discounts
+    total_sales = Column(Float, nullable=False, default=0)  # Net sales amount in AED
+    transaction_count = Column(Integer, nullable=False, default=0)  # Guest count
+    cash_sales = Column(Float, nullable=True, default=0)  # Cash sales amount
 
-    # Scoop counts by type
+    # Category sales data (JSON: [{name, qty, sales, pct}, ...])
+    category_data = Column(Text, nullable=True)
+
+    # Scoop counts by type (legacy, kept for backward compat)
     kids_scoop_count = Column(Integer, default=0)
     single_scoop_count = Column(Integer, default=0)
     double_scoop_count = Column(Integer, default=0)
     triple_scoop_count = Column(Integer, default=0)
 
-    # Other products
+    # Other products (legacy, kept for backward compat)
     sundae_count = Column(Integer, default=0)
     shake_count = Column(Integer, default=0)
     cake_count = Column(Integer, default=0)
     take_home_count = Column(Integer, default=0)
 
-    # Photo proof (URL to uploaded image)
+    # Photo proof (URL to uploaded image, comma-separated for multiple)
     photo_url = Column(String(500), nullable=True)
 
     # Who submitted
