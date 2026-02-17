@@ -206,24 +206,46 @@ def extract_branch_name(text: str) -> Optional[str]:
     """Extract branch name from BR POS receipt header"""
     lines = text.split('\n')
 
-    for line in lines[:15]:
-        line = line.strip()
-        if not line or len(line) < 3:
+    # Strategy 1: Look for "IBQ" pattern anywhere in the first 20 lines
+    for line in lines[:20]:
+        # Clean the line - remove non-ASCII characters (Arabic text etc.)
+        cleaned = re.sub(r'[^\x20-\x7E]', '', line).strip()
+        if not cleaned or len(cleaned) < 3:
             continue
+
+        # Match IBQ followed by branch name (e.g. "IBQ LAMCY RESIDENCE")
+        ibq_match = re.search(r'IBQ\s+(.+)', cleaned, re.IGNORECASE)
+        if ibq_match:
+            branch = ibq_match.group(0).strip()
+            logger.info(f"Branch name extracted (IBQ pattern): {branch}")
+            return branch
+
+    # Strategy 2: Look for clean uppercase lines that aren't headers/separators
+    for line in lines[:15]:
+        cleaned = re.sub(r'[^\x20-\x7E]', '', line).strip()
+        if not cleaned or len(cleaned) < 4:
+            continue
+        lower = cleaned.lower()
         # Skip BR logo, separators, date lines, report type lines
-        lower = line.lower()
         if any(skip in lower for skip in [
             'baskin', 'robbins', 'date:', 'tm:', 'spot sales',
-            '====', '****', '----',
+            '====', '****', '----', 'cash', 'gross', 'net ',
         ]):
             continue
-        # Branch name often starts with IBQ or is a location name
-        # It's usually the first meaningful non-logo line
-        if re.match(r'^[A-Z\s/&\-\.]+$', line) and len(line) > 3:
-            return line.strip()
-        if lower.startswith('ibq') or lower.startswith('br '):
-            return line.strip()
+        # Check for uppercase location name (at least 2 words)
+        if re.match(r'^[A-Z][A-Z\s/&\-\.]{3,}$', cleaned) and ' ' in cleaned:
+            logger.info(f"Branch name extracted (uppercase pattern): {cleaned}")
+            return cleaned
 
+    # Strategy 3: Look for "BR " prefix
+    for line in lines[:15]:
+        cleaned = re.sub(r'[^\x20-\x7E]', '', line).strip()
+        lower = cleaned.lower()
+        if lower.startswith('br ') and len(cleaned) > 5:
+            logger.info(f"Branch name extracted (BR prefix): {cleaned}")
+            return cleaned
+
+    logger.warning(f"Could not extract branch name. First 10 lines: {lines[:10]}")
     return None
 
 
@@ -408,6 +430,7 @@ async def extract_sales_from_photos(
 
         if all_text.strip():
             confidence = "medium"
+            logger.info(f"OCR extracted text (first 500 chars): {all_text[:500]}")
 
     except ImportError:
         logger.warning("pytesseract not installed. OCR extraction unavailable.")
