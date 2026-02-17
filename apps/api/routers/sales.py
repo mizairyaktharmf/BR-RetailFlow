@@ -413,14 +413,14 @@ async def extract_sales_from_photos(
         logger.warning("pytesseract not installed. OCR extraction unavailable.")
         return SalesExtractionResponse(
             branch_name=None,
-            branch_match=False,
+            branch_match=True,
             confidence="none",
         )
     except Exception as e:
         logger.error(f"OCR extraction error: {e}")
         return SalesExtractionResponse(
             branch_name=None,
-            branch_match=False,
+            branch_match=True,
             confidence="none",
         )
 

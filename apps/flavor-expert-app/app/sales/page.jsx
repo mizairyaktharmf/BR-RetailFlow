@@ -143,13 +143,13 @@ export default function SalesPage() {
       return
     }
 
-    if (!extractedData?.branch_match) {
+    if (!extractedData?.branch_match && extractedData?.confidence !== 'none') {
       alert('Branch name on receipt does not match your branch. Cannot submit.')
       return
     }
 
     if (!extractedData?.gross_sales && !extractedData?.net_sales) {
-      alert('Please enter sales data or wait for photo processing')
+      alert('Please enter sales data before submitting')
       return
     }
 
@@ -358,7 +358,15 @@ export default function SalesPage() {
 
             {/* Branch Verification */}
             {extractedData && !processing && (
-              extractedData.branch_match ? (
+              extractedData.confidence === 'none' ? (
+                <div className="flex items-center gap-3 p-3 rounded-xl bg-amber-50 border border-amber-200">
+                  <AlertCircle className="w-5 h-5 text-amber-600 flex-shrink-0" />
+                  <div>
+                    <p className="text-sm font-medium text-amber-800">OCR Not Available</p>
+                    <p className="text-xs text-amber-600">Please enter sales values manually below</p>
+                  </div>
+                </div>
+              ) : extractedData.branch_match ? (
                 <div className="flex items-center gap-3 p-3 rounded-xl bg-green-50 border border-green-200">
                   <ShieldCheck className="w-5 h-5 text-green-600 flex-shrink-0" />
                   <div>
@@ -504,7 +512,7 @@ export default function SalesPage() {
             {extractedData && !processing && (
               <Button
                 onClick={handleSubmit}
-                disabled={saving || photos.length === 0 || !extractedData.branch_match}
+                disabled={saving || photos.length === 0 || (!extractedData.branch_match && extractedData.confidence !== 'none')}
                 className="w-full h-14 text-base bg-orange-500 hover:bg-orange-600 disabled:bg-gray-300"
                 size="lg"
               >
@@ -513,7 +521,7 @@ export default function SalesPage() {
                     <Loader2 className="w-5 h-5 mr-2 animate-spin" />
                     Submitting...
                   </>
-                ) : !extractedData.branch_match ? (
+                ) : !extractedData.branch_match && extractedData.confidence !== 'none' ? (
                   <>
                     <ShieldAlert className="w-5 h-5 mr-2" />
                     Branch Mismatch - Cannot Submit
