@@ -13,7 +13,8 @@ import {
   Calendar,
   CheckCircle2,
   IceCream,
-  Cake
+  Cake,
+  PieChart
 } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { formatDate, SALES_WINDOWS } from '@/lib/utils'
@@ -60,8 +61,45 @@ export default function SalesDashboardPage() {
 
   // Calculate totals from today's sales
   const totalSalesAmount = todaySales.reduce((sum, s) => sum + (s.total_sales || 0), 0)
+  const totalGrossSales = todaySales.reduce((sum, s) => sum + (s.gross_sales || 0), 0)
   const totalTransactions = todaySales.reduce((sum, s) => sum + (s.transaction_count || 0), 0)
-  const submittedWindows = todaySales.map(s => s.window_type)
+  const submittedWindows = todaySales.map(s => s.sales_window)
+
+  // Aggregate category data across all windows
+  const allCategories = todaySales.reduce((acc, s) => {
+    if (s.category_data) {
+      try {
+        const cats = JSON.parse(s.category_data)
+        cats.forEach(cat => {
+          const existing = acc.find(a => a.name === cat.name)
+          if (existing) {
+            existing.qty += cat.qty
+            existing.sales += cat.sales
+          } else {
+            acc.push({ ...cat })
+          }
+        })
+      } catch {}
+    }
+    return acc
+  }, [])
+
+  // Recalculate percentages based on aggregated totals
+  const categoryTotal = allCategories.reduce((sum, c) => sum + c.sales, 0)
+  if (categoryTotal > 0) {
+    allCategories.forEach(c => { c.pct = Math.round((c.sales / categoryTotal) * 100) })
+  }
+
+  // Category colors
+  const getCategoryColor = (name) => {
+    const lower = name.toLowerCase()
+    if (lower.includes('cup') || lower.includes('cone')) return '#ec4899'
+    if (lower.includes('sundae')) return '#f59e0b'
+    if (lower.includes('beverage') || lower.includes('shake') || lower.includes('drink')) return '#3b82f6'
+    if (lower.includes('cake')) return '#f97316'
+    if (lower.includes('take') || lower.includes('home') || lower.includes('pint')) return '#8b5cf6'
+    return '#6b7280'
+  }
 
   if (!user) {
     return (
@@ -145,16 +183,87 @@ export default function SalesDashboardPage() {
                 <Card className="bg-gradient-to-br from-amber-50 to-white">
                   <CardContent className="p-4">
                     <div className="flex items-center gap-2 text-amber-600 mb-2">
-                      <Calendar className="w-4 h-4" />
-                      <span className="text-xs font-medium">Date</span>
+                      <TrendingUp className="w-4 h-4" />
+                      <span className="text-xs font-medium">Gross Sales</span>
                     </div>
-                    <p className="text-lg font-bold text-gray-900">
-                      {new Date().toLocaleDateString('en-AE', { day: 'numeric', month: 'short' })}
+                    <p className="text-2xl font-bold text-gray-900">
+                      {totalGrossSales > 0 ? `AED ${totalGrossSales.toFixed(0)}` : '—'}
                     </p>
                   </CardContent>
                 </Card>
               </div>
             </div>
+
+            {/* Category Breakdown Donut Chart */}
+            {allCategories.length > 0 && (
+              <div>
+                <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-3">Category Breakdown</h2>
+                <Card>
+                  <CardContent className="p-4">
+                    <div className="flex items-center gap-4">
+                      {/* Donut Chart */}
+                      <div className="relative flex-shrink-0" style={{ width: 140, height: 140 }}>
+                        <svg width="140" height="140" viewBox="0 0 140 140">
+                          {/* Background circle */}
+                          <circle cx="70" cy="70" r="54" fill="none" stroke="#f3f4f6" strokeWidth="16" />
+                          {/* Category segments */}
+                          {(() => {
+                            const radius = 54
+                            const circumference = 2 * Math.PI * radius
+                            let offset = 0
+                            return allCategories.map((cat, idx) => {
+                              const pct = categoryTotal > 0 ? cat.sales / categoryTotal : 0
+                              const dashLength = pct * circumference
+                              const dashOffset = -offset
+                              offset += dashLength
+                              return (
+                                <circle
+                                  key={idx}
+                                  cx="70"
+                                  cy="70"
+                                  r={radius}
+                                  fill="none"
+                                  stroke={getCategoryColor(cat.name)}
+                                  strokeWidth="16"
+                                  strokeDasharray={`${dashLength} ${circumference - dashLength}`}
+                                  strokeDashoffset={dashOffset}
+                                  transform="rotate(-90 70 70)"
+                                  strokeLinecap="butt"
+                                />
+                              )
+                            })
+                          })()}
+                        </svg>
+                        {/* Center total */}
+                        <div className="absolute inset-0 flex flex-col items-center justify-center">
+                          <p className="text-[10px] text-gray-400 uppercase">Total</p>
+                          <p className="text-lg font-bold text-gray-900">{categoryTotal.toFixed(0)}</p>
+                        </div>
+                      </div>
+
+                      {/* Legend */}
+                      <div className="flex-1 space-y-2">
+                        {allCategories.map((cat, idx) => (
+                          <div key={idx} className="flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                              <div
+                                className="w-3 h-3 rounded-full flex-shrink-0"
+                                style={{ backgroundColor: getCategoryColor(cat.name) }}
+                              />
+                              <span className="text-xs text-gray-700 truncate max-w-[100px]">{cat.name}</span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <span className="text-xs font-bold text-gray-900">{cat.pct}%</span>
+                              <span className="text-[10px] text-gray-400 w-14 text-right">{cat.sales.toFixed(0)}</span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+            )}
 
             {/* Sales Windows Status */}
             <div>
@@ -163,7 +272,7 @@ export default function SalesDashboardPage() {
                 <CardContent className="p-0">
                   {SALES_WINDOWS.map((window, idx) => {
                     const isSubmitted = submittedWindows.includes(window.id)
-                    const salesRecord = todaySales.find(s => s.window_type === window.id)
+                    const salesRecord = todaySales.find(s => s.sales_window === window.id)
                     return (
                       <div
                         key={window.id}
