@@ -33,8 +33,8 @@ const MAX_PHOTOS = 4
 
 // ============================================================
 // SALES WINDOW TIME RULES (commented out — enable when ready)
-// Each window has an open/close time. Outside that range, the
-// window is locked and the user cannot submit for it.
+// Each window has an open/close time. Outside that range,
+// the window is locked and the user cannot submit for it.
 //
 // const WINDOW_TIME_RULES = {
 //   '3pm':     { openHour: 15, closeHour: 19 },   // 3 PM → 7 PM
@@ -56,9 +56,8 @@ const MAX_PHOTOS = 4
 //   }
 // }
 //
-// To enforce: replace `isLocked` in the window selector with:
+// To enable: uncomment above, then change isLocked to:
 //   const isLocked = !isWindowAvailable(window.id)
-// and disable the button when isLocked is true.
 // ============================================================
 
 export default function SalesPage() {
@@ -313,9 +312,7 @@ export default function SalesPage() {
             {SALES_WINDOWS.map((window) => {
               const isSelected = selectedWindow === window.id
               const isSubmitted = submittedWindows.includes(window.id)
-              // For now all windows are open. To enforce time rules,
-              // replace false with: !isWindowAvailable(window.id)
-              const isLocked = false
+              const isLocked = false // change to !isWindowAvailable(window.id) to enable time rules
               return (
                 <button
                   key={window.id}
