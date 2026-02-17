@@ -9,6 +9,7 @@ import {
   Clock,
   LogOut,
   ChevronRight,
+  ChevronDown,
   RefreshCw,
   Wifi,
   WifiOff,
@@ -22,7 +23,6 @@ import {
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
-import { Separator } from '@/components/ui/separator'
 import { formatDate, getCurrentSalesWindow, getNextSalesWindow, SALES_WINDOWS } from '@/lib/utils'
 import api from '@/services/api'
 import offlineStore from '@/store/offline-store'
@@ -37,6 +37,7 @@ export default function DashboardPage() {
   const [nextWindow, setNextWindow] = useState(null)
   const [todayDate, setTodayDate] = useState('')
   const [cakeAlerts, setCakeAlerts] = useState([])
+  const [expandedCategory, setExpandedCategory] = useState(null)
 
   useEffect(() => {
     // Check authentication
@@ -63,7 +64,7 @@ export default function DashboardPage() {
       setNextWindow(getNextSalesWindow())
     }
     checkWindow()
-    const windowInterval = setInterval(checkWindow, 60000) // Check every minute
+    const windowInterval = setInterval(checkWindow, 60000)
 
     // Check pending sync count
     const checkPending = async () => {
@@ -95,62 +96,110 @@ export default function DashboardPage() {
     router.push('/login')
   }
 
-  const menuItems = [
+  const toggleCategory = (cat) => {
+    setExpandedCategory(prev => prev === cat ? null : cat)
+  }
+
+  const categories = [
     {
-      title: 'Ice Cream Inventory',
-      description: 'Record opening & closing stock for each flavor',
+      id: 'icecream',
+      name: 'Ice Cream',
+      description: 'Inventory & receiving',
       icon: IceCream,
-      href: '/inventory',
-      color: 'bg-pink-500',
-      info: 'Track daily inventory levels by measuring each tub'
+      color: 'pink',
+      gradient: 'from-pink-500 to-rose-500',
+      bgLight: 'bg-pink-50',
+      borderColor: 'border-l-pink-500',
+      badge: null,
+      items: [
+        {
+          title: 'Stock Inventory',
+          description: 'Record opening & closing stock levels',
+          icon: ClipboardList,
+          href: '/inventory',
+          iconBg: 'bg-pink-100',
+          iconColor: 'text-pink-600',
+        },
+        {
+          title: 'Receive from Warehouse',
+          description: 'Log new tubs received today',
+          icon: Package,
+          href: '/receive',
+          iconBg: 'bg-blue-100',
+          iconColor: 'text-blue-600',
+        },
+      ],
     },
     {
-      title: 'Receive from Warehouse',
-      description: 'Record new tubs received today',
-      icon: Package,
-      href: '/receive',
-      color: 'bg-blue-500',
-      info: 'Log incoming stock with quantity and reference number'
-    },
-    {
-      title: 'Submit Sales Report',
-      description: currentWindow
-        ? `${currentWindow.toUpperCase()} window is OPEN now!`
-        : nextWindow
-          ? `Next window: ${nextWindow.opensAt}`
-          : 'Submit sales with photo proof',
-      icon: Camera,
-      href: '/sales',
-      color: currentWindow ? 'bg-green-500' : 'bg-orange-500',
-      info: 'Report sales at 3PM, 7PM, 9PM, and Closing',
-      highlight: !!currentWindow
-    },
-    {
-      title: 'Daily Summary',
-      description: 'View today\'s complete summary',
-      icon: ClipboardList,
-      href: '/summary',
-      color: 'bg-purple-500',
-      info: 'See consumption, sales, and inventory at a glance'
-    },
-    {
-      title: 'Cake Stock',
-      description: cakeAlerts.length > 0
-        ? `${cakeAlerts.length} low stock alert${cakeAlerts.length > 1 ? 's' : ''}!`
-        : 'View and record cake sales',
+      id: 'cake',
+      name: 'Cake',
+      description: 'Stock, sales & alerts',
       icon: Cake,
-      href: '/cake/stock',
-      color: cakeAlerts.length > 0 ? 'bg-red-500' : 'bg-orange-500',
-      info: 'Track cake inventory and record sales in real-time',
-      highlight: cakeAlerts.length > 0
+      color: 'orange',
+      gradient: 'from-orange-500 to-amber-500',
+      bgLight: 'bg-orange-50',
+      borderColor: 'border-l-orange-500',
+      badge: cakeAlerts.length > 0 ? { count: cakeAlerts.length, type: 'danger' } : null,
+      items: [
+        {
+          title: 'Cake Stock',
+          description: 'View current stock & record sales',
+          icon: Cake,
+          href: '/cake/stock',
+          iconBg: 'bg-orange-100',
+          iconColor: 'text-orange-600',
+        },
+        {
+          title: 'Receive Cakes',
+          description: 'Log cake deliveries from warehouse',
+          icon: PackagePlus,
+          href: '/cake/receive',
+          iconBg: 'bg-emerald-100',
+          iconColor: 'text-emerald-600',
+        },
+        {
+          title: 'Alert Settings',
+          description: 'Set low-stock alert thresholds',
+          icon: Bell,
+          href: '/cake/alerts',
+          iconBg: 'bg-amber-100',
+          iconColor: 'text-amber-600',
+        },
+      ],
     },
     {
-      title: 'Receive Cakes',
-      description: 'Record cakes from warehouse',
-      icon: PackagePlus,
-      href: '/cake/receive',
-      color: 'bg-emerald-500',
-      info: 'Log incoming cake deliveries from warehouse'
+      id: 'sales',
+      name: 'Sales & Reports',
+      description: 'Sales submission & summary',
+      icon: TrendingUp,
+      color: 'green',
+      gradient: 'from-green-500 to-emerald-500',
+      bgLight: 'bg-green-50',
+      borderColor: 'border-l-green-500',
+      badge: currentWindow ? { text: 'LIVE', type: 'live' } : null,
+      items: [
+        {
+          title: 'Submit Sales Report',
+          description: currentWindow
+            ? `${currentWindow.toUpperCase()} window is OPEN!`
+            : nextWindow
+              ? `Next window: ${nextWindow.opensAt}`
+              : 'Submit sales with photo proof',
+          icon: Camera,
+          href: '/sales',
+          iconBg: currentWindow ? 'bg-green-100' : 'bg-gray-100',
+          iconColor: currentWindow ? 'text-green-600' : 'text-gray-600',
+          highlight: !!currentWindow,
+        },
+        {
+          title: 'Daily Summary',
+          description: 'View today\'s complete overview',
+          icon: ClipboardList,
+          href: '/summary',
+          iconBg: 'bg-purple-100',
+          iconColor: 'text-purple-600',
+        },
+      ],
     },
   ]
 
@@ -290,35 +339,73 @@ export default function DashboardPage() {
           </Card>
         </div>
 
-        {/* Main Menu */}
+        {/* Category Cards */}
         <h2 className="text-lg font-semibold text-gray-900 mb-3">Quick Actions</h2>
-        <div className="space-y-3">
-          {menuItems.map((item) => (
-            <Card
-              key={item.href}
-              className={`cursor-pointer transition-all hover:shadow-md ${
-                item.highlight ? 'ring-2 ring-green-500 ring-offset-2' : ''
-              }`}
-              onClick={() => router.push(item.href)}
-            >
-              <CardContent className="p-4">
-                <div className="flex items-center gap-4">
-                  <div className={`w-12 h-12 rounded-xl ${item.color} flex items-center justify-center flex-shrink-0`}>
-                    <item.icon className="w-6 h-6 text-white" />
+        <div className="space-y-4">
+          {categories.map((cat) => {
+            const isExpanded = expandedCategory === cat.id
+            const CatIcon = cat.icon
+
+            return (
+              <div key={cat.id} className="rounded-xl overflow-hidden shadow-sm">
+                {/* Category Header — clickable */}
+                <button
+                  onClick={() => toggleCategory(cat.id)}
+                  className={`w-full flex items-center gap-4 p-4 bg-white border-l-4 ${cat.borderColor} transition-all active:scale-[0.99]`}
+                >
+                  <div className={`w-14 h-14 rounded-2xl bg-gradient-to-br ${cat.gradient} flex items-center justify-center flex-shrink-0 shadow-md`}>
+                    <CatIcon className="w-7 h-7 text-white" />
                   </div>
-                  <div className="flex-1 min-w-0">
-                    <h3 className="font-semibold text-gray-900">{item.title}</h3>
-                    <p className="text-sm text-gray-500 truncate">{item.description}</p>
+                  <div className="flex-1 text-left min-w-0">
+                    <div className="flex items-center gap-2">
+                      <h3 className="font-bold text-gray-900 text-base">{cat.name}</h3>
+                      {cat.badge && cat.badge.type === 'danger' && (
+                        <span className="px-2 py-0.5 rounded-full bg-red-100 text-red-600 text-[11px] font-semibold">
+                          {cat.badge.count} alert{cat.badge.count > 1 ? 's' : ''}
+                        </span>
+                      )}
+                      {cat.badge && cat.badge.type === 'live' && (
+                        <span className="px-2 py-0.5 rounded-full bg-green-100 text-green-600 text-[11px] font-semibold animate-pulse">
+                          LIVE
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-sm text-gray-500 mt-0.5">{cat.description}</p>
                   </div>
-                  <ChevronRight className="w-5 h-5 text-gray-400 flex-shrink-0" />
-                </div>
-                {/* Info tooltip */}
-                <div className="mt-3 pt-3 border-t">
-                  <p className="text-xs text-gray-400">{item.info}</p>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
+                  <div className={`w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center flex-shrink-0 transition-transform duration-200 ${isExpanded ? 'rotate-180' : ''}`}>
+                    <ChevronDown className="w-4 h-4 text-gray-500" />
+                  </div>
+                </button>
+
+                {/* Expanded Sub-items */}
+                {isExpanded && (
+                  <div className={`${cat.bgLight} p-3 space-y-2 border-l-4 ${cat.borderColor} border-t border-gray-100`}>
+                    {cat.items.map((item) => {
+                      const ItemIcon = item.icon
+                      return (
+                        <button
+                          key={item.href}
+                          onClick={() => router.push(item.href)}
+                          className={`w-full flex items-center gap-3 p-3 rounded-xl bg-white shadow-sm hover:shadow-md transition-all active:scale-[0.98] ${
+                            item.highlight ? 'ring-2 ring-green-400 ring-offset-1' : ''
+                          }`}
+                        >
+                          <div className={`w-10 h-10 rounded-xl ${item.iconBg} flex items-center justify-center flex-shrink-0`}>
+                            <ItemIcon className={`w-5 h-5 ${item.iconColor}`} />
+                          </div>
+                          <div className="flex-1 text-left min-w-0">
+                            <h4 className="font-semibold text-gray-900 text-sm">{item.title}</h4>
+                            <p className="text-xs text-gray-500 truncate">{item.description}</p>
+                          </div>
+                          <ChevronRight className="w-4 h-4 text-gray-400 flex-shrink-0" />
+                        </button>
+                      )
+                    })}
+                  </div>
+                )}
+              </div>
+            )
+          })}
         </div>
 
         {/* Sales Windows Info */}
@@ -370,8 +457,8 @@ export default function DashboardPage() {
             </CardHeader>
             <CardContent>
               <p className="text-sm text-gray-600 mb-3">
-                This app helps you manage daily ice cream inventory and report sales.
-                Your accurate data helps the company order the right amount of each flavor.
+                This app helps you manage daily ice cream & cake inventory and report sales.
+                Your accurate data helps the company order the right amount of stock.
               </p>
               <div className="space-y-2 text-sm">
                 <div className="flex items-start gap-2">
@@ -380,7 +467,7 @@ export default function DashboardPage() {
                 </div>
                 <div className="flex items-start gap-2">
                   <span className="text-pink-500 font-bold">2.</span>
-                  <span className="text-gray-600">Record any new tubs received from warehouse</span>
+                  <span className="text-gray-600">Record any new stock received from warehouse</span>
                 </div>
                 <div className="flex items-start gap-2">
                   <span className="text-pink-500 font-bold">3.</span>
