@@ -389,9 +389,13 @@ def parse_br_pos_receipt(text: str) -> dict:
                 if numbers:
                     result["gross_sales"] = numbers[0].replace(',', '')
                 # Check for GC on same line
-                gc_match = re.search(r'gc[:\s]+(\d+)', lower)
+                # OCR misreads: GC→6C, G→6, :→; or . etc.
+                gc_match = re.search(r'(?:gc|6c|g\.c)[:\s;.,]+(\d+)', lower)
                 if gc_match:
                     result["guest_count"] = gc_match.group(1)
+                    logger.info(f"GC found on gross sales line: {gc_match.group(1)}")
+                else:
+                    logger.info(f"GC not found on gross sales line: '{stripped}'")
 
             # Net Sales..: 1,314.46
             elif 'net sale' in lower:
@@ -401,9 +405,10 @@ def parse_br_pos_receipt(text: str) -> dict:
 
             # GC on its own line or after other values
             if result["guest_count"] is None:
-                gc_match = re.search(r'gc[:\s]+(\d+)', lower)
+                gc_match = re.search(r'(?:gc|6c|g\.c)[:\s;.,]+(\d+)', lower)
                 if gc_match:
                     result["guest_count"] = gc_match.group(1)
+                    logger.info(f"GC found on separate summary line: {gc_match.group(1)}")
 
         # ---- CASH SECTION ----
         elif section == "cash":
@@ -442,6 +447,25 @@ def parse_br_pos_receipt(text: str) -> dict:
                             })
                         except (ValueError, IndexError):
                             pass
+
+    # Fallback: scan ALL lines for GC if not found in sections
+    # OCR may put GC on any line, or section detection may have missed it
+    # Receipt has GC in summary (total=32) and in cash section (cash=2)
+    # We want the LARGEST one (that's the total guest count)
+    if result["guest_count"] is None:
+        best_gc = 0
+        for line in lines:
+            lower_line = line.strip().lower()
+            # Match GC/6C followed by colon/space/dots and a number
+            # But NOT "RGC:" (returns guest count)
+            gc_match = re.search(r'(?<![r])(?:gc|6c|g\.c)[:\s;.,]+(\d+)', lower_line)
+            if gc_match:
+                val = int(gc_match.group(1))
+                if val > best_gc:
+                    best_gc = val
+        if best_gc > 0:
+            result["guest_count"] = str(best_gc)
+            logger.info(f"GC extracted from fallback scan: {best_gc}")
 
     return result
 
