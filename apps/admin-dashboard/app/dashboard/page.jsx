@@ -63,12 +63,14 @@ export default function DashboardPage() {
         users: usersData.length,
       })
 
-      // Load cake low-stock alerts
-      try {
-        const cakeData = await api.getCakeLowStockAlerts()
-        setCakeAlerts(cakeData)
-      } catch (err) {
-        // Silently fail
+      // Load cake low-stock alerts (TM and AM only — HQ does not see cake alerts)
+      if (userData?.role === 'admin' || userData?.role === 'super_admin') {
+        try {
+          const cakeData = await api.getCakeLowStockAlerts()
+          setCakeAlerts(cakeData)
+        } catch (err) {
+          // Silently fail
+        }
       }
 
       // Load pending approvals (HQ only)
@@ -213,31 +215,35 @@ export default function DashboardPage() {
         </div>
       )}
 
-      {/* Cake Alerts Banner */}
-      {cakeAlerts.total_count > 0 && (
-        <div
-          className="p-4 rounded-lg bg-red-500/10 border border-red-500/30 cursor-pointer hover:bg-red-500/20 transition-colors"
-          onClick={() => router.push('/dashboard/cake-alerts')}
-        >
-          <div className="flex items-center gap-3">
+      {/* Cake Alerts Banner — TM and AM only */}
+      {(user.role === 'admin' || user.role === 'super_admin') && cakeAlerts.total_count > 0 && (
+        <div className="p-4 rounded-lg bg-red-500/10 border border-red-500/30">
+          <div className="flex items-center gap-3 mb-3">
             <div className="w-10 h-10 rounded-lg bg-red-500/20 flex items-center justify-center flex-shrink-0">
               <Cake className="w-5 h-5 text-red-400" />
             </div>
             <div className="flex-1">
               <p className="text-sm font-medium text-red-300">
-                Low Cake Stock Alert — {cakeAlerts.total_count} item{cakeAlerts.total_count > 1 ? 's' : ''}
+                Low Cake Stock — {cakeAlerts.total_count} item{cakeAlerts.total_count > 1 ? 's' : ''}
                 {cakeAlerts.critical_count > 0 && (
                   <span className="ml-2 px-1.5 py-0.5 rounded text-[10px] bg-red-500/30 text-red-200">
                     {cakeAlerts.critical_count} critical
                   </span>
                 )}
               </p>
-              <p className="text-xs text-red-400/70 mt-0.5">
-                {cakeAlerts.alerts.slice(0, 3).map(a => `${a.cake_name}: ${a.current_quantity} pcs (${a.branch_name})`).join(' | ')}
-                {cakeAlerts.total_count > 3 && ` +${cakeAlerts.total_count - 3} more`}
-              </p>
+              <p className="text-xs text-red-400/70 mt-0.5">Thresholds are set per-branch from the Flavor Expert app</p>
             </div>
-            <span className="text-xs text-red-400">View All</span>
+          </div>
+          <div className="space-y-1.5 ml-[52px]">
+            {cakeAlerts.alerts.slice(0, 5).map((a, i) => (
+              <div key={i} className="flex items-center justify-between text-xs">
+                <span className="text-slate-300">{a.cake_name} <span className="text-slate-500">({a.branch_name})</span></span>
+                <span className={a.current_quantity === 0 ? 'text-red-400 font-medium' : 'text-amber-400'}>{a.current_quantity} pcs</span>
+              </div>
+            ))}
+            {cakeAlerts.total_count > 5 && (
+              <p className="text-[11px] text-slate-500">+{cakeAlerts.total_count - 5} more alerts</p>
+            )}
           </div>
         </div>
       )}
@@ -306,23 +312,20 @@ export default function DashboardPage() {
               </div>
             </a>
 
+            {user.role === 'supreme_admin' && (
             <a
-              href="/dashboard/cake-alerts"
+              href="/dashboard/cake-products"
               className="flex items-center gap-3 p-3 rounded-lg bg-slate-700/30 hover:bg-slate-700/50 transition-colors cursor-pointer"
             >
-              <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${cakeAlerts.total_count > 0 ? 'bg-red-500/20' : 'bg-orange-500/20'}`}>
-                <Cake className={`w-4 h-4 ${cakeAlerts.total_count > 0 ? 'text-red-400' : 'text-orange-400'}`} />
+              <div className="w-8 h-8 rounded-lg bg-orange-500/20 flex items-center justify-center">
+                <Cake className="w-4 h-4 text-orange-400" />
               </div>
               <div>
-                <p className="text-sm font-medium text-white">Cake Alerts</p>
-                <p className="text-xs text-slate-400">
-                  {cakeAlerts.total_count > 0
-                    ? `${cakeAlerts.total_count} low stock alert${cakeAlerts.total_count > 1 ? 's' : ''}`
-                    : 'Monitor cake stock levels'
-                  }
-                </p>
+                <p className="text-sm font-medium text-white">Cake Products</p>
+                <p className="text-xs text-slate-400">Manage cake products and defaults</p>
               </div>
             </a>
+            )}
           </CardContent>
         </Card>
 
