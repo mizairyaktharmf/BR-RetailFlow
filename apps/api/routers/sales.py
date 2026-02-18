@@ -306,6 +306,8 @@ def normalize_branch_name(name: str) -> str:
 BRANCH_ABBREVIATIONS = {
     'tc': 'trade centre',
     't c': 'trade centre',
+    'tc road': 'trade centre road',
+    't c road': 'trade centre road',
     'jlt': 'jumeirah lake towers',
     'jbr': 'jumeirah beach residence',
     'dcc': 'deira city centre',
@@ -314,10 +316,19 @@ BRANCH_ABBREVIATIONS = {
     'ibc': 'ibn battuta',
 }
 
+# Common OCR typo corrections for branch names
+BRANCH_TYPO_MAP = {
+    'roade': 'road',
+    'centre': 'center',
+    'center': 'centre',
+    'trad': 'trade',
+}
+
 
 def check_branch_match(receipt_name: str, db_branch_name: str) -> bool:
     """Fuzzy match branch name from receipt against database branch name.
     Handles OCR typos like LANCY vs LAMCY, abbreviations like T.C. → Trade Centre.
+    DB names may have "/" separator like "TRADE CENTER ROADE / KARAMA 3".
     """
     if not receipt_name or not db_branch_name:
         return False
@@ -325,7 +336,24 @@ def check_branch_match(receipt_name: str, db_branch_name: str) -> bool:
     receipt_clean = normalize_branch_name(receipt_name)
     db_clean = normalize_branch_name(db_branch_name)
 
-    # Exact match after normalization
+    # DB branch may have multiple names separated by /
+    # e.g. "TRADE CENTER ROADE / KARAMA 3" — try matching against each part
+    db_parts = [db_clean]
+    if '/' in db_clean:
+        db_parts = [p.strip() for p in db_clean.split('/') if p.strip()]
+        db_parts.append(db_clean.replace('/', ' '))  # also try the full name
+
+    for db_part in db_parts:
+        if _match_single(receipt_clean, db_part):
+            return True
+
+    return False
+
+
+def _match_single(receipt_clean: str, db_clean: str) -> bool:
+    """Match receipt name against a single DB branch name part."""
+
+    # Exact match
     if receipt_clean == db_clean:
         return True
 
@@ -333,7 +361,19 @@ def check_branch_match(receipt_name: str, db_branch_name: str) -> bool:
     if receipt_clean in db_clean or db_clean in receipt_clean:
         return True
 
-    # Expand abbreviations and check again
+    # Apply typo corrections to both
+    receipt_fixed = receipt_clean
+    db_fixed = db_clean
+    for typo, correction in BRANCH_TYPO_MAP.items():
+        receipt_fixed = receipt_fixed.replace(typo, correction)
+        db_fixed = db_fixed.replace(typo, correction)
+
+    if receipt_fixed == db_fixed:
+        return True
+    if receipt_fixed in db_fixed or db_fixed in receipt_fixed:
+        return True
+
+    # Expand abbreviations and check
     receipt_expanded = receipt_clean
     db_expanded = db_clean
     for abbr, full in BRANCH_ABBREVIATIONS.items():
@@ -342,40 +382,41 @@ def check_branch_match(receipt_name: str, db_branch_name: str) -> bool:
         if abbr in db_expanded:
             db_expanded = db_expanded.replace(abbr, full)
 
+    # Also apply typo fixes to expanded forms
+    for typo, correction in BRANCH_TYPO_MAP.items():
+        receipt_expanded = receipt_expanded.replace(typo, correction)
+        db_expanded = db_expanded.replace(typo, correction)
+
     if receipt_expanded == db_expanded:
         return True
     if receipt_expanded in db_expanded or db_expanded in receipt_expanded:
         return True
 
-    # Check if key words match (e.g. "lamcy" in both)
-    receipt_words = set(receipt_clean.split())
-    db_words = set(db_clean.split())
-    receipt_words = {w for w in receipt_words if len(w) > 2}
-    db_words = {w for w in db_words if len(w) > 2}
+    # Collect all word sets for overlap checks
+    all_word_sets = [
+        (set(receipt_clean.split()), set(db_clean.split())),
+        (set(receipt_fixed.split()), set(db_fixed.split())),
+        (set(receipt_expanded.split()), set(db_expanded.split())),
+    ]
 
-    if receipt_words and db_words:
-        overlap = receipt_words & db_words
-        if len(overlap) >= 1:
-            return True
+    for receipt_words, db_words in all_word_sets:
+        receipt_words = {w for w in receipt_words if len(w) > 2}
+        db_words = {w for w in db_words if len(w) > 2}
+        if receipt_words and db_words:
+            overlap = receipt_words & db_words
+            if len(overlap) >= 1:
+                return True
 
-    # Also check expanded words overlap
-    receipt_exp_words = set(receipt_expanded.split())
-    db_exp_words = set(db_expanded.split())
-    receipt_exp_words = {w for w in receipt_exp_words if len(w) > 2}
-    db_exp_words = {w for w in db_exp_words if len(w) > 2}
-
-    if receipt_exp_words and db_exp_words:
-        overlap = receipt_exp_words & db_exp_words
-        if len(overlap) >= 1:
-            return True
-
-    # Fuzzy character match: handle OCR typos (LANCY vs LAMCY)
-    all_receipt_words = receipt_words | receipt_exp_words
-    all_db_words = db_words | db_exp_words
+    # Fuzzy character match: handle OCR typos (LANCY vs LAMCY, ROADE vs ROAD)
+    all_receipt_words = set()
+    all_db_words = set()
+    for rw_set, dw_set in all_word_sets:
+        all_receipt_words |= {w for w in rw_set if len(w) > 2}
+        all_db_words |= {w for w in dw_set if len(w) > 2}
 
     for rw in all_receipt_words:
         for dw in all_db_words:
-            if len(rw) >= 4 and len(dw) >= 4:
+            if len(rw) >= 3 and len(dw) >= 3:
                 if len(rw) == len(dw):
                     diff = sum(1 for a, b in zip(rw, dw) if a != b)
                     if diff <= 2:
@@ -700,9 +741,13 @@ async def extract_sales_from_photos(
     receipt_branch = extract_branch_name(all_text, receipt_type=receipt_type or "pos")
 
     # Check branch match
-    branch_matched = False
-    if receipt_branch and branch_name:
+    # If we couldn't extract branch name from receipt, don't block — let user proceed
+    if not receipt_branch:
+        branch_matched = True
+    elif branch_name:
         branch_matched = check_branch_match(receipt_branch, branch_name)
+    else:
+        branch_matched = True
 
     # Parse the receipt data using the appropriate parser
     if receipt_type == "hd":
