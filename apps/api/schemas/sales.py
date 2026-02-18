@@ -27,6 +27,11 @@ class DailySalesCreate(BaseModel):
     category_data: Optional[str] = None  # JSON string
     photo_url: Optional[str] = None
     notes: Optional[str] = None
+    # Home Delivery fields
+    hd_gross_sales: Optional[float] = 0
+    hd_net_sales: Optional[float] = 0
+    hd_orders: Optional[int] = 0
+    hd_photo_url: Optional[str] = None
 
 
 class DailySalesResponse(BaseModel):
@@ -42,6 +47,11 @@ class DailySalesResponse(BaseModel):
     category_data: Optional[str] = None
     photo_url: Optional[str] = None
     notes: Optional[str] = None
+    # Home Delivery fields
+    hd_gross_sales: Optional[float] = None
+    hd_net_sales: Optional[float] = None
+    hd_orders: Optional[int] = None
+    hd_photo_url: Optional[str] = None
     submitted_by_id: int
     created_at: datetime
 

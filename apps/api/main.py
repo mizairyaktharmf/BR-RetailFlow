@@ -79,6 +79,16 @@ def run_migrations():
                 conn.commit()
                 logger.info("Migration: category_data added successfully")
 
+            # Home Delivery columns
+            if 'hd_gross_sales' not in ds_columns:
+                logger.info("Migration: Adding HD columns to daily_sales table")
+                conn.execute(text("ALTER TABLE daily_sales ADD COLUMN hd_gross_sales FLOAT DEFAULT 0"))
+                conn.execute(text("ALTER TABLE daily_sales ADD COLUMN hd_net_sales FLOAT DEFAULT 0"))
+                conn.execute(text("ALTER TABLE daily_sales ADD COLUMN hd_orders INTEGER DEFAULT 0"))
+                conn.execute(text("ALTER TABLE daily_sales ADD COLUMN hd_photo_url VARCHAR(500)"))
+                conn.commit()
+                logger.info("Migration: HD columns added successfully")
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):

@@ -207,7 +207,7 @@ class ApiService {
     return response.json()
   }
 
-  async extractSalesFromPhotos(files, branchName) {
+  async extractSalesFromPhotos(files, branchName, receiptType = 'pos') {
     const formData = new FormData()
     files.forEach(file => {
       formData.append('files', file)
@@ -215,6 +215,7 @@ class ApiService {
     if (branchName) {
       formData.append('branch_name', branchName)
     }
+    formData.append('receipt_type', receiptType)
 
     const token = this.getToken()
     const response = await fetch(`${this.baseUrl}/sales/extract-from-photos`, {

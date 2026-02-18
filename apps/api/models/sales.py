@@ -44,6 +44,12 @@ class DailySales(Base):
     # Category sales data (JSON: [{name, qty, sales, pct}, ...])
     category_data = Column(Text, nullable=True)
 
+    # Home Delivery data (separate receipt uploaded alongside POS)
+    hd_gross_sales = Column(Float, nullable=True, default=0)
+    hd_net_sales = Column(Float, nullable=True, default=0)
+    hd_orders = Column(Integer, nullable=True, default=0)  # "Orders" from HD receipt
+    hd_photo_url = Column(String(500), nullable=True)
+
     # Scoop counts by type (legacy, kept for backward compat)
     kids_scoop_count = Column(Integer, default=0)
     single_scoop_count = Column(Integer, default=0)

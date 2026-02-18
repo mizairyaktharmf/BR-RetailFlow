@@ -59,11 +59,13 @@ export default function SalesDashboardPage() {
     }
   }
 
-  // Calculate totals from today's sales
-  const totalSalesAmount = todaySales.reduce((sum, s) => sum + (s.total_sales || 0), 0)
-  const totalGrossSales = todaySales.reduce((sum, s) => sum + (s.gross_sales || 0), 0)
+  // Calculate totals from today's sales (POS + HD combined)
+  const totalSalesAmount = todaySales.reduce((sum, s) => sum + (s.total_sales || 0) + (s.hd_net_sales || 0), 0)
+  const totalGrossSales = todaySales.reduce((sum, s) => sum + (s.gross_sales || 0) + (s.hd_gross_sales || 0), 0)
   const totalTransactions = todaySales.reduce((sum, s) => sum + (s.transaction_count || 0), 0)
+  const totalHdOrders = todaySales.reduce((sum, s) => sum + (s.hd_orders || 0), 0)
   const submittedWindows = todaySales.map(s => s.sales_window)
+  const hasAnyHd = todaySales.some(s => (s.hd_net_sales || 0) > 0)
 
   // Aggregate category data across all windows
   const allCategories = todaySales.reduce((acc, s) => {
@@ -160,11 +162,14 @@ export default function SalesDashboardPage() {
                   <CardContent className="p-4">
                     <div className="flex items-center gap-2 text-blue-600 mb-2">
                       <ShoppingBag className="w-4 h-4" />
-                      <span className="text-xs font-medium">Transactions</span>
+                      <span className="text-xs font-medium">{hasAnyHd ? 'GC + Orders' : 'Transactions'}</span>
                     </div>
                     <p className="text-2xl font-bold text-gray-900">
-                      {totalTransactions > 0 ? totalTransactions : '—'}
+                      {(totalTransactions + totalHdOrders) > 0 ? totalTransactions + totalHdOrders : '—'}
                     </p>
+                    {hasAnyHd && (totalTransactions > 0 || totalHdOrders > 0) && (
+                      <p className="text-[10px] text-gray-400 mt-0.5">GC {totalTransactions} + HD {totalHdOrders}</p>
+                    )}
                   </CardContent>
                 </Card>
 
@@ -299,10 +304,11 @@ export default function SalesDashboardPage() {
                           {isSubmitted ? (
                             <>
                               <p className="text-sm font-semibold text-green-600">
-                                AED {(salesRecord?.total_sales || 0).toFixed(0)}
+                                AED {((salesRecord?.total_sales || 0) + (salesRecord?.hd_net_sales || 0)).toFixed(0)}
                               </p>
                               <p className="text-[11px] text-gray-400">
-                                {salesRecord?.transaction_count || 0} txn
+                                {salesRecord?.transaction_count || 0} GC
+                                {(salesRecord?.hd_orders || 0) > 0 && ` + ${salesRecord.hd_orders} HD`}
                               </p>
                             </>
                           ) : (
