@@ -187,52 +187,6 @@ class ApiService {
     return this.request(`/sales/daily?branch_id=${branchId}&date=${date}`)
   }
 
-  async uploadSalesPhoto(file) {
-    const formData = new FormData()
-    formData.append('file', file)
-
-    const token = this.getToken()
-    const response = await fetch(`${this.baseUrl}/sales/upload-photo`, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${token}`,
-      },
-      body: formData,
-    })
-
-    if (!response.ok) {
-      throw new Error('Failed to upload photo')
-    }
-
-    return response.json()
-  }
-
-  async extractSalesFromPhotos(files, branchName, receiptType = 'pos') {
-    const formData = new FormData()
-    files.forEach(file => {
-      formData.append('files', file)
-    })
-    if (branchName) {
-      formData.append('branch_name', branchName)
-    }
-    formData.append('receipt_type', receiptType)
-
-    const token = this.getToken()
-    const response = await fetch(`${this.baseUrl}/sales/extract-from-photos`, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${token}`,
-      },
-      body: formData,
-    })
-
-    if (!response.ok) {
-      throw new Error('Failed to extract data from photos')
-    }
-
-    return response.json()
-  }
-
   // ============== CUP USAGE ==============
 
   async submitCupUsage(data) {

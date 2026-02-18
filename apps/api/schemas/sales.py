@@ -3,20 +3,12 @@ Sales schemas for request/response validation
 """
 
 from pydantic import BaseModel, Field
-from typing import Optional, List
+from typing import Optional
 from datetime import datetime, date
 
 
-class CategorySales(BaseModel):
-    """Schema for a single category in the sales breakdown"""
-    name: str
-    qty: int = 0
-    sales: float = 0
-    pct: float = 0
-
-
 class DailySalesCreate(BaseModel):
-    """Schema for creating a daily sales entry"""
+    """Schema for creating a daily sales entry (manual form)"""
     branch_id: int
     date: date
     sales_window: str  # 3pm, 7pm, 9pm, closing
@@ -30,7 +22,7 @@ class DailySalesCreate(BaseModel):
     hand_pack_units: Optional[int] = 0
     sundae_pct: Optional[float] = 0  # Sundae %
     cups_cones_pct: Optional[float] = 0  # Cups & Cones %
-    category_data: Optional[str] = None  # JSON string (legacy)
+    category_data: Optional[str] = None
     photo_url: Optional[str] = None
     notes: Optional[str] = None
     # Home Delivery fields (optional)
@@ -69,21 +61,3 @@ class DailySalesResponse(BaseModel):
 
     class Config:
         from_attributes = True
-
-
-class SalesExtractionResponse(BaseModel):
-    """Schema for photo extraction response (legacy, kept for API compat)"""
-    branch_name: Optional[str] = None
-    branch_match: bool = False
-    gross_sales: Optional[str] = None
-    net_sales: Optional[str] = None
-    guest_count: Optional[str] = None
-    cash_sales: Optional[str] = None
-    categories: List[CategorySales] = []
-    confidence: Optional[str] = "low"
-
-
-class PhotoUploadResponse(BaseModel):
-    """Schema for photo upload response"""
-    url: str
-    filename: str
