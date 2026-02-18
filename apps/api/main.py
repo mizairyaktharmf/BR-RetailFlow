@@ -89,6 +89,17 @@ def run_migrations():
                 conn.commit()
                 logger.info("Migration: HD columns added successfully")
 
+            # Manual POS entry columns
+            if 'ly_sale' not in ds_columns:
+                logger.info("Migration: Adding manual POS columns to daily_sales table")
+                conn.execute(text("ALTER TABLE daily_sales ADD COLUMN ly_sale FLOAT DEFAULT 0"))
+                conn.execute(text("ALTER TABLE daily_sales ADD COLUMN cake_units INTEGER DEFAULT 0"))
+                conn.execute(text("ALTER TABLE daily_sales ADD COLUMN hand_pack_units INTEGER DEFAULT 0"))
+                conn.execute(text("ALTER TABLE daily_sales ADD COLUMN sundae_pct FLOAT DEFAULT 0"))
+                conn.execute(text("ALTER TABLE daily_sales ADD COLUMN cups_cones_pct FLOAT DEFAULT 0"))
+                conn.commit()
+                logger.info("Migration: Manual POS columns added successfully")
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):

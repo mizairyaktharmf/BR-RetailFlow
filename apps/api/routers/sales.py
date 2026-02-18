@@ -50,6 +50,11 @@ def _build_sales_response(s) -> DailySalesResponse:
         total_sales=s.total_sales,
         transaction_count=s.transaction_count,
         cash_sales=getattr(s, 'cash_sales', None),
+        ly_sale=getattr(s, 'ly_sale', None),
+        cake_units=getattr(s, 'cake_units', None),
+        hand_pack_units=getattr(s, 'hand_pack_units', None),
+        sundae_pct=getattr(s, 'sundae_pct', None),
+        cups_cones_pct=getattr(s, 'cups_cones_pct', None),
         category_data=getattr(s, 'category_data', None),
         photo_url=s.photo_url,
         notes=s.notes,
@@ -91,26 +96,32 @@ async def submit_daily_sales(
         )
     ).first()
 
+    # Helper to safely set a field if column exists
+    def _set(obj, field, value):
+        if hasattr(obj, field):
+            setattr(obj, field, value)
+
     if existing:
         existing.total_sales = data.total_sales
         existing.transaction_count = data.transaction_count
-        if data.gross_sales:
-            existing.gross_sales = data.gross_sales
-        if hasattr(existing, 'cash_sales') and data.cash_sales:
-            existing.cash_sales = data.cash_sales
-        if hasattr(existing, 'category_data') and data.category_data:
-            existing.category_data = data.category_data
+        _set(existing, 'gross_sales', data.gross_sales or 0)
+        _set(existing, 'cash_sales', data.cash_sales or 0)
+        _set(existing, 'ly_sale', data.ly_sale or 0)
+        _set(existing, 'cake_units', data.cake_units or 0)
+        _set(existing, 'hand_pack_units', data.hand_pack_units or 0)
+        _set(existing, 'sundae_pct', data.sundae_pct or 0)
+        _set(existing, 'cups_cones_pct', data.cups_cones_pct or 0)
+        _set(existing, 'category_data', data.category_data)
         if data.photo_url:
             existing.photo_url = data.photo_url
         if data.notes:
             existing.notes = data.notes
         # Home Delivery fields
-        if hasattr(existing, 'hd_gross_sales'):
-            existing.hd_gross_sales = data.hd_gross_sales or 0
-            existing.hd_net_sales = data.hd_net_sales or 0
-            existing.hd_orders = data.hd_orders or 0
-            if data.hd_photo_url:
-                existing.hd_photo_url = data.hd_photo_url
+        _set(existing, 'hd_gross_sales', data.hd_gross_sales or 0)
+        _set(existing, 'hd_net_sales', data.hd_net_sales or 0)
+        _set(existing, 'hd_orders', data.hd_orders or 0)
+        if data.hd_photo_url:
+            _set(existing, 'hd_photo_url', data.hd_photo_url)
         db.commit()
         db.refresh(existing)
 
@@ -127,18 +138,18 @@ async def submit_daily_sales(
         submitted_by_id=current_user.id,
     )
 
-    if hasattr(sales_entry, 'gross_sales') and data.gross_sales:
-        sales_entry.gross_sales = data.gross_sales
-    if hasattr(sales_entry, 'cash_sales') and data.cash_sales:
-        sales_entry.cash_sales = data.cash_sales
-    if hasattr(sales_entry, 'category_data') and data.category_data:
-        sales_entry.category_data = data.category_data
-    # Home Delivery fields
-    if hasattr(sales_entry, 'hd_gross_sales'):
-        sales_entry.hd_gross_sales = data.hd_gross_sales or 0
-        sales_entry.hd_net_sales = data.hd_net_sales or 0
-        sales_entry.hd_orders = data.hd_orders or 0
-        sales_entry.hd_photo_url = data.hd_photo_url
+    _set(sales_entry, 'gross_sales', data.gross_sales or 0)
+    _set(sales_entry, 'cash_sales', data.cash_sales or 0)
+    _set(sales_entry, 'ly_sale', data.ly_sale or 0)
+    _set(sales_entry, 'cake_units', data.cake_units or 0)
+    _set(sales_entry, 'hand_pack_units', data.hand_pack_units or 0)
+    _set(sales_entry, 'sundae_pct', data.sundae_pct or 0)
+    _set(sales_entry, 'cups_cones_pct', data.cups_cones_pct or 0)
+    _set(sales_entry, 'category_data', data.category_data)
+    _set(sales_entry, 'hd_gross_sales', data.hd_gross_sales or 0)
+    _set(sales_entry, 'hd_net_sales', data.hd_net_sales or 0)
+    _set(sales_entry, 'hd_orders', data.hd_orders or 0)
+    _set(sales_entry, 'hd_photo_url', data.hd_photo_url)
 
     db.add(sales_entry)
     db.commit()

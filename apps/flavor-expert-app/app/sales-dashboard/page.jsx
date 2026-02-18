@@ -4,17 +4,20 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import {
   TrendingUp,
+  TrendingDown,
   ArrowLeft,
   Clock,
   DollarSign,
   ShoppingBag,
   BarChart3,
   Loader2,
-  Calendar,
   CheckCircle2,
   IceCream,
   Cake,
-  PieChart
+  Package,
+  Percent,
+  Truck,
+  Users
 } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { formatDate, SALES_WINDOWS } from '@/lib/utils'
@@ -60,48 +63,24 @@ export default function SalesDashboardPage() {
   }
 
   // Calculate totals from today's sales (POS + HD combined)
-  const totalSalesAmount = todaySales.reduce((sum, s) => sum + (s.total_sales || 0) + (s.hd_net_sales || 0), 0)
-  const totalGrossSales = todaySales.reduce((sum, s) => sum + (s.gross_sales || 0) + (s.hd_gross_sales || 0), 0)
+  const totalNetSales = todaySales.reduce((sum, s) => sum + (s.total_sales || 0), 0)
+  const totalHdNetSales = todaySales.reduce((sum, s) => sum + (s.hd_net_sales || 0), 0)
+  const totalSalesAmount = totalNetSales + totalHdNetSales
+  const totalLySale = todaySales.reduce((sum, s) => sum + (s.ly_sale || 0), 0)
   const totalTransactions = todaySales.reduce((sum, s) => sum + (s.transaction_count || 0), 0)
   const totalHdOrders = todaySales.reduce((sum, s) => sum + (s.hd_orders || 0), 0)
+  const totalCakeUnits = todaySales.reduce((sum, s) => sum + (s.cake_units || 0), 0)
+  const totalHandPackUnits = todaySales.reduce((sum, s) => sum + (s.hand_pack_units || 0), 0)
   const submittedWindows = todaySales.map(s => s.sales_window)
   const hasAnyHd = todaySales.some(s => (s.hd_net_sales || 0) > 0)
 
-  // Aggregate category data across all windows
-  const allCategories = todaySales.reduce((acc, s) => {
-    if (s.category_data) {
-      try {
-        const cats = JSON.parse(s.category_data)
-        cats.forEach(cat => {
-          const existing = acc.find(a => a.name === cat.name)
-          if (existing) {
-            existing.qty += cat.qty
-            existing.sales += cat.sales
-          } else {
-            acc.push({ ...cat })
-          }
-        })
-      } catch {}
-    }
-    return acc
-  }, [])
+  // Average percentages across submitted windows
+  const windowCount = todaySales.length || 1
+  const avgSundaePct = todaySales.reduce((sum, s) => sum + (s.sundae_pct || 0), 0) / windowCount
+  const avgCupsConesPct = todaySales.reduce((sum, s) => sum + (s.cups_cones_pct || 0), 0) / windowCount
 
-  // Recalculate percentages based on aggregated totals
-  const categoryTotal = allCategories.reduce((sum, c) => sum + c.sales, 0)
-  if (categoryTotal > 0) {
-    allCategories.forEach(c => { c.pct = Math.round((c.sales / categoryTotal) * 100) })
-  }
-
-  // Category colors
-  const getCategoryColor = (name) => {
-    const lower = name.toLowerCase()
-    if (lower.includes('cup') || lower.includes('cone')) return '#ec4899'
-    if (lower.includes('sundae')) return '#f59e0b'
-    if (lower.includes('beverage') || lower.includes('shake') || lower.includes('drink')) return '#3b82f6'
-    if (lower.includes('cake')) return '#f97316'
-    if (lower.includes('take') || lower.includes('home') || lower.includes('pint')) return '#8b5cf6'
-    return '#6b7280'
-  }
+  // Growth vs LY
+  const lyGrowth = totalLySale > 0 ? ((totalNetSales - totalLySale) / totalLySale * 100) : null
 
   if (!user) {
     return (
@@ -150,19 +129,39 @@ export default function SalesDashboardPage() {
                   <CardContent className="p-4">
                     <div className="flex items-center gap-2 text-green-600 mb-2">
                       <DollarSign className="w-4 h-4" />
-                      <span className="text-xs font-medium">Total Sales</span>
+                      <span className="text-xs font-medium">Net Sales (TY)</span>
                     </div>
                     <p className="text-2xl font-bold text-gray-900">
-                      {totalSalesAmount > 0 ? `AED ${totalSalesAmount.toFixed(0)}` : '—'}
+                      {totalNetSales > 0 ? `AED ${totalNetSales.toFixed(0)}` : '—'}
                     </p>
+                    {hasAnyHd && totalHdNetSales > 0 && (
+                      <p className="text-[10px] text-gray-400 mt-0.5">+ HD AED {totalHdNetSales.toFixed(0)}</p>
+                    )}
+                  </CardContent>
+                </Card>
+
+                <Card className="bg-gradient-to-br from-gray-50 to-white">
+                  <CardContent className="p-4">
+                    <div className="flex items-center gap-2 text-gray-500 mb-2">
+                      <TrendingDown className="w-4 h-4" />
+                      <span className="text-xs font-medium">LY Sale</span>
+                    </div>
+                    <p className="text-2xl font-bold text-gray-900">
+                      {totalLySale > 0 ? `AED ${totalLySale.toFixed(0)}` : '—'}
+                    </p>
+                    {lyGrowth !== null && (
+                      <p className={`text-[10px] mt-0.5 font-medium ${lyGrowth >= 0 ? 'text-green-600' : 'text-red-500'}`}>
+                        {lyGrowth >= 0 ? '+' : ''}{lyGrowth.toFixed(1)}% vs LY
+                      </p>
+                    )}
                   </CardContent>
                 </Card>
 
                 <Card className="bg-gradient-to-br from-blue-50 to-white">
                   <CardContent className="p-4">
                     <div className="flex items-center gap-2 text-blue-600 mb-2">
-                      <ShoppingBag className="w-4 h-4" />
-                      <span className="text-xs font-medium">{hasAnyHd ? 'GC + Orders' : 'Transactions'}</span>
+                      <Users className="w-4 h-4" />
+                      <span className="text-xs font-medium">{hasAnyHd ? 'TY GC + HD' : 'TY GC'}</span>
                     </div>
                     <p className="text-2xl font-bold text-gray-900">
                       {(totalTransactions + totalHdOrders) > 0 ? totalTransactions + totalHdOrders : '—'}
@@ -184,85 +183,82 @@ export default function SalesDashboardPage() {
                     </p>
                   </CardContent>
                 </Card>
-
-                <Card className="bg-gradient-to-br from-amber-50 to-white">
-                  <CardContent className="p-4">
-                    <div className="flex items-center gap-2 text-amber-600 mb-2">
-                      <TrendingUp className="w-4 h-4" />
-                      <span className="text-xs font-medium">Gross Sales</span>
-                    </div>
-                    <p className="text-2xl font-bold text-gray-900">
-                      {totalGrossSales > 0 ? `AED ${totalGrossSales.toFixed(0)}` : '—'}
-                    </p>
-                  </CardContent>
-                </Card>
               </div>
             </div>
 
-            {/* Category Breakdown Donut Chart */}
-            {allCategories.length > 0 && (
+            {/* Pacesetter Attributes */}
+            {todaySales.length > 0 && (
               <div>
-                <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-3">Category Breakdown</h2>
+                <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-3">Pacesetter Attributes</h2>
                 <Card>
-                  <CardContent className="p-4">
-                    <div className="flex items-center gap-4">
-                      {/* Donut Chart */}
-                      <div className="relative flex-shrink-0" style={{ width: 140, height: 140 }}>
-                        <svg width="140" height="140" viewBox="0 0 140 140">
-                          {/* Background circle */}
-                          <circle cx="70" cy="70" r="54" fill="none" stroke="#f3f4f6" strokeWidth="16" />
-                          {/* Category segments */}
-                          {(() => {
-                            const radius = 54
-                            const circumference = 2 * Math.PI * radius
-                            let offset = 0
-                            return allCategories.map((cat, idx) => {
-                              const pct = categoryTotal > 0 ? cat.sales / categoryTotal : 0
-                              const dashLength = pct * circumference
-                              const dashOffset = -offset
-                              offset += dashLength
-                              return (
-                                <circle
-                                  key={idx}
-                                  cx="70"
-                                  cy="70"
-                                  r={radius}
-                                  fill="none"
-                                  stroke={getCategoryColor(cat.name)}
-                                  strokeWidth="16"
-                                  strokeDasharray={`${dashLength} ${circumference - dashLength}`}
-                                  strokeDashoffset={dashOffset}
-                                  transform="rotate(-90 70 70)"
-                                  strokeLinecap="butt"
-                                />
-                              )
-                            })
-                          })()}
-                        </svg>
-                        {/* Center total */}
-                        <div className="absolute inset-0 flex flex-col items-center justify-center">
-                          <p className="text-[10px] text-gray-400 uppercase">Total</p>
-                          <p className="text-lg font-bold text-gray-900">{categoryTotal.toFixed(0)}</p>
+                  <CardContent className="p-4 space-y-3">
+                    {/* Percentages row */}
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="flex items-center gap-3 p-3 rounded-lg bg-amber-50">
+                        <div className="w-9 h-9 rounded-lg bg-amber-100 flex items-center justify-center">
+                          <IceCream className="w-4.5 h-4.5 text-amber-600" />
+                        </div>
+                        <div>
+                          <p className="text-[10px] text-gray-500 uppercase font-medium">Sundae %</p>
+                          <p className="text-lg font-bold text-gray-900">{avgSundaePct > 0 ? `${avgSundaePct.toFixed(1)}%` : '—'}</p>
                         </div>
                       </div>
+                      <div className="flex items-center gap-3 p-3 rounded-lg bg-blue-50">
+                        <div className="w-9 h-9 rounded-lg bg-blue-100 flex items-center justify-center">
+                          <Percent className="w-4.5 h-4.5 text-blue-600" />
+                        </div>
+                        <div>
+                          <p className="text-[10px] text-gray-500 uppercase font-medium">Cups & Cones</p>
+                          <p className="text-lg font-bold text-gray-900">{avgCupsConesPct > 0 ? `${avgCupsConesPct.toFixed(1)}%` : '—'}</p>
+                        </div>
+                      </div>
+                    </div>
+                    {/* Units row */}
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="flex items-center gap-3 p-3 rounded-lg bg-pink-50">
+                        <div className="w-9 h-9 rounded-lg bg-pink-100 flex items-center justify-center">
+                          <Cake className="w-4.5 h-4.5 text-pink-600" />
+                        </div>
+                        <div>
+                          <p className="text-[10px] text-gray-500 uppercase font-medium">Cake Units</p>
+                          <p className="text-lg font-bold text-gray-900">{totalCakeUnits > 0 ? totalCakeUnits : '—'}</p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-3 p-3 rounded-lg bg-indigo-50">
+                        <div className="w-9 h-9 rounded-lg bg-indigo-100 flex items-center justify-center">
+                          <Package className="w-4.5 h-4.5 text-indigo-600" />
+                        </div>
+                        <div>
+                          <p className="text-[10px] text-gray-500 uppercase font-medium">Hand Pack</p>
+                          <p className="text-lg font-bold text-gray-900">{totalHandPackUnits > 0 ? totalHandPackUnits : '—'}</p>
+                        </div>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+            )}
 
-                      {/* Legend */}
-                      <div className="flex-1 space-y-2">
-                        {allCategories.map((cat, idx) => (
-                          <div key={idx} className="flex items-center justify-between">
-                            <div className="flex items-center gap-2">
-                              <div
-                                className="w-3 h-3 rounded-full flex-shrink-0"
-                                style={{ backgroundColor: getCategoryColor(cat.name) }}
-                              />
-                              <span className="text-xs text-gray-700 truncate max-w-[100px]">{cat.name}</span>
-                            </div>
-                            <div className="flex items-center gap-2">
-                              <span className="text-xs font-bold text-gray-900">{cat.pct}%</span>
-                              <span className="text-[10px] text-gray-400 w-14 text-right">{cat.sales.toFixed(0)}</span>
-                            </div>
-                          </div>
-                        ))}
+            {/* Home Delivery Summary */}
+            {hasAnyHd && (
+              <div>
+                <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-3">Home Delivery</h2>
+                <Card className="bg-gradient-to-br from-cyan-50 to-white border-cyan-100">
+                  <CardContent className="p-4">
+                    <div className="grid grid-cols-3 gap-3 text-center">
+                      <div>
+                        <p className="text-[10px] text-gray-500 uppercase font-medium">Net Sales</p>
+                        <p className="text-lg font-bold text-gray-900">AED {totalHdNetSales.toFixed(0)}</p>
+                      </div>
+                      <div>
+                        <p className="text-[10px] text-gray-500 uppercase font-medium">Gross Sales</p>
+                        <p className="text-lg font-bold text-gray-900">
+                          AED {todaySales.reduce((sum, s) => sum + (s.hd_gross_sales || 0), 0).toFixed(0)}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-[10px] text-gray-500 uppercase font-medium">Orders</p>
+                        <p className="text-lg font-bold text-gray-900">{totalHdOrders}</p>
                       </div>
                     </div>
                   </CardContent>
@@ -304,12 +300,17 @@ export default function SalesDashboardPage() {
                           {isSubmitted ? (
                             <>
                               <p className="text-sm font-semibold text-green-600">
-                                AED {((salesRecord?.total_sales || 0) + (salesRecord?.hd_net_sales || 0)).toFixed(0)}
+                                AED {(salesRecord?.total_sales || 0).toFixed(0)}
                               </p>
                               <p className="text-[11px] text-gray-400">
                                 {salesRecord?.transaction_count || 0} GC
                                 {(salesRecord?.hd_orders || 0) > 0 && ` + ${salesRecord.hd_orders} HD`}
                               </p>
+                              {(salesRecord?.ly_sale || 0) > 0 && (
+                                <p className="text-[10px] text-gray-400">
+                                  LY {salesRecord.ly_sale.toFixed(0)}
+                                </p>
+                              )}
                             </>
                           ) : (
                             <span className="px-2 py-1 rounded-full bg-gray-100 text-gray-500 text-xs">
