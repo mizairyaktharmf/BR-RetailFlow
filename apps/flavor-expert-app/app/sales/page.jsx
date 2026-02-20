@@ -9,6 +9,7 @@ import {
   CheckCircle2,
   Camera,
   X,
+  Plus,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
@@ -40,10 +41,12 @@ import api from '@/services/api'
 //   const isLocked = !isWindowAvailable(window.id)
 // ============================================================
 
+const MAX_PHOTOS = 4
+
 const SECTIONS = [
-  { key: 'pos', label: 'POS', bg: 'bg-orange-500', ring: 'ring-orange-400', required: true },
-  { key: 'hd', label: 'HD', bg: 'bg-cyan-500', ring: 'ring-cyan-400', required: false },
-  { key: 'deliveroo', label: 'Deliveroo', bg: 'bg-teal-600', ring: 'ring-teal-400', required: false },
+  { key: 'pos', label: 'POS', bg: 'bg-orange-500', ring: 'ring-orange-400', borderColor: 'border-orange-200', required: true },
+  { key: 'hd', label: 'HD', bg: 'bg-cyan-500', ring: 'ring-cyan-400', borderColor: 'border-cyan-200', required: false },
+  { key: 'deliveroo', label: 'Deliveroo', bg: 'bg-teal-600', ring: 'ring-teal-400', borderColor: 'border-teal-200', required: false },
 ]
 
 export default function SalesPage() {
@@ -55,7 +58,8 @@ export default function SalesPage() {
   const [submittedWindows, setSubmittedWindows] = useState([])
   const [loadingWindows, setLoadingWindows] = useState(true)
 
-  const [photos, setPhotos] = useState({ pos: null, hd: null, deliveroo: null })
+  // Photos: { pos: [{ file, preview }], hd: [...], deliveroo: [...] }
+  const [photos, setPhotos] = useState({ pos: [], hd: [], deliveroo: [] })
   const fileRefs = { pos: useRef(null), hd: useRef(null), deliveroo: useRef(null) }
 
   useEffect(() => {
@@ -96,34 +100,45 @@ export default function SalesPage() {
   }
 
   const resetPhotos = () => {
-    Object.values(photos).forEach(p => { if (p?.preview) URL.revokeObjectURL(p.preview) })
-    setPhotos({ pos: null, hd: null, deliveroo: null })
+    Object.values(photos).forEach(arr =>
+      arr.forEach(p => { if (p?.preview) URL.revokeObjectURL(p.preview) })
+    )
+    setPhotos({ pos: [], hd: [], deliveroo: [] })
   }
 
-  const handlePhotoSelect = (key, e) => {
+  const addPhoto = (key, e) => {
     const file = e.target.files?.[0]
     if (!file) return
-    if (photos[key]?.preview) URL.revokeObjectURL(photos[key].preview)
-    setPhotos(prev => ({ ...prev, [key]: { file, preview: URL.createObjectURL(file) } }))
-  }
-
-  const removePhoto = (key) => {
-    if (photos[key]?.preview) URL.revokeObjectURL(photos[key].preview)
-    setPhotos(prev => ({ ...prev, [key]: null }))
+    if (photos[key].length >= MAX_PHOTOS) return
+    const preview = URL.createObjectURL(file)
+    setPhotos(prev => ({ ...prev, [key]: [...prev[key], { file, preview }] }))
+    // Reset input so same file can be selected again
     if (fileRefs[key]?.current) fileRefs[key].current.value = ''
   }
 
+  const removePhoto = (key, idx) => {
+    const photo = photos[key][idx]
+    if (photo?.preview) URL.revokeObjectURL(photo.preview)
+    setPhotos(prev => ({ ...prev, [key]: prev[key].filter((_, i) => i !== idx) }))
+  }
+
   const handleSubmit = async () => {
-    if (!photos.pos) { alert('Please add POS receipt photo'); return }
+    if (photos.pos.length === 0) { alert('Please add at least one POS receipt photo'); return }
     setSaving(true)
     try {
+      // Upload all photos per section, collect URLs
       const urls = {}
       for (const s of SECTIONS) {
-        if (photos[s.key]?.file) {
-          const result = await api.uploadSalesPhoto(photos[s.key].file)
-          urls[s.key] = result.url
+        if (photos[s.key].length > 0) {
+          const uploaded = []
+          for (const p of photos[s.key]) {
+            const result = await api.uploadSalesPhoto(p.file)
+            uploaded.push(result.url)
+          }
+          urls[s.key] = uploaded.join(',')
         }
       }
+
       await api.submitSales({
         branch_id: user.branch_id || 1,
         date: new Date().toISOString().split('T')[0],
@@ -134,6 +149,7 @@ export default function SalesPage() {
         hd_photo_url: urls.hd || null,
         deliveroo_photo_url: urls.deliveroo || null,
       })
+
       const updated = [...submittedWindows, selectedWindow]
       setSubmittedWindows(updated)
       resetPhotos()
@@ -152,7 +168,7 @@ export default function SalesPage() {
     }
   }
 
-  const photoCount = Object.values(photos).filter(p => p?.file).length
+  const totalPhotos = Object.values(photos).reduce((sum, arr) => sum + arr.length, 0)
 
   return (
     <div className="min-h-screen bg-gray-50 pb-24">
@@ -215,74 +231,79 @@ export default function SalesPage() {
             </Alert>
           ) : (
             <div className="space-y-3">
-              {/* Photo Upload Row */}
-              <div className="bg-white rounded-xl p-3 border border-gray-200">
-                <p className="text-xs font-semibold text-gray-500 uppercase mb-3">Upload Receipt Photos</p>
-                <div className="grid grid-cols-3 gap-3">
-                  {SECTIONS.map((s) => {
-                    const photo = photos[s.key]
-                    return (
-                      <div key={s.key} className="flex flex-col items-center gap-1.5">
-                        <input
-                          ref={fileRefs[s.key]}
-                          type="file"
-                          accept="image/*"
-                          capture="environment"
-                          className="hidden"
-                          onChange={(e) => handlePhotoSelect(s.key, e)}
-                        />
+              {/* Photo Sections */}
+              {SECTIONS.map((s) => {
+                const sectionPhotos = photos[s.key]
+                const canAdd = sectionPhotos.length < MAX_PHOTOS
 
-                        {photo?.preview ? (
-                          <div className="relative w-full aspect-square">
-                            <img
-                              src={photo.preview}
-                              alt={s.label}
-                              className={`w-full h-full rounded-xl object-cover ring-2 ${s.ring}`}
-                              onClick={() => fileRefs[s.key].current?.click()}
-                            />
-                            <button
-                              onClick={() => removePhoto(s.key)}
-                              className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-red-500 rounded-full flex items-center justify-center shadow"
-                            >
-                              <X className="w-3 h-3 text-white" />
-                            </button>
-                          </div>
-                        ) : (
-                          <button
-                            onClick={() => fileRefs[s.key].current?.click()}
-                            className="w-full aspect-square rounded-xl border-2 border-dashed border-gray-300 hover:border-gray-400 bg-gray-50 flex flex-col items-center justify-center gap-1 transition-all active:scale-95"
-                          >
-                            <Camera className="w-6 h-6 text-gray-400" />
-                          </button>
-                        )}
-
-                        <div className="text-center">
-                          <span className={`text-[11px] font-bold text-white px-2 py-0.5 rounded-full ${s.bg}`}>
-                            {s.label}
-                          </span>
-                          {s.required && !photo && (
-                            <p className="text-[9px] text-red-400 mt-0.5">Required</p>
-                          )}
-                          {!s.required && !photo && (
-                            <p className="text-[9px] text-gray-400 mt-0.5">Optional</p>
-                          )}
-                        </div>
+                return (
+                  <div key={s.key} className={`bg-white rounded-xl p-3 border ${s.borderColor}`}>
+                    {/* Section Header */}
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="flex items-center gap-2">
+                        <span className={`text-[11px] font-bold text-white px-2.5 py-0.5 rounded-full ${s.bg}`}>{s.label}</span>
+                        {s.required && <span className="text-[10px] text-red-400 font-medium">Required</span>}
+                        {!s.required && <span className="text-[10px] text-gray-400">Optional</span>}
                       </div>
-                    )
-                  })}
-                </div>
-              </div>
+                      <span className="text-[10px] text-gray-400">{sectionPhotos.length}/{MAX_PHOTOS}</span>
+                    </div>
+
+                    {/* Photos Grid */}
+                    <input
+                      ref={fileRefs[s.key]}
+                      type="file"
+                      accept="image/*"
+                      capture="environment"
+                      className="hidden"
+                      onChange={(e) => addPhoto(s.key, e)}
+                    />
+
+                    <div className="grid grid-cols-4 gap-2">
+                      {/* Existing photos */}
+                      {sectionPhotos.map((photo, idx) => (
+                        <div key={idx} className="relative aspect-square">
+                          <img
+                            src={photo.preview}
+                            alt={`${s.label} ${idx + 1}`}
+                            className={`w-full h-full rounded-lg object-cover ring-2 ${s.ring}`}
+                          />
+                          <button
+                            onClick={() => removePhoto(s.key, idx)}
+                            className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 rounded-full flex items-center justify-center shadow-sm"
+                          >
+                            <X className="w-3 h-3 text-white" />
+                          </button>
+                        </div>
+                      ))}
+
+                      {/* Add button */}
+                      {canAdd && (
+                        <button
+                          onClick={() => fileRefs[s.key].current?.click()}
+                          className="aspect-square rounded-lg border-2 border-dashed border-gray-300 hover:border-gray-400 bg-gray-50 flex flex-col items-center justify-center gap-0.5 transition-all active:scale-95"
+                        >
+                          {sectionPhotos.length === 0 ? (
+                            <Camera className="w-5 h-5 text-gray-400" />
+                          ) : (
+                            <Plus className="w-5 h-5 text-gray-400" />
+                          )}
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                )
+              })}
 
               {/* Submit */}
               <Button
                 onClick={handleSubmit}
-                disabled={saving || !photos.pos}
+                disabled={saving || photos.pos.length === 0}
                 className="w-full h-12 text-sm bg-orange-500 hover:bg-orange-600 disabled:bg-gray-300"
               >
                 {saving ? (
                   <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Uploading...</>
                 ) : (
-                  <><Save className="w-4 h-4 mr-2" />Submit {SALES_WINDOWS.find(w => w.id === selectedWindow)?.label} ({photoCount} photo{photoCount !== 1 ? 's' : ''})</>
+                  <><Save className="w-4 h-4 mr-2" />Submit {SALES_WINDOWS.find(w => w.id === selectedWindow)?.label} ({totalPhotos} photo{totalPhotos !== 1 ? 's' : ''})</>
                 )}
               </Button>
             </div>

@@ -48,10 +48,10 @@ class DailySales(Base):
     hd_gross_sales = Column(Float, nullable=True, default=0)
     hd_net_sales = Column(Float, nullable=True, default=0)
     hd_orders = Column(Integer, nullable=True, default=0)
-    hd_photo_url = Column(String(500), nullable=True)
+    hd_photo_url = Column(Text, nullable=True)
 
     # Deliveroo data
-    deliveroo_photo_url = Column(String(500), nullable=True)
+    deliveroo_photo_url = Column(Text, nullable=True)
 
     # POS manual entry fields (kept for backward compat)
     ly_sale = Column(Float, nullable=True, default=0)
@@ -72,8 +72,8 @@ class DailySales(Base):
     cake_count = Column(Integer, default=0)
     take_home_count = Column(Integer, default=0)
 
-    # Photo proof (URL to uploaded image, comma-separated for multiple)
-    photo_url = Column(String(500), nullable=True)
+    # Photo proof (comma-separated URLs for multiple images)
+    photo_url = Column(Text, nullable=True)
 
     # Who submitted
     submitted_by_id = Column(Integer, ForeignKey("users.id"), nullable=False)
