@@ -1,13 +1,15 @@
 """
 Sales router
-Handles daily sales submissions (manual entry)
+Handles daily sales submissions and photo uploads
 """
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
 from sqlalchemy.orm import Session
 from sqlalchemy import and_
 from typing import List
 from datetime import date
+import os
+import uuid
 import logging
 
 from utils.database import get_db
@@ -15,10 +17,14 @@ from utils.security import get_current_user
 from models.user import User
 from models.location import Branch
 from models.sales import DailySales, SalesWindowType
-from schemas.sales import DailySalesCreate, DailySalesResponse
+from schemas.sales import DailySalesCreate, DailySalesResponse, PhotoUploadResponse
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
+
+# Upload directory for sales photos
+UPLOAD_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "uploads", "sales")
+os.makedirs(UPLOAD_DIR, exist_ok=True)
 
 
 # ============== DAILY SALES ==============
@@ -46,6 +52,7 @@ def _build_sales_response(s) -> DailySalesResponse:
         hd_net_sales=getattr(s, 'hd_net_sales', None),
         hd_orders=getattr(s, 'hd_orders', None),
         hd_photo_url=getattr(s, 'hd_photo_url', None),
+        deliveroo_photo_url=getattr(s, 'deliveroo_photo_url', None),
         submitted_by_id=s.submitted_by_id,
         created_at=s.created_at,
     )
@@ -100,12 +107,15 @@ async def submit_daily_sales(
             existing.photo_url = data.photo_url
         if data.notes:
             existing.notes = data.notes
-        # Home Delivery fields
+        # Home Delivery
         _set(existing, 'hd_gross_sales', data.hd_gross_sales or 0)
         _set(existing, 'hd_net_sales', data.hd_net_sales or 0)
         _set(existing, 'hd_orders', data.hd_orders or 0)
         if data.hd_photo_url:
             _set(existing, 'hd_photo_url', data.hd_photo_url)
+        # Deliveroo
+        if data.deliveroo_photo_url:
+            _set(existing, 'deliveroo_photo_url', data.deliveroo_photo_url)
         db.commit()
         db.refresh(existing)
 
@@ -134,6 +144,7 @@ async def submit_daily_sales(
     _set(sales_entry, 'hd_net_sales', data.hd_net_sales or 0)
     _set(sales_entry, 'hd_orders', data.hd_orders or 0)
     _set(sales_entry, 'hd_photo_url', data.hd_photo_url)
+    _set(sales_entry, 'deliveroo_photo_url', data.deliveroo_photo_url)
 
     db.add(sales_entry)
     db.commit()
@@ -158,3 +169,29 @@ async def get_daily_sales(
     ).order_by(DailySales.created_at).all()
 
     return [_build_sales_response(s) for s in sales]
+
+
+# ============== PHOTO UPLOAD ==============
+
+@router.post("/upload-photo", response_model=PhotoUploadResponse)
+async def upload_sales_photo(
+    file: UploadFile = File(...),
+    current_user: User = Depends(get_current_user),
+):
+    """Upload a sales receipt photo"""
+    allowed_types = ["image/jpeg", "image/png", "image/webp", "image/heic"]
+    if file.content_type not in allowed_types:
+        raise HTTPException(status_code=400, detail="Invalid file type. Use JPEG, PNG, or WebP.")
+
+    ext = file.filename.split(".")[-1] if "." in file.filename else "jpg"
+    filename = f"{uuid.uuid4().hex}.{ext}"
+    filepath = os.path.join(UPLOAD_DIR, filename)
+
+    content = await file.read()
+    with open(filepath, "wb") as f:
+        f.write(content)
+
+    return PhotoUploadResponse(
+        url=f"/uploads/sales/{filename}",
+        filename=filename,
+    )

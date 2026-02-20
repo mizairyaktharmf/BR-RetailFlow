@@ -187,6 +187,21 @@ class ApiService {
     return this.request(`/sales/daily?branch_id=${branchId}&date=${date}`)
   }
 
+  async uploadSalesPhoto(file) {
+    const formData = new FormData()
+    formData.append('file', file)
+
+    const token = this.getToken()
+    const response = await fetch(`${this.baseUrl}/sales/upload-photo`, {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${token}` },
+      body: formData,
+    })
+
+    if (!response.ok) throw new Error('Failed to upload photo')
+    return response.json()
+  }
+
   // ============== CUP USAGE ==============
 
   async submitCupUsage(data) {

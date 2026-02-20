@@ -8,28 +8,30 @@ from datetime import datetime, date
 
 
 class DailySalesCreate(BaseModel):
-    """Schema for creating a daily sales entry (manual form)"""
+    """Schema for creating a daily sales entry"""
     branch_id: int
     date: date
     sales_window: str  # 3pm, 7pm, 9pm, closing
-    # POS fields (manual entry)
-    total_sales: float = Field(..., ge=0)  # Net sales
-    transaction_count: int = Field(default=0, ge=0)  # TY GC
+    # POS
+    total_sales: float = Field(default=0, ge=0)
+    transaction_count: int = Field(default=0, ge=0)
     gross_sales: Optional[float] = 0
     cash_sales: Optional[float] = 0
-    ly_sale: Optional[float] = 0  # Last Year Sale
+    ly_sale: Optional[float] = 0
     cake_units: Optional[int] = 0
     hand_pack_units: Optional[int] = 0
-    sundae_pct: Optional[float] = 0  # Sundae %
-    cups_cones_pct: Optional[float] = 0  # Cups & Cones %
+    sundae_pct: Optional[float] = 0
+    cups_cones_pct: Optional[float] = 0
     category_data: Optional[str] = None
     photo_url: Optional[str] = None
     notes: Optional[str] = None
-    # Home Delivery fields (optional)
+    # Home Delivery (optional)
     hd_gross_sales: Optional[float] = 0
     hd_net_sales: Optional[float] = 0
     hd_orders: Optional[int] = 0
     hd_photo_url: Optional[str] = None
+    # Deliveroo (optional)
+    deliveroo_photo_url: Optional[str] = None
 
 
 class DailySalesResponse(BaseModel):
@@ -38,7 +40,6 @@ class DailySalesResponse(BaseModel):
     branch_id: int
     date: date
     sales_window: str
-    # POS fields
     total_sales: float
     transaction_count: int
     gross_sales: Optional[float] = None
@@ -51,13 +52,19 @@ class DailySalesResponse(BaseModel):
     category_data: Optional[str] = None
     photo_url: Optional[str] = None
     notes: Optional[str] = None
-    # Home Delivery fields
     hd_gross_sales: Optional[float] = None
     hd_net_sales: Optional[float] = None
     hd_orders: Optional[int] = None
     hd_photo_url: Optional[str] = None
+    deliveroo_photo_url: Optional[str] = None
     submitted_by_id: int
     created_at: datetime
 
     class Config:
         from_attributes = True
+
+
+class PhotoUploadResponse(BaseModel):
+    """Schema for photo upload response"""
+    url: str
+    filename: str

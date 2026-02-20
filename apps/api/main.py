@@ -100,6 +100,13 @@ def run_migrations():
                 conn.commit()
                 logger.info("Migration: Manual POS columns added successfully")
 
+            # Deliveroo column
+            if 'deliveroo_photo_url' not in ds_columns:
+                logger.info("Migration: Adding deliveroo_photo_url to daily_sales table")
+                conn.execute(text("ALTER TABLE daily_sales ADD COLUMN deliveroo_photo_url VARCHAR(500)"))
+                conn.commit()
+                logger.info("Migration: deliveroo_photo_url added successfully")
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):

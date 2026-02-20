@@ -44,18 +44,21 @@ class DailySales(Base):
     # Category sales data (JSON: [{name, qty, sales, pct}, ...])
     category_data = Column(Text, nullable=True)
 
-    # Home Delivery data (optional, entered manually)
+    # Home Delivery data
     hd_gross_sales = Column(Float, nullable=True, default=0)
     hd_net_sales = Column(Float, nullable=True, default=0)
-    hd_orders = Column(Integer, nullable=True, default=0)  # Orders / GC from HD
+    hd_orders = Column(Integer, nullable=True, default=0)
     hd_photo_url = Column(String(500), nullable=True)
 
-    # POS manual entry fields
-    ly_sale = Column(Float, nullable=True, default=0)  # Last Year Sale
+    # Deliveroo data
+    deliveroo_photo_url = Column(String(500), nullable=True)
+
+    # POS manual entry fields (kept for backward compat)
+    ly_sale = Column(Float, nullable=True, default=0)
     cake_units = Column(Integer, nullable=True, default=0)
     hand_pack_units = Column(Integer, nullable=True, default=0)
-    sundae_pct = Column(Float, nullable=True, default=0)  # Sundae %
-    cups_cones_pct = Column(Float, nullable=True, default=0)  # Cups & Cones %
+    sundae_pct = Column(Float, nullable=True, default=0)
+    cups_cones_pct = Column(Float, nullable=True, default=0)
 
     # Scoop counts by type (legacy, kept for backward compat)
     kids_scoop_count = Column(Integer, default=0)

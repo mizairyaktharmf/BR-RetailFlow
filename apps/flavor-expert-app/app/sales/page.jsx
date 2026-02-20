@@ -1,27 +1,21 @@
 "use client"
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import {
   ArrowLeft,
   Save,
   Loader2,
   CheckCircle2,
-  DollarSign,
-  Users,
-  Cake,
-  IceCream,
-  TrendingDown,
-  Package,
-  Truck,
+  Camera,
+  X,
   Store,
-  Percent
+  Truck,
+  Image as ImageIcon,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
-import { Label } from '@/components/ui/label'
 import { formatDate, SALES_WINDOWS } from '@/lib/utils'
 import api from '@/services/api'
 
@@ -50,6 +44,49 @@ import api from '@/services/api'
 //   const isLocked = !isWindowAvailable(window.id)
 // ============================================================
 
+// Photo section config
+const SECTIONS = [
+  {
+    key: 'pos',
+    label: 'POS Receipt',
+    icon: Store,
+    color: 'orange',
+    bgFrom: 'from-orange-50',
+    border: 'border-orange-200',
+    iconBg: 'bg-orange-100',
+    iconColor: 'text-orange-500',
+    textColor: 'text-orange-700',
+    ringColor: 'ring-orange-300',
+    required: true,
+  },
+  {
+    key: 'hd',
+    label: 'Home Delivery',
+    icon: Truck,
+    color: 'cyan',
+    bgFrom: 'from-cyan-50',
+    border: 'border-cyan-200',
+    iconBg: 'bg-cyan-100',
+    iconColor: 'text-cyan-500',
+    textColor: 'text-cyan-700',
+    ringColor: 'ring-cyan-300',
+    required: false,
+  },
+  {
+    key: 'deliveroo',
+    label: 'Deliveroo',
+    icon: Truck,
+    color: 'teal',
+    bgFrom: 'from-teal-50',
+    border: 'border-teal-200',
+    iconBg: 'bg-teal-100',
+    iconColor: 'text-teal-600',
+    textColor: 'text-teal-700',
+    ringColor: 'ring-teal-300',
+    required: false,
+  },
+]
+
 export default function SalesPage() {
   const router = useRouter()
   const [user, setUser] = useState(null)
@@ -59,20 +96,19 @@ export default function SalesPage() {
   const [submittedWindows, setSubmittedWindows] = useState([])
   const [loadingWindows, setLoadingWindows] = useState(true)
 
-  // POS fields
-  const [netSale, setNetSale] = useState('')
-  const [lySale, setLySale] = useState('')
-  const [tyGc, setTyGc] = useState('')
-  const [cakeUnits, setCakeUnits] = useState('')
-  const [handPackUnits, setHandPackUnits] = useState('')
-  const [sundaePct, setSundaePct] = useState('')
-  const [cupsConesPct, setCupsConesPct] = useState('')
+  // Photos state: { pos: { file, preview, uploading }, hd: {...}, deliveroo: {...} }
+  const [photos, setPhotos] = useState({
+    pos: null,
+    hd: null,
+    deliveroo: null,
+  })
 
-  // HD fields (optional)
-  const [showHd, setShowHd] = useState(false)
-  const [hdNetSales, setHdNetSales] = useState('')
-  const [hdGrossSales, setHdGrossSales] = useState('')
-  const [hdOrders, setHdOrders] = useState('')
+  // File input refs
+  const fileRefs = {
+    pos: useRef(null),
+    hd: useRef(null),
+    deliveroo: useRef(null),
+  }
 
   useEffect(() => {
     const userData = localStorage.getItem('br_user')
@@ -114,54 +150,89 @@ export default function SalesPage() {
   const handleWindowSelect = (windowId) => {
     if (submittedWindows.includes(windowId)) return
     setSelectedWindow(windowId)
-    resetForm()
+    resetPhotos()
   }
 
-  const resetForm = () => {
-    setNetSale('')
-    setLySale('')
-    setTyGc('')
-    setCakeUnits('')
-    setHandPackUnits('')
-    setSundaePct('')
-    setCupsConesPct('')
-    setShowHd(false)
-    setHdNetSales('')
-    setHdGrossSales('')
-    setHdOrders('')
+  const resetPhotos = () => {
+    // Revoke old previews
+    Object.values(photos).forEach(p => {
+      if (p?.preview) URL.revokeObjectURL(p.preview)
+    })
+    setPhotos({ pos: null, hd: null, deliveroo: null })
+  }
+
+  const handlePhotoSelect = (sectionKey, e) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    // Revoke old preview
+    if (photos[sectionKey]?.preview) {
+      URL.revokeObjectURL(photos[sectionKey].preview)
+    }
+
+    const preview = URL.createObjectURL(file)
+    setPhotos(prev => ({
+      ...prev,
+      [sectionKey]: { file, preview, uploading: false },
+    }))
+  }
+
+  const removePhoto = (sectionKey) => {
+    if (photos[sectionKey]?.preview) {
+      URL.revokeObjectURL(photos[sectionKey].preview)
+    }
+    setPhotos(prev => ({ ...prev, [sectionKey]: null }))
+    // Reset file input
+    if (fileRefs[sectionKey]?.current) {
+      fileRefs[sectionKey].current.value = ''
+    }
   }
 
   const handleSubmit = async () => {
-    if (!netSale || parseFloat(netSale) <= 0) {
-      alert('Please enter Net Sale amount')
+    if (!photos.pos) {
+      alert('Please take a POS receipt photo')
       return
     }
 
     setSaving(true)
 
     try {
+      // Upload photos that exist
+      const uploadedUrls = {}
+
+      for (const section of SECTIONS) {
+        const photo = photos[section.key]
+        if (photo?.file) {
+          setPhotos(prev => ({
+            ...prev,
+            [section.key]: { ...prev[section.key], uploading: true },
+          }))
+          const result = await api.uploadSalesPhoto(photo.file)
+          uploadedUrls[section.key] = result.url
+          setPhotos(prev => ({
+            ...prev,
+            [section.key]: { ...prev[section.key], uploading: false },
+          }))
+        }
+      }
+
+      // Submit sales record with photo URLs
       const submitData = {
         branch_id: user.branch_id || 1,
         date: new Date().toISOString().split('T')[0],
         sales_window: selectedWindow,
-        total_sales: parseFloat(netSale) || 0,
-        transaction_count: parseInt(tyGc) || 0,
-        ly_sale: parseFloat(lySale) || 0,
-        cake_units: parseInt(cakeUnits) || 0,
-        hand_pack_units: parseInt(handPackUnits) || 0,
-        sundae_pct: parseFloat(sundaePct) || 0,
-        cups_cones_pct: parseFloat(cupsConesPct) || 0,
-        // HD data (optional)
-        hd_net_sales: showHd ? (parseFloat(hdNetSales) || 0) : 0,
-        hd_gross_sales: showHd ? (parseFloat(hdGrossSales) || 0) : 0,
-        hd_orders: showHd ? (parseInt(hdOrders) || 0) : 0,
+        total_sales: 0,
+        transaction_count: 0,
+        photo_url: uploadedUrls.pos || null,
+        hd_photo_url: uploadedUrls.hd || null,
+        deliveroo_photo_url: uploadedUrls.deliveroo || null,
       }
 
       await api.submitSales(submitData)
 
       const updatedSubmitted = [...submittedWindows, selectedWindow]
       setSubmittedWindows(updatedSubmitted)
-      resetForm()
+      resetPhotos()
 
       const nextWindow = SALES_WINDOWS.find(w => !updatedSubmitted.includes(w.id))
       if (nextWindow) {
@@ -177,6 +248,8 @@ export default function SalesPage() {
       setSaving(false)
     }
   }
+
+  const photoCount = Object.values(photos).filter(p => p?.file).length
 
   return (
     <div className="min-h-screen bg-gray-50 pb-24">
@@ -245,7 +318,7 @@ export default function SalesPage() {
         )}
       </div>
 
-      {/* Main Form */}
+      {/* Main Content */}
       <div className="px-4">
         {!selectedWindow || loadingWindows ? null : submittedWindows.includes(selectedWindow) ? (
           <Alert variant="success" className="bg-green-50 border-green-200">
@@ -257,221 +330,105 @@ export default function SalesPage() {
           </Alert>
         ) : (
           <div className="space-y-4">
+            {/* Photo Sections */}
+            {SECTIONS.map((section) => {
+              const Icon = section.icon
+              const photo = photos[section.key]
 
-            {/* ========== POS SECTION ========== */}
-            <Card className="border-orange-200">
-              <CardHeader className="pb-3">
-                <CardTitle className="text-base flex items-center gap-2">
-                  <Store className="w-5 h-5 text-orange-500" />
-                  POS Sales
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                {/* Net Sale & LY Sale */}
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="p-3 rounded-lg bg-green-50 border border-green-100">
-                    <div className="flex items-center gap-1.5 mb-1.5">
-                      <DollarSign className="w-3.5 h-3.5 text-green-600" />
-                      <Label className="text-xs font-semibold text-green-800">NET SALE *</Label>
-                    </div>
-                    <Input
-                      type="number"
-                      inputMode="decimal"
-                      placeholder="0.00"
-                      value={netSale}
-                      onChange={(e) => setNetSale(e.target.value)}
-                      className="h-10 text-sm font-bold bg-white border-green-200"
-                    />
-                  </div>
-                  <div className="p-3 rounded-lg bg-gray-50 border border-gray-200">
-                    <div className="flex items-center gap-1.5 mb-1.5">
-                      <TrendingDown className="w-3.5 h-3.5 text-gray-500" />
-                      <Label className="text-xs font-semibold text-gray-600">LY SALE</Label>
-                    </div>
-                    <Input
-                      type="number"
-                      inputMode="decimal"
-                      placeholder="0.00"
-                      value={lySale}
-                      onChange={(e) => setLySale(e.target.value)}
-                      className="h-10 text-sm font-bold bg-white border-gray-200"
-                    />
-                  </div>
-                </div>
-
-                {/* TY GC */}
-                <div className="p-3 rounded-lg bg-purple-50 border border-purple-100">
-                  <div className="flex items-center gap-1.5 mb-1.5">
-                    <Users className="w-3.5 h-3.5 text-purple-600" />
-                    <Label className="text-xs font-semibold text-purple-800">TY GC (Guest Count)</Label>
-                  </div>
-                  <Input
-                    type="number"
-                    inputMode="numeric"
-                    placeholder="0"
-                    value={tyGc}
-                    onChange={(e) => setTyGc(e.target.value)}
-                    className="h-10 text-sm font-bold bg-white border-purple-200"
-                  />
-                </div>
-
-                {/* Cake Units & Hand Pack Units */}
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="p-3 rounded-lg bg-pink-50 border border-pink-100">
-                    <div className="flex items-center gap-1.5 mb-1.5">
-                      <Cake className="w-3.5 h-3.5 text-pink-600" />
-                      <Label className="text-xs font-semibold text-pink-800">CAKE UNITS</Label>
-                    </div>
-                    <Input
-                      type="number"
-                      inputMode="numeric"
-                      placeholder="0"
-                      value={cakeUnits}
-                      onChange={(e) => setCakeUnits(e.target.value)}
-                      className="h-10 text-sm font-bold bg-white border-pink-200"
-                    />
-                  </div>
-                  <div className="p-3 rounded-lg bg-indigo-50 border border-indigo-100">
-                    <div className="flex items-center gap-1.5 mb-1.5">
-                      <Package className="w-3.5 h-3.5 text-indigo-600" />
-                      <Label className="text-xs font-semibold text-indigo-800">HAND PACK UNITS</Label>
-                    </div>
-                    <Input
-                      type="number"
-                      inputMode="numeric"
-                      placeholder="0"
-                      value={handPackUnits}
-                      onChange={(e) => setHandPackUnits(e.target.value)}
-                      className="h-10 text-sm font-bold bg-white border-indigo-200"
-                    />
-                  </div>
-                </div>
-
-                {/* Sundae % & Cups & Cones % */}
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="p-3 rounded-lg bg-amber-50 border border-amber-100">
-                    <div className="flex items-center gap-1.5 mb-1.5">
-                      <Percent className="w-3.5 h-3.5 text-amber-600" />
-                      <Label className="text-xs font-semibold text-amber-800">SUNDAE %</Label>
-                    </div>
-                    <Input
-                      type="number"
-                      inputMode="decimal"
-                      placeholder="0"
-                      value={sundaePct}
-                      onChange={(e) => setSundaePct(e.target.value)}
-                      className="h-10 text-sm font-bold bg-white border-amber-200"
-                    />
-                  </div>
-                  <div className="p-3 rounded-lg bg-blue-50 border border-blue-100">
-                    <div className="flex items-center gap-1.5 mb-1.5">
-                      <IceCream className="w-3.5 h-3.5 text-blue-600" />
-                      <Label className="text-xs font-semibold text-blue-800">CUPS & CONES %</Label>
-                    </div>
-                    <Input
-                      type="number"
-                      inputMode="decimal"
-                      placeholder="0"
-                      value={cupsConesPct}
-                      onChange={(e) => setCupsConesPct(e.target.value)}
-                      className="h-10 text-sm font-bold bg-white border-blue-200"
-                    />
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* ========== HOME DELIVERY SECTION (Optional) ========== */}
-            {!showHd ? (
-              <button
-                onClick={() => setShowHd(true)}
-                className="w-full flex items-center gap-3 p-4 rounded-xl border-2 border-dashed border-cyan-300 hover:border-cyan-400 hover:bg-cyan-50 transition-colors"
-              >
-                <Truck className="w-5 h-5 text-cyan-500" />
-                <span className="text-sm font-medium text-cyan-700">+ Add Home Delivery (Optional)</span>
-              </button>
-            ) : (
-              <Card className="border-cyan-200">
-                <CardHeader className="pb-3">
-                  <div className="flex items-center justify-between">
-                    <CardTitle className="text-base flex items-center gap-2">
-                      <Truck className="w-5 h-5 text-cyan-500" />
-                      Home Delivery
+              return (
+                <Card key={section.key} className={section.border}>
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-base flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <div className={`w-8 h-8 rounded-lg ${section.iconBg} flex items-center justify-center`}>
+                          <Icon className={`w-4 h-4 ${section.iconColor}`} />
+                        </div>
+                        <span>{section.label}</span>
+                        {section.required && <span className="text-red-500 text-xs">*</span>}
+                      </div>
+                      {!section.required && !photo && (
+                        <span className="text-[10px] uppercase text-gray-400 font-medium">Optional</span>
+                      )}
                     </CardTitle>
-                    <button
-                      onClick={() => { setShowHd(false); setHdNetSales(''); setHdGrossSales(''); setHdOrders('') }}
-                      className="text-xs text-gray-400 hover:text-red-500"
-                    >
-                      Remove
-                    </button>
-                  </div>
-                  <CardDescription className="text-xs">Optional — for branches with home delivery</CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-3">
-                  <div className="grid grid-cols-2 gap-3">
-                    <div className="p-3 rounded-lg bg-green-50 border border-green-100">
-                      <div className="flex items-center gap-1.5 mb-1.5">
-                        <DollarSign className="w-3.5 h-3.5 text-green-600" />
-                        <Label className="text-xs font-semibold text-green-800">Net Sales</Label>
-                      </div>
-                      <Input
-                        type="number"
-                        inputMode="decimal"
-                        placeholder="0.00"
-                        value={hdNetSales}
-                        onChange={(e) => setHdNetSales(e.target.value)}
-                        className="h-10 text-sm font-bold bg-white border-green-200"
-                      />
-                    </div>
-                    <div className="p-3 rounded-lg bg-blue-50 border border-blue-100">
-                      <div className="flex items-center gap-1.5 mb-1.5">
-                        <DollarSign className="w-3.5 h-3.5 text-blue-600" />
-                        <Label className="text-xs font-semibold text-blue-800">Gross Sales</Label>
-                      </div>
-                      <Input
-                        type="number"
-                        inputMode="decimal"
-                        placeholder="0.00"
-                        value={hdGrossSales}
-                        onChange={(e) => setHdGrossSales(e.target.value)}
-                        className="h-10 text-sm font-bold bg-white border-blue-200"
-                      />
-                    </div>
-                  </div>
-                  <div className="p-3 rounded-lg bg-purple-50 border border-purple-100">
-                    <div className="flex items-center gap-1.5 mb-1.5">
-                      <Users className="w-3.5 h-3.5 text-purple-600" />
-                      <Label className="text-xs font-semibold text-purple-800">Orders / GC</Label>
-                    </div>
-                    <Input
-                      type="number"
-                      inputMode="numeric"
-                      placeholder="0"
-                      value={hdOrders}
-                      onChange={(e) => setHdOrders(e.target.value)}
-                      className="h-10 text-sm font-bold bg-white border-purple-200"
+                  </CardHeader>
+                  <CardContent>
+                    {/* Hidden file input */}
+                    <input
+                      ref={fileRefs[section.key]}
+                      type="file"
+                      accept="image/*"
+                      capture="environment"
+                      className="hidden"
+                      onChange={(e) => handlePhotoSelect(section.key, e)}
                     />
-                  </div>
-                </CardContent>
-              </Card>
-            )}
 
-            {/* ========== SUBMIT BUTTON ========== */}
+                    {photo?.preview ? (
+                      /* Photo Preview */
+                      <div className="relative">
+                        <img
+                          src={photo.preview}
+                          alt={section.label}
+                          className={`w-full rounded-xl object-cover max-h-64 ring-2 ${section.ringColor}`}
+                        />
+                        {photo.uploading && (
+                          <div className="absolute inset-0 bg-black/40 rounded-xl flex items-center justify-center">
+                            <Loader2 className="w-8 h-8 animate-spin text-white" />
+                          </div>
+                        )}
+                        {/* Remove button */}
+                        <button
+                          onClick={() => removePhoto(section.key)}
+                          className="absolute top-2 right-2 w-8 h-8 bg-black/60 hover:bg-black/80 rounded-full flex items-center justify-center transition-colors"
+                        >
+                          <X className="w-4 h-4 text-white" />
+                        </button>
+                        {/* Retake button */}
+                        <button
+                          onClick={() => fileRefs[section.key].current?.click()}
+                          className="absolute bottom-2 right-2 px-3 py-1.5 bg-black/60 hover:bg-black/80 rounded-lg flex items-center gap-1.5 transition-colors"
+                        >
+                          <Camera className="w-3.5 h-3.5 text-white" />
+                          <span className="text-xs text-white font-medium">Retake</span>
+                        </button>
+                      </div>
+                    ) : (
+                      /* Capture Button */
+                      <button
+                        onClick={() => fileRefs[section.key].current?.click()}
+                        className={`w-full py-10 rounded-xl border-2 border-dashed ${section.border} bg-gradient-to-b ${section.bgFrom} to-white hover:shadow-md transition-all flex flex-col items-center gap-3 active:scale-[0.98]`}
+                      >
+                        <div className={`w-14 h-14 rounded-2xl ${section.iconBg} flex items-center justify-center`}>
+                          <Camera className={`w-7 h-7 ${section.iconColor}`} />
+                        </div>
+                        <div className="text-center">
+                          <p className={`text-sm font-semibold ${section.textColor}`}>
+                            Tap to take photo
+                          </p>
+                          <p className="text-xs text-gray-400 mt-0.5">or select from gallery</p>
+                        </div>
+                      </button>
+                    )}
+                  </CardContent>
+                </Card>
+              )
+            })}
+
+            {/* Submit Button */}
             <Button
               onClick={handleSubmit}
-              disabled={saving || !netSale || parseFloat(netSale) <= 0}
+              disabled={saving || !photos.pos}
               className="w-full h-14 text-base bg-orange-500 hover:bg-orange-600 disabled:bg-gray-300"
               size="lg"
             >
               {saving ? (
                 <>
                   <Loader2 className="w-5 h-5 mr-2 animate-spin" />
-                  Submitting...
+                  Uploading {photoCount} photo{photoCount !== 1 ? 's' : ''}...
                 </>
               ) : (
                 <>
                   <Save className="w-5 h-5 mr-2" />
-                  Submit {SALES_WINDOWS.find(w => w.id === selectedWindow)?.label || ''} Report
+                  Submit {SALES_WINDOWS.find(w => w.id === selectedWindow)?.label || ''} ({photoCount} photo{photoCount !== 1 ? 's' : ''})
                 </>
               )}
             </Button>
