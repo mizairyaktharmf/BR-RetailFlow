@@ -225,3 +225,86 @@ class BranchBudget(Base):
 
     def __repr__(self):
         return f"<BranchBudget {self.branch_id} {self.year}-{self.month}>"
+
+
+class DailyBudget(Base):
+    """
+    Daily Budget model
+    Per-day budget targets extracted from DAILY SALES TRACKER sheet photos
+    """
+    __tablename__ = "daily_budgets"
+
+    id = Column(Integer, primary_key=True, index=True)
+
+    branch_id = Column(Integer, ForeignKey("branches.id"), nullable=False)
+    budget_date = Column(Date, nullable=False, index=True)
+    day_name = Column(String(3), nullable=True)  # Sun, Mon, Tue...
+
+    # Days Sales
+    ly_sales = Column(Float, nullable=True, default=0)  # 2025 actual
+    budget_amount = Column(Float, nullable=False, default=0)  # 2026 target
+
+    # Days Guest Count
+    ly_gc = Column(Integer, nullable=True, default=0)  # 2025 guest count
+    budget_gc = Column(Integer, nullable=True, default=0)  # Calculated target GC
+
+    # MTD (Month-To-Date cumulative)
+    mtd_ly_sales = Column(Float, nullable=True, default=0)
+    mtd_budget = Column(Float, nullable=True, default=0)
+
+    # LY KPIs for reference
+    ly_atv = Column(Float, nullable=True, default=0)  # LY ATV for that day
+
+    # Day info (legacy compat)
+    day_of_week = Column(String(10), nullable=True)
+    notes = Column(Text, nullable=True)
+
+    # Who uploaded
+    set_by = Column(Integer, ForeignKey("users.id"), nullable=True)
+
+    # Timestamps
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+
+    # Relationships
+    branch = relationship("Branch")
+
+    def __repr__(self):
+        return f"<DailyBudget {self.branch_id} {self.budget_date}>"
+
+
+class BudgetUpload(Base):
+    """
+    Budget Upload log
+    Tracks each budget sheet photo upload with KPIs from sheet footer
+    """
+    __tablename__ = "budget_uploads"
+
+    id = Column(Integer, primary_key=True, index=True)
+
+    branch_id = Column(Integer, ForeignKey("branches.id"), nullable=False)
+    parlor_name = Column(String(100), nullable=True)
+    month = Column(String(7), nullable=False)  # YYYY-MM
+    area_manager = Column(String(100), nullable=True)
+    days_count = Column(Integer, nullable=True)
+    total_budget = Column(Float, nullable=True)
+    total_ly_sales = Column(Float, nullable=True)
+    total_ly_gc = Column(Integer, nullable=True)
+
+    # KPIs from sheet footer
+    ly_atv = Column(Float, nullable=True)
+    ly_auv = Column(Float, nullable=True)
+    ly_cake_qty = Column(Float, nullable=True)
+    ly_hp_qty = Column(Float, nullable=True)
+
+    uploaded_by = Column(Integer, ForeignKey("users.id"), nullable=True)
+    status = Column(String(20), nullable=True, default="confirmed")
+
+    # Timestamps
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    # Relationships
+    branch = relationship("Branch")
+
+    def __repr__(self):
+        return f"<BudgetUpload {self.branch_id} {self.month}>"

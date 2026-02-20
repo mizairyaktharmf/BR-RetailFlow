@@ -8,7 +8,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 import logging
 
-from routers import auth, users, territories, areas, branches, flavors, inventory, analytics, cake, sales
+from routers import auth, users, territories, areas, branches, flavors, inventory, analytics, cake, sales, budget
 from utils.database import engine, Base
 from utils.config import settings
 
@@ -121,6 +121,35 @@ def run_migrations():
                 conn.commit()
                 logger.info("Migration: items_data added successfully")
 
+        # Migrate daily_budgets table
+        if 'daily_budgets' in inspector.get_table_names():
+            db_columns = [c['name'] for c in inspector.get_columns('daily_budgets')]
+            if 'day_name' not in db_columns:
+                logger.info("Migration: Adding new columns to daily_budgets table")
+                conn.execute(text("ALTER TABLE daily_budgets ADD COLUMN day_name VARCHAR(3)"))
+                conn.execute(text("ALTER TABLE daily_budgets ADD COLUMN mtd_ly_sales FLOAT DEFAULT 0"))
+                conn.execute(text("ALTER TABLE daily_budgets ADD COLUMN mtd_budget FLOAT DEFAULT 0"))
+                conn.execute(text("ALTER TABLE daily_budgets ADD COLUMN ly_atv FLOAT DEFAULT 0"))
+                conn.commit()
+                logger.info("Migration: daily_budgets new columns added")
+
+        # Migrate budget_uploads table
+        if 'budget_uploads' in inspector.get_table_names():
+            bu_columns = [c['name'] for c in inspector.get_columns('budget_uploads')]
+            if 'parlor_name' not in bu_columns:
+                logger.info("Migration: Adding new columns to budget_uploads table")
+                conn.execute(text("ALTER TABLE budget_uploads ADD COLUMN parlor_name VARCHAR(100)"))
+                conn.execute(text("ALTER TABLE budget_uploads ADD COLUMN area_manager VARCHAR(100)"))
+                conn.execute(text("ALTER TABLE budget_uploads ADD COLUMN total_ly_sales FLOAT"))
+                conn.execute(text("ALTER TABLE budget_uploads ADD COLUMN total_ly_gc INTEGER"))
+                conn.execute(text("ALTER TABLE budget_uploads ADD COLUMN ly_atv FLOAT"))
+                conn.execute(text("ALTER TABLE budget_uploads ADD COLUMN ly_auv FLOAT"))
+                conn.execute(text("ALTER TABLE budget_uploads ADD COLUMN ly_cake_qty FLOAT"))
+                conn.execute(text("ALTER TABLE budget_uploads ADD COLUMN ly_hp_qty FLOAT"))
+                conn.execute(text("ALTER TABLE budget_uploads ADD COLUMN status VARCHAR(20) DEFAULT 'confirmed'"))
+                conn.commit()
+                logger.info("Migration: budget_uploads new columns added")
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -169,6 +198,7 @@ app.include_router(inventory.router, prefix="/api/v1/inventory", tags=["Inventor
 app.include_router(analytics.router, prefix="/api/v1/analytics", tags=["Analytics"])
 app.include_router(cake.router, prefix="/api/v1/cake", tags=["Cake Inventory"])
 app.include_router(sales.router, prefix="/api/v1/sales", tags=["Sales"])
+app.include_router(budget.router, prefix="/api/v1/budget", tags=["Budget"])
 
 
 @app.get("/")

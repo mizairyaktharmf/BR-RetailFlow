@@ -414,6 +414,48 @@ class ApiService {
   async getCakeAlertConfigs(branchId) {
     return this.request(`/cake/cake-stock/alerts/config/${branchId}`)
   }
+
+  // ============ BUDGET ============
+  async uploadBudgetSheet(file, branchId) {
+    const formData = new FormData()
+    formData.append('file', file)
+
+    const token = this.getToken()
+    const response = await fetch(
+      `${this.baseUrl}/budget/upload?branch_id=${branchId}`,
+      {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}` },
+        body: formData,
+      }
+    )
+
+    if (!response.ok) throw new Error('Budget extraction failed')
+    return response.json()
+  }
+
+  async confirmBudget(data) {
+    return this.request('/budget/confirm', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    })
+  }
+
+  async getMonthBudget(branchId, month) {
+    return this.request(`/budget/month?branch_id=${branchId}&month=${month}`)
+  }
+
+  async checkBudget(branchId, month) {
+    return this.request(`/budget/check/${branchId}?month=${month}`)
+  }
+
+  async getSmartAdvisor(branchId, date) {
+    return this.request(`/budget/advisor/${branchId}?date=${date}`)
+  }
+
+  async getTrackerOverview(date) {
+    return this.request(`/budget/tracker-overview?date=${date}`)
+  }
 }
 
 const api = new ApiService()
