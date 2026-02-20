@@ -51,7 +51,13 @@ class DailySales(Base):
     hd_photo_url = Column(Text, nullable=True)
 
     # Deliveroo data
+    deliveroo_gross_sales = Column(Float, nullable=True, default=0)
+    deliveroo_net_sales = Column(Float, nullable=True, default=0)
+    deliveroo_orders = Column(Integer, nullable=True, default=0)
     deliveroo_photo_url = Column(Text, nullable=True)
+
+    # Items breakdown (JSON: [{code, name, category, qty, sales, pct}, ...])
+    items_data = Column(Text, nullable=True)
 
     # POS manual entry fields (kept for backward compat)
     ly_sale = Column(Float, nullable=True, default=0)

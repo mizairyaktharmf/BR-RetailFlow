@@ -100,12 +100,26 @@ def run_migrations():
                 conn.commit()
                 logger.info("Migration: Manual POS columns added successfully")
 
-            # Deliveroo column
+            # Deliveroo columns
             if 'deliveroo_photo_url' not in ds_columns:
                 logger.info("Migration: Adding deliveroo_photo_url to daily_sales table")
                 conn.execute(text("ALTER TABLE daily_sales ADD COLUMN deliveroo_photo_url VARCHAR(500)"))
                 conn.commit()
                 logger.info("Migration: deliveroo_photo_url added successfully")
+
+            if 'deliveroo_gross_sales' not in ds_columns:
+                logger.info("Migration: Adding Deliveroo numeric columns to daily_sales table")
+                conn.execute(text("ALTER TABLE daily_sales ADD COLUMN deliveroo_gross_sales FLOAT DEFAULT 0"))
+                conn.execute(text("ALTER TABLE daily_sales ADD COLUMN deliveroo_net_sales FLOAT DEFAULT 0"))
+                conn.execute(text("ALTER TABLE daily_sales ADD COLUMN deliveroo_orders INTEGER DEFAULT 0"))
+                conn.commit()
+                logger.info("Migration: Deliveroo numeric columns added successfully")
+
+            if 'items_data' not in ds_columns:
+                logger.info("Migration: Adding items_data to daily_sales table")
+                conn.execute(text("ALTER TABLE daily_sales ADD COLUMN items_data TEXT"))
+                conn.commit()
+                logger.info("Migration: items_data added successfully")
 
 
 @asynccontextmanager

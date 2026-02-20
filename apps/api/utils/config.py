@@ -23,6 +23,9 @@ class Settings(BaseSettings):
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
     REFRESH_TOKEN_EXPIRE_DAYS: int = 7
 
+    # Gemini Vision API
+    GEMINI_API_KEY: str = ""
+
     # CORS - comma-separated origins string
     CORS_ORIGINS: str = "http://localhost:3000,http://localhost:3001,http://localhost:3002"
 

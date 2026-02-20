@@ -3,7 +3,7 @@ Sales schemas for request/response validation
 """
 
 from pydantic import BaseModel, Field
-from typing import Optional
+from typing import Optional, Any
 from datetime import datetime, date
 
 
@@ -23,6 +23,7 @@ class DailySalesCreate(BaseModel):
     sundae_pct: Optional[float] = 0
     cups_cones_pct: Optional[float] = 0
     category_data: Optional[str] = None
+    items_data: Optional[str] = None
     photo_url: Optional[str] = None
     notes: Optional[str] = None
     # Home Delivery (optional)
@@ -31,6 +32,9 @@ class DailySalesCreate(BaseModel):
     hd_orders: Optional[int] = 0
     hd_photo_url: Optional[str] = None
     # Deliveroo (optional)
+    deliveroo_gross_sales: Optional[float] = 0
+    deliveroo_net_sales: Optional[float] = 0
+    deliveroo_orders: Optional[int] = 0
     deliveroo_photo_url: Optional[str] = None
 
 
@@ -50,12 +54,16 @@ class DailySalesResponse(BaseModel):
     sundae_pct: Optional[float] = None
     cups_cones_pct: Optional[float] = None
     category_data: Optional[str] = None
+    items_data: Optional[str] = None
     photo_url: Optional[str] = None
     notes: Optional[str] = None
     hd_gross_sales: Optional[float] = None
     hd_net_sales: Optional[float] = None
     hd_orders: Optional[int] = None
     hd_photo_url: Optional[str] = None
+    deliveroo_gross_sales: Optional[float] = None
+    deliveroo_net_sales: Optional[float] = None
+    deliveroo_orders: Optional[int] = None
     deliveroo_photo_url: Optional[str] = None
     submitted_by_id: int
     created_at: datetime
@@ -64,7 +72,9 @@ class DailySalesResponse(BaseModel):
         from_attributes = True
 
 
-class PhotoUploadResponse(BaseModel):
-    """Schema for photo upload response"""
-    url: str
-    filename: str
+class ReceiptExtractionResponse(BaseModel):
+    """Schema for Gemini Vision extraction response"""
+    receipt_type: str
+    success: bool
+    data: dict = {}
+    error: Optional[str] = None

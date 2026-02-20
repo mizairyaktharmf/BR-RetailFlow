@@ -187,19 +187,26 @@ class ApiService {
     return this.request(`/sales/daily?branch_id=${branchId}&date=${date}`)
   }
 
-  async uploadSalesPhoto(file) {
+  async extractReceipt(file, receiptType) {
     const formData = new FormData()
     formData.append('file', file)
 
     const token = this.getToken()
-    const response = await fetch(`${this.baseUrl}/sales/upload-photo`, {
-      method: 'POST',
-      headers: { 'Authorization': `Bearer ${token}` },
-      body: formData,
-    })
+    const response = await fetch(
+      `${this.baseUrl}/sales/extract-receipt?receipt_type=${receiptType}`,
+      {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}` },
+        body: formData,
+      }
+    )
 
-    if (!response.ok) throw new Error('Failed to upload photo')
+    if (!response.ok) throw new Error('Extraction failed')
     return response.json()
+  }
+
+  async getBranchBudget(branchId, year, month) {
+    return this.request(`/sales/budget?branch_id=${branchId}&year=${year}&month=${month}`)
   }
 
   // ============== CUP USAGE ==============

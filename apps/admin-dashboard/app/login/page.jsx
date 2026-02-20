@@ -195,7 +195,7 @@ export default function AdminLoginPage() {
 
       {/* Footer */}
       <div className="p-4 text-center relative z-10">
-        <p className="text-slate-500 text-sm">BR-RetailFlow - Provide by NexCode Nova</p>
+        <p className="text-slate-500 text-sm">BR-RetailFlow v1.0  - Provide by NexCode Nova</p>
       </div>
     </div>
   )

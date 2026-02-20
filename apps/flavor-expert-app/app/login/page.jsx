@@ -198,7 +198,7 @@ export default function LoginPage() {
       {/* Footer */}
       <div className="p-4 text-center relative z-10">
         <p className="text-slate-500 text-xs">
-          BR-RetailFlow v1.0 | Inventory Management System
+          BR-RetailFlow v1.0  - Provide by NexCode Nova
         </p>
       </div>
     </div>
