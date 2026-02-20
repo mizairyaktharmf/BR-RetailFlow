@@ -329,7 +329,7 @@ export default function RegisterPage() {
 
       {/* Footer */}
       <div className="p-4 text-center relative z-10">
-        <p className="text-slate-500 text-sm">Baskin Robbins UAE - Ice Cream Inventory System</p>
+        <p className="text-slate-500 text-sm">BR-RetailFlow - Provide by NexCode Nova</p>
       </div>
     </div>
   )
