@@ -196,6 +196,14 @@ function UsersContent() {
       }
     }
 
+    // Sort by role priority: HQ first, then TM, AM, FE
+    const rolePriority = { supreme_admin: 0, super_admin: 1, admin: 2, staff: 3 }
+    filtered.sort((a, b) => {
+      const pa = rolePriority[a.role] ?? 9
+      const pb = rolePriority[b.role] ?? 9
+      return pa - pb
+    })
+
     return filtered
   }
 

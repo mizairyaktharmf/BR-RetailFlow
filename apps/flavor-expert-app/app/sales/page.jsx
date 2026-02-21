@@ -24,7 +24,6 @@ import api from '@/services/api'
 
 const SECTIONS = [
   { key: 'pos', type: 'pos', label: 'POS Sales', bg: 'bg-orange-500', ring: 'ring-orange-400', border: 'border-orange-200', required: true },
-  { key: 'pos_cat', type: 'pos_categories', label: 'Categories', bg: 'bg-pink-500', ring: 'ring-pink-400', border: 'border-pink-200', required: false },
   { key: 'hd', type: 'hd', label: 'Home Delivery', bg: 'bg-cyan-500', ring: 'ring-cyan-400', border: 'border-cyan-200', required: false },
   { key: 'deliveroo', type: 'deliveroo', label: 'Deliveroo', bg: 'bg-teal-600', ring: 'ring-teal-400', border: 'border-teal-200', required: false },
 ]
@@ -44,7 +43,6 @@ export default function SalesPage() {
   // Extraction state per section
   const [extractions, setExtractions] = useState({
     pos: { ...INITIAL_EXTRACT },
-    pos_cat: { ...INITIAL_EXTRACT },
     hd: { ...INITIAL_EXTRACT },
     deliveroo: { ...INITIAL_EXTRACT },
   })
@@ -63,7 +61,6 @@ export default function SalesPage() {
   // File refs
   const fileRefs = {
     pos: useRef(null),
-    pos_cat: useRef(null),
     hd: useRef(null),
     deliveroo: useRef(null),
   }
@@ -119,7 +116,6 @@ export default function SalesPage() {
   const resetAll = () => {
     setExtractions({
       pos: { ...INITIAL_EXTRACT },
-      pos_cat: { ...INITIAL_EXTRACT },
       hd: { ...INITIAL_EXTRACT },
       deliveroo: { ...INITIAL_EXTRACT },
     })
@@ -140,25 +136,40 @@ export default function SalesPage() {
     }))
 
     try {
-      const result = await api.extractReceipt(file, sectionType)
-      if (result.success) {
-        setExtractions(prev => ({
-          ...prev,
-          [sectionKey]: { status: 'extracted', data: result.data, error: null },
-        }))
-        // Set editable data
-        if (sectionKey === 'pos') setPosData(result.data)
-        if (sectionKey === 'pos_cat') setCatData(result.data)
-        if (sectionKey === 'hd') setHdData(result.data)
-        if (sectionKey === 'deliveroo') {
-          const d = result.data
-          setDeliverooData(d.totals || d)
+      if (sectionKey === 'pos') {
+        // Extract POS sales and categories from the same photo in parallel
+        const [posResult, catResult] = await Promise.all([
+          api.extractReceipt(file, 'pos'),
+          api.extractReceipt(file, 'pos_categories').catch(() => null),
+        ])
+        if (posResult.success) {
+          setExtractions(prev => ({
+            ...prev,
+            pos: { status: 'extracted', data: posResult.data, error: null },
+          }))
+          setPosData(posResult.data)
+          if (catResult?.success) setCatData(catResult.data)
+        } else {
+          setExtractions(prev => ({
+            ...prev,
+            pos: { status: 'error', data: null, error: posResult.error || 'Extraction failed' },
+          }))
         }
       } else {
-        setExtractions(prev => ({
-          ...prev,
-          [sectionKey]: { status: 'error', data: null, error: result.error || 'Extraction failed' },
-        }))
+        const result = await api.extractReceipt(file, sectionType)
+        if (result.success) {
+          setExtractions(prev => ({
+            ...prev,
+            [sectionKey]: { status: 'extracted', data: result.data, error: null },
+          }))
+          if (sectionKey === 'hd') setHdData(result.data)
+          if (sectionKey === 'deliveroo') setDeliverooData(result.data.totals || result.data)
+        } else {
+          setExtractions(prev => ({
+            ...prev,
+            [sectionKey]: { status: 'error', data: null, error: result.error || 'Extraction failed' },
+          }))
+        }
       }
     } catch (err) {
       setExtractions(prev => ({
@@ -173,8 +184,7 @@ export default function SalesPage() {
       ...prev,
       [sectionKey]: { ...INITIAL_EXTRACT },
     }))
-    if (sectionKey === 'pos') setPosData({})
-    if (sectionKey === 'pos_cat') setCatData({ categories: [], items: [] })
+    if (sectionKey === 'pos') { setPosData({}); setCatData({ categories: [], items: [] }) }
     if (sectionKey === 'hd') setHdData({})
     if (sectionKey === 'deliveroo') setDeliverooData({})
   }
@@ -410,7 +420,7 @@ export default function SalesPage() {
                       </div>
                     )}
 
-                    {/* State: Extracted — POS Sales */}
+                    {/* State: Extracted — POS Sales + Categories */}
                     {ext.status === 'extracted' && s.key === 'pos' && (
                       <div className="space-y-2">
                         <div className="grid grid-cols-2 gap-2">
@@ -424,35 +434,33 @@ export default function SalesPage() {
                         {posData.atv > 0 && (
                           <p className="text-[10px] text-gray-500 text-right">ATV: {fmtNum(posData.atv)}</p>
                         )}
-                      </div>
-                    )}
-
-                    {/* State: Extracted — Categories */}
-                    {ext.status === 'extracted' && s.key === 'pos_cat' && (
-                      <div className="space-y-2">
+                        {/* Categories extracted from same POS photo */}
                         {catData.categories?.length > 0 && (
-                          <div className="overflow-x-auto">
-                            <table className="w-full text-[11px]">
-                              <thead>
-                                <tr className="text-gray-500 border-b">
-                                  <th className="text-left py-1">Category</th>
-                                  <th className="text-right py-1">Qty</th>
-                                  <th className="text-right py-1">Sales</th>
-                                  <th className="text-right py-1">%</th>
-                                </tr>
-                              </thead>
-                              <tbody>
-                                {catData.categories.map((cat, i) => (
-                                  <tr key={i} className="border-b border-gray-50">
-                                    <td className="py-1 font-medium">{cat.name}</td>
-                                    <td className="text-right">{cat.quantity}</td>
-                                    <td className="text-right">{fmtNum(cat.sales)}</td>
-                                    <td className="text-right">{fmtNum(cat.contribution_pct)}%</td>
+                          <details className="mt-1">
+                            <summary className="text-[11px] text-pink-600 font-bold cursor-pointer">Categories ({catData.categories.length})</summary>
+                            <div className="overflow-x-auto mt-1">
+                              <table className="w-full text-[11px]">
+                                <thead>
+                                  <tr className="text-gray-500 border-b">
+                                    <th className="text-left py-1">Category</th>
+                                    <th className="text-right py-1">Qty</th>
+                                    <th className="text-right py-1">Sales</th>
+                                    <th className="text-right py-1">%</th>
                                   </tr>
-                                ))}
-                              </tbody>
-                            </table>
-                          </div>
+                                </thead>
+                                <tbody>
+                                  {catData.categories.map((cat, i) => (
+                                    <tr key={i} className="border-b border-gray-50">
+                                      <td className="py-1 font-medium">{cat.name}</td>
+                                      <td className="text-right">{cat.quantity}</td>
+                                      <td className="text-right">{fmtNum(cat.sales)}</td>
+                                      <td className="text-right">{fmtNum(cat.contribution_pct)}%</td>
+                                    </tr>
+                                  ))}
+                                </tbody>
+                              </table>
+                            </div>
+                          </details>
                         )}
                         {catData.items?.length > 0 && (
                           <details className="text-[10px]">
