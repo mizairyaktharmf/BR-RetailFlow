@@ -52,11 +52,15 @@ jobs:
           PRIVATE_KEY: ${{ secrets.EC2_SSH_KEY }}
           HOST: ${{ secrets.EC2_HOST }}
           USER: ${{ secrets.EC2_USERNAME }}
+          GEMINI_KEY: ${{ secrets.GEMINI_API_KEY }}
         run: |
           echo "$PRIVATE_KEY" > key.pem && chmod 600 key.pem
-          ssh -o StrictHostKeyChecking=no -i key.pem ${USER}@${HOST} << 'ENDSSH'
+          ssh -o StrictHostKeyChecking=no -i key.pem ${USER}@${HOST} << ENDSSH
             cd ~/BR-RetailFlow
             git pull origin main
+            # Ensure GEMINI_API_KEY is in .env
+            grep -q "GEMINI_API_KEY" .env 2>/dev/null || echo "GEMINI_API_KEY=${GEMINI_KEY}" >> .env
+            sed -i "s|^GEMINI_API_KEY=.*|GEMINI_API_KEY=${GEMINI_KEY}|" .env
             docker compose down
             docker compose build --no-cache
             docker compose up -d
