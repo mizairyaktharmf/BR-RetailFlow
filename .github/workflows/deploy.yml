@@ -53,6 +53,7 @@ jobs:
           HOST: ${{ secrets.EC2_HOST }}
           USER: ${{ secrets.EC2_USERNAME }}
           GEMINI_KEY: ${{ secrets.GEMINI_API_KEY }}
+          CORS_ORIGINS: "http://localhost:3000,http://localhost:3001,http://localhost:3002,https://dtfodpsr2q3pz.cloudfront.net,https://djvcfg93zki1h.cloudfront.net"
         run: |
           echo "$PRIVATE_KEY" > key.pem && chmod 600 key.pem
           ssh -o StrictHostKeyChecking=no -i key.pem ${USER}@${HOST} << ENDSSH
@@ -61,6 +62,9 @@ jobs:
             # Ensure GEMINI_API_KEY is in .env
             grep -q "GEMINI_API_KEY" .env 2>/dev/null || echo "GEMINI_API_KEY=${GEMINI_KEY}" >> .env
             sed -i "s|^GEMINI_API_KEY=.*|GEMINI_API_KEY=${GEMINI_KEY}|" .env
+            # Update CORS_ORIGINS
+            grep -q "CORS_ORIGINS" .env 2>/dev/null || echo "CORS_ORIGINS=${CORS_ORIGINS}" >> .env
+            sed -i "s|^CORS_ORIGINS=.*|CORS_ORIGINS=${CORS_ORIGINS}|" .env
             docker compose down
             docker compose build --no-cache
             docker compose up -d
