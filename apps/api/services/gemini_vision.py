@@ -3,7 +3,7 @@ Gemini Vision Service
 Extracts structured sales data from receipt photos using Google Gemini Vision API
 """
 
-import google.generativeai as genai
+from google import genai
 from PIL import Image
 import io
 import json
@@ -241,12 +241,12 @@ Return ONLY valid JSON, no markdown code blocks:
 }"""
 
 
-def _configure_gemini():
-    """Configure Gemini API with key from settings."""
+def _get_client() -> genai.Client:
+    """Return a configured Gemini client."""
     api_key = settings.GEMINI_API_KEY
     if not api_key:
         raise ValueError("GEMINI_API_KEY not configured")
-    genai.configure(api_key=api_key)
+    return genai.Client(api_key=api_key)
 
 
 def _parse_json_response(text: str) -> dict:
@@ -270,62 +270,57 @@ def _image_from_bytes(image_bytes: bytes) -> Image.Image:
 
 async def extract_pos_sales(image_bytes: bytes) -> dict:
     """Extract POS sales summary from receipt photo."""
-    _configure_gemini()
-    model = genai.GenerativeModel("gemini-1.5-flash")
+    client = _get_client()
     img = _image_from_bytes(image_bytes)
-
-    # First prompt: sales summary
-    response = model.generate_content([POS_SALES_PROMPT, img])
-    sales_data = _parse_json_response(response.text)
-
-    return sales_data
+    response = client.models.generate_content(
+        model="gemini-2.0-flash",
+        contents=[img, POS_SALES_PROMPT],
+    )
+    return _parse_json_response(response.text)
 
 
 async def extract_pos_categories(image_bytes: bytes) -> dict:
     """Extract category and item breakdown from POS receipt photo."""
-    _configure_gemini()
-    model = genai.GenerativeModel("gemini-1.5-flash")
+    client = _get_client()
     img = _image_from_bytes(image_bytes)
-
-    response = model.generate_content([CATEGORY_ITEMS_PROMPT, img])
-    category_data = _parse_json_response(response.text)
-
-    return category_data
+    response = client.models.generate_content(
+        model="gemini-2.0-flash",
+        contents=[img, CATEGORY_ITEMS_PROMPT],
+    )
+    return _parse_json_response(response.text)
 
 
 async def extract_hd_sales(image_bytes: bytes) -> dict:
     """Extract Home Delivery data from report photo."""
-    _configure_gemini()
-    model = genai.GenerativeModel("gemini-1.5-flash")
+    client = _get_client()
     img = _image_from_bytes(image_bytes)
-
-    response = model.generate_content([HOME_DELIVERY_PROMPT, img])
-    hd_data = _parse_json_response(response.text)
-
-    return hd_data
+    response = client.models.generate_content(
+        model="gemini-2.0-flash",
+        contents=[img, HOME_DELIVERY_PROMPT],
+    )
+    return _parse_json_response(response.text)
 
 
 async def extract_deliveroo_sales(image_bytes: bytes) -> dict:
     """Extract Deliveroo data from dashboard photo."""
-    _configure_gemini()
-    model = genai.GenerativeModel("gemini-1.5-flash")
+    client = _get_client()
     img = _image_from_bytes(image_bytes)
-
-    response = model.generate_content([DELIVEROO_PROMPT, img])
-    deliveroo_data = _parse_json_response(response.text)
-
-    return deliveroo_data
+    response = client.models.generate_content(
+        model="gemini-2.0-flash",
+        contents=[img, DELIVEROO_PROMPT],
+    )
+    return _parse_json_response(response.text)
 
 
 async def extract_budget_sheet(image_bytes: bytes) -> dict:
     """Extract monthly budget sheet data from photo (DAILY SALES TRACKER format)."""
-    _configure_gemini()
-    model = genai.GenerativeModel("gemini-1.5-flash")
+    from google.genai import types
+    client = _get_client()
     img = _image_from_bytes(image_bytes)
-
-    response = model.generate_content(
-        [BUDGET_SHEET_PROMPT, img],
-        generation_config={"temperature": 0.1, "max_output_tokens": 8192},
+    response = client.models.generate_content(
+        model="gemini-2.0-flash",
+        contents=[img, BUDGET_SHEET_PROMPT],
+        config=types.GenerateContentConfig(temperature=0.1, max_output_tokens=8192),
     )
     budget_data = _parse_json_response(response.text)
 
