@@ -27,7 +27,7 @@ class Settings(BaseSettings):
     GEMINI_API_KEY: str = ""
 
     # CORS - comma-separated origins string
-    CORS_ORIGINS: str = "http://localhost:3000,http://localhost:3001,http://localhost:3002,https://dtfodpsr2q3pz.cloudfront.net,https://djvcfg93zki1h.cloudfront.net"
+    CORS_ORIGINS: str = "http://localhost:3000,http://localhost:3001,http://localhost:3002"
 
     @property
     def cors_origins_list(self) -> list:
