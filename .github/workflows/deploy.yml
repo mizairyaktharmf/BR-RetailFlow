@@ -106,10 +106,14 @@ jobs:
 
       # Build and deploy Admin Dashboard
       - name: Build Admin Dashboard
+        env:
+          NEXT_PUBLIC_API_URL: ${{ secrets.API_URL }}
         run: |
+          echo "Building Admin Dashboard with API URL: $NEXT_PUBLIC_API_URL"
           cd apps/admin-dashboard
           npm ci
-          echo "NEXT_PUBLIC_API_URL=${{ secrets.API_URL }}" > .env.local
+          echo "NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL" > .env.local
+          cat .env.local
           npm run build
 
       - name: Deploy Admin Dashboard to S3
@@ -119,13 +123,17 @@ jobs:
 
       # Build and deploy Flavor Expert App
       - name: Build Flavor Expert App
+        env:
+          NEXT_PUBLIC_API_URL: ${{ secrets.API_URL }}
         run: |
+          echo "Building Flavor Expert with API URL: $NEXT_PUBLIC_API_URL"
           cd apps/flavor-expert-app
           npm ci
-          echo "NEXT_PUBLIC_API_URL=${{ secrets.API_URL }}" > .env.local
+          echo "NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL" > .env.local
+          cat .env.local
           npm run build
 
       - name: Deploy Flavor Expert App to S3
         run: |
-          aws s3 sync apps/flavor-expert-app/out/ s3://br-flavor-expert-app --delete
+          aws s3 sync apps/flavor-expert-app/out/ s3://br-flavor-expert --delete
           aws cloudfront create-invalidation --distribution-id ${{ secrets.FLAVOR_CF_DISTRIBUTION_ID }} --paths "/*"
