@@ -53,12 +53,16 @@ jobs:
           HOST: ${{ secrets.EC2_HOST }}
           USER: ${{ secrets.EC2_USERNAME }}
           GEMINI_KEY: ${{ secrets.GEMINI_API_KEY }}
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
           CORS_ORIGINS: "http://localhost:3000,http://localhost:3001,http://localhost:3002,https://d4oeur9mmvhxa.cloudfront.net,https://d38dkajjvnnmib.cloudfront.net"
         run: |
           echo "$PRIVATE_KEY" > key.pem && chmod 600 key.pem
           ssh -o StrictHostKeyChecking=no -i key.pem ${USER}@${HOST} << ENDSSH
             cd ~/BR-RetailFlow
             git pull origin main
+            # Ensure DATABASE_URL is in .env
+            grep -q "DATABASE_URL" .env 2>/dev/null || echo "DATABASE_URL=${DATABASE_URL}" >> .env
+            sed -i "s|^DATABASE_URL=.*|DATABASE_URL=${DATABASE_URL}|" .env
             # Ensure GEMINI_API_KEY is in .env
             grep -q "GEMINI_API_KEY" .env 2>/dev/null || echo "GEMINI_API_KEY=${GEMINI_KEY}" >> .env
             sed -i "s|^GEMINI_API_KEY=.*|GEMINI_API_KEY=${GEMINI_KEY}|" .env
