@@ -1,4 +1,19 @@
 services:
+  db:
+    image: postgres:15
+    container_name: br-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: bruser
+      POSTGRES_PASSWORD: brpassword
+      POSTGRES_DB: brretailflow
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    networks:
+      - br-network
+
   api:
     build:
       context: ./apps/api
@@ -9,9 +24,14 @@ services:
       - .env
     ports:
       - "8000:8000"
+    depends_on:
+      - db
     networks:
       - br-network
 
 networks:
   br-network:
     driver: bridge
+
+volumes:
+  pgdata:
