@@ -271,7 +271,7 @@ def _image_from_bytes(image_bytes: bytes) -> Image.Image:
 async def extract_pos_sales(image_bytes: bytes) -> dict:
     """Extract POS sales summary from receipt photo."""
     _configure_gemini()
-    model = genai.GenerativeModel("gemini-2.0-flash")
+    model = genai.GenerativeModel("gemini-1.5-flash")
     img = _image_from_bytes(image_bytes)
 
     # First prompt: sales summary
@@ -284,7 +284,7 @@ async def extract_pos_sales(image_bytes: bytes) -> dict:
 async def extract_pos_categories(image_bytes: bytes) -> dict:
     """Extract category and item breakdown from POS receipt photo."""
     _configure_gemini()
-    model = genai.GenerativeModel("gemini-2.0-flash")
+    model = genai.GenerativeModel("gemini-1.5-flash")
     img = _image_from_bytes(image_bytes)
 
     response = model.generate_content([CATEGORY_ITEMS_PROMPT, img])
@@ -296,7 +296,7 @@ async def extract_pos_categories(image_bytes: bytes) -> dict:
 async def extract_hd_sales(image_bytes: bytes) -> dict:
     """Extract Home Delivery data from report photo."""
     _configure_gemini()
-    model = genai.GenerativeModel("gemini-2.0-flash")
+    model = genai.GenerativeModel("gemini-1.5-flash")
     img = _image_from_bytes(image_bytes)
 
     response = model.generate_content([HOME_DELIVERY_PROMPT, img])
@@ -308,7 +308,7 @@ async def extract_hd_sales(image_bytes: bytes) -> dict:
 async def extract_deliveroo_sales(image_bytes: bytes) -> dict:
     """Extract Deliveroo data from dashboard photo."""
     _configure_gemini()
-    model = genai.GenerativeModel("gemini-2.0-flash")
+    model = genai.GenerativeModel("gemini-1.5-flash")
     img = _image_from_bytes(image_bytes)
 
     response = model.generate_content([DELIVEROO_PROMPT, img])
@@ -320,7 +320,7 @@ async def extract_deliveroo_sales(image_bytes: bytes) -> dict:
 async def extract_budget_sheet(image_bytes: bytes) -> dict:
     """Extract monthly budget sheet data from photo (DAILY SALES TRACKER format)."""
     _configure_gemini()
-    model = genai.GenerativeModel("gemini-2.0-flash")
+    model = genai.GenerativeModel("gemini-1.5-flash")
     img = _image_from_bytes(image_bytes)
 
     response = model.generate_content(
