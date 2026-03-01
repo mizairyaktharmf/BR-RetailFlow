@@ -11,8 +11,6 @@ import {
   ChevronRight,
   ChevronDown,
   RefreshCw,
-  Wifi,
-  WifiOff,
   Camera,
   ClipboardList,
   AlertCircle,
@@ -21,18 +19,15 @@ import {
   Bell
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { formatDate, getCurrentSalesWindow, getNextSalesWindow, SALES_WINDOWS } from '@/lib/utils'
 import api from '@/services/api'
-import offlineStore from '@/store/offline-store'
 
 export default function DashboardPage() {
   const router = useRouter()
   const [user, setUser] = useState(null)
   const [branch, setBranch] = useState(null)
-  const [isOnline, setIsOnline] = useState(true)
-  const [pendingSync, setPendingSync] = useState({ total: 0 })
   const [currentWindow, setCurrentWindow] = useState(null)
   const [nextWindow, setNextWindow] = useState(null)
   const [todayDate, setTodayDate] = useState('')
@@ -53,11 +48,6 @@ export default function DashboardPage() {
     // Set today's date
     setTodayDate(formatDate(new Date()))
 
-    // Check online status
-    setIsOnline(navigator.onLine)
-    window.addEventListener('online', () => setIsOnline(true))
-    window.addEventListener('offline', () => setIsOnline(false))
-
     // Check sales window
     const checkWindow = () => {
       setCurrentWindow(getCurrentSalesWindow())
@@ -65,13 +55,6 @@ export default function DashboardPage() {
     }
     checkWindow()
     const windowInterval = setInterval(checkWindow, 60000)
-
-    // Check pending sync count
-    const checkPending = async () => {
-      const pending = await offlineStore.getPendingCount()
-      setPendingSync(pending)
-    }
-    checkPending()
 
     // Load cake low-stock alerts
     const loadCakeAlerts = async () => {
@@ -85,8 +68,6 @@ export default function DashboardPage() {
     loadCakeAlerts()
 
     return () => {
-      window.removeEventListener('online', () => setIsOnline(true))
-      window.removeEventListener('offline', () => setIsOnline(false))
       clearInterval(windowInterval)
     }
   }, [router])
@@ -244,28 +225,6 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* Connection Status */}
-      {!isOnline && (
-        <Alert variant="warning" className="mx-4 mt-4">
-          <WifiOff className="h-4 w-4" />
-          <AlertTitle>You're Offline</AlertTitle>
-          <AlertDescription>
-            Your data will be saved locally and synced when you're back online.
-          </AlertDescription>
-        </Alert>
-      )}
-
-      {/* Pending Sync */}
-      {pendingSync.total > 0 && isOnline && (
-        <Alert variant="info" className="mx-4 mt-4">
-          <RefreshCw className="h-4 w-4" />
-          <AlertTitle>Pending Sync</AlertTitle>
-          <AlertDescription>
-            {pendingSync.total} items waiting to sync with server.
-          </AlertDescription>
-        </Alert>
-      )}
-
       {/* Cake Low Stock Alerts */}
       {cakeAlerts.length > 0 && (
         <Alert className="mx-4 mt-4 border-red-500 bg-red-50 cursor-pointer" onClick={() => router.push('/cake/stock')}>
@@ -314,19 +273,11 @@ export default function DashboardPage() {
           <Card className="bg-gradient-to-br from-blue-50 to-white">
             <CardContent className="p-4">
               <div className="flex items-center gap-2 text-blue-600 mb-1">
-                {isOnline ? (
-                  <Wifi className="w-4 h-4" />
-                ) : (
-                  <WifiOff className="w-4 h-4" />
-                )}
+                <TrendingUp className="w-4 h-4" />
                 <span className="text-xs font-medium">Status</span>
               </div>
-              <p className="text-lg font-bold text-gray-900">
-                {isOnline ? 'Online' : 'Offline'}
-              </p>
-              <p className="text-xs text-gray-500">
-                {pendingSync.total > 0 ? `${pendingSync.total} pending` : 'All synced'}
-              </p>
+              <p className="text-lg font-bold text-gray-900">Online</p>
+              <p className="text-xs text-gray-500">All synced</p>
             </CardContent>
           </Card>
         </div>

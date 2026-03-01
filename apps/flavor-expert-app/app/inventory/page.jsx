@@ -18,7 +18,6 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { Separator } from '@/components/ui/separator'
 import { formatDate } from '@/lib/utils'
 import api from '@/services/api'
-import offlineStore from '@/store/offline-store'
 
 export default function InventoryPage() {
   const router = useRouter()
@@ -51,8 +50,6 @@ export default function InventoryPage() {
       const flavorsData = await api.getFlavors()
       if (flavorsData && flavorsData.length > 0) {
         setFlavors(flavorsData)
-        await offlineStore.cacheFlavors(flavorsData)
-        // Initialize inventory state from fetched flavors
         const initialInventory = {}
         flavorsData.forEach(flavor => {
           initialInventory[flavor.id] = ''
@@ -60,16 +57,7 @@ export default function InventoryPage() {
         setInventory(initialInventory)
       }
     } catch (error) {
-      // Fall back to cached data
-      const cached = await offlineStore.getCachedFlavors()
-      if (cached.length > 0) {
-        setFlavors(cached)
-        const initialInventory = {}
-        cached.forEach(flavor => {
-          initialInventory[flavor.id] = ''
-        })
-        setInventory(initialInventory)
-      }
+      console.error('Failed to load flavors:', error)
     } finally {
       setLoading(false)
     }
@@ -111,13 +99,7 @@ export default function InventoryPage() {
         items,
       }
 
-      // Try to submit to API
-      try {
-        await api.submitClosingInventory(submitData)
-      } catch (error) {
-        // Save offline if API fails
-        await offlineStore.saveInventoryEntry(submitData)
-      }
+      await api.submitClosingInventory(submitData)
 
       setSubmitted(true)
       alert('Inventory submitted successfully!')

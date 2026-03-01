@@ -23,7 +23,6 @@ import { Label } from '@/components/ui/label'
 import { Separator } from '@/components/ui/separator'
 import { formatDate } from '@/lib/utils'
 import api from '@/services/api'
-import offlineStore from '@/store/offline-store'
 
 export default function ReceivePage() {
   const router = useRouter()
@@ -55,14 +54,9 @@ export default function ReceivePage() {
       const flavorsData = await api.getFlavors()
       if (flavorsData && flavorsData.length > 0) {
         setFlavors(flavorsData)
-        await offlineStore.cacheFlavors(flavorsData)
       }
     } catch (error) {
-      // Fall back to cached data
-      const cached = await offlineStore.getCachedFlavors()
-      if (cached.length > 0) {
-        setFlavors(cached)
-      }
+      console.error('Failed to load flavors:', error)
     } finally {
       setLoading(false)
     }
@@ -133,13 +127,7 @@ export default function ReceivePage() {
         }))
       }
 
-      // Try to submit to API
-      try {
-        await api.submitBulkTubReceipts(submitData)
-      } catch (error) {
-        // Save offline
-        await offlineStore.saveTubReceipt(submitData)
-      }
+      await api.submitBulkTubReceipts(submitData)
 
       // Add to today's receipts display
       setTodaysReceipts(prev => [...prev, ...receipts])
