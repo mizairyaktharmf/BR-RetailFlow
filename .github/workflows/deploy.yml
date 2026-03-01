@@ -53,7 +53,7 @@ jobs:
           HOST: ${{ secrets.EC2_HOST }}
           USER: ${{ secrets.EC2_USERNAME }}
           GEMINI_KEY: ${{ secrets.GEMINI_API_KEY }}
-          CORS_ORIGINS: "http://localhost:3000,http://localhost:3001,http://localhost:3002,https://dtfodpsr2q3pz.cloudfront.net,https://djvcfg93zki1h.cloudfront.net"
+          CORS_ORIGINS: "http://localhost:3000,http://localhost:3001,http://localhost:3002,https://d4oeur9mmvhxa.cloudfront.net,https://d38dkajjvnnmib.cloudfront.net"
         run: |
           echo "$PRIVATE_KEY" > key.pem && chmod 600 key.pem
           ssh -o StrictHostKeyChecking=no -i key.pem ${USER}@${HOST} << ENDSSH
