@@ -135,5 +135,5 @@ jobs:
 
       - name: Deploy Flavor Expert App to S3
         run: |
-          aws s3 sync apps/flavor-expert-app/out/ s3://br-flavor-expert --delete
+          aws s3 sync apps/flavor-expert-app/out/ s3://br-flavor-expert-app --delete
           aws cloudfront create-invalidation --distribution-id ${{ secrets.FLAVOR_CF_DISTRIBUTION_ID }} --paths "/*"
