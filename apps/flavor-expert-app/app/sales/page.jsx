@@ -8,19 +8,57 @@ import {
   Loader2,
   CheckCircle2,
   Camera,
-  RotateCcw,
+  X,
   Sparkles,
+  Plus,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { formatDate, SALES_WINDOWS } from '@/lib/utils'
 import api from '@/services/api'
 
+const MAX_PHOTOS = 5
+
 const SECTIONS = [
   { key: 'pos', type: 'pos', label: 'POS Sales', bg: 'bg-orange-500', border: 'border-orange-200', required: true },
   { key: 'hd', type: 'hd', label: 'Home Delivery', bg: 'bg-cyan-500', border: 'border-cyan-200', required: false },
   { key: 'deliveroo', type: 'deliveroo', label: 'Deliveroo', bg: 'bg-teal-600', border: 'border-teal-200', required: false },
 ]
+
+// Sum numeric fields from multiple extraction results
+function mergeNumericResults(dataArray) {
+  if (!dataArray.length) return {}
+  return dataArray.reduce((acc, d) => {
+    const keys = ['gross_sales', 'net_sales', 'total_sales', 'guest_count', 'cash_sales',
+                  'discount', 'tax', 'orders', 'total_orders', 'avg_sales_per_order']
+    const merged = { ...acc }
+    for (const k of keys) {
+      if (d[k] !== undefined) {
+        merged[k] = (merged[k] || 0) + (Number(d[k]) || 0)
+      }
+    }
+    return merged
+  }, {})
+}
+
+// Merge category data from multiple POS photos
+function mergeCategoryResults(dataArray) {
+  const merged = { categories: [], items: [] }
+  for (const d of dataArray) {
+    if (!d) continue
+    for (const cat of (d.categories || [])) {
+      const existing = merged.categories.find(c => c.name === cat.name)
+      if (existing) {
+        existing.quantity = (existing.quantity || 0) + (cat.quantity || 0)
+        existing.sales = (existing.sales || 0) + (cat.sales || 0)
+      } else {
+        merged.categories.push({ ...cat })
+      }
+    }
+    merged.items.push(...(d.items || []))
+  }
+  return merged
+}
 
 export default function SalesPage() {
   const router = useRouter()
@@ -31,11 +69,12 @@ export default function SalesPage() {
   const [submittedWindows, setSubmittedWindows] = useState([])
   const [loadingWindows, setLoadingWindows] = useState(true)
 
-  // Photos stored per section (File objects, not yet extracted)
-  const [photos, setPhotos] = useState({ pos: null, hd: null, deliveroo: null })
-  // Per-section status: idle | captured | extracting | done | error
+  // photos: { pos: File[], hd: File[], deliveroo: File[] }
+  const [photos, setPhotos] = useState({ pos: [], hd: [], deliveroo: [] })
+  // previews: { pos: string[], hd: string[], deliveroo: string[] }
+  const [previews, setPreviews] = useState({ pos: [], hd: [], deliveroo: [] })
+  // section submitting status
   const [sectionStatus, setSectionStatus] = useState({ pos: 'idle', hd: 'idle', deliveroo: 'idle' })
-  const [sectionError, setSectionError] = useState({ pos: null, hd: null, deliveroo: null })
 
   const fileRefs = {
     pos: useRef(null),
@@ -52,6 +91,13 @@ export default function SalesPage() {
     if (branchData) setBranch(JSON.parse(branchData))
     loadSubmittedWindows()
   }, [router])
+
+  // Cleanup object URLs on unmount
+  useEffect(() => {
+    return () => {
+      Object.values(previews).flat().forEach(url => URL.revokeObjectURL(url))
+    }
+  }, [])
 
   const loadSubmittedWindows = async () => {
     setLoadingWindows(true)
@@ -82,67 +128,86 @@ export default function SalesPage() {
   }
 
   const resetAll = () => {
-    setPhotos({ pos: null, hd: null, deliveroo: null })
+    previews.pos.forEach(u => URL.revokeObjectURL(u))
+    previews.hd.forEach(u => URL.revokeObjectURL(u))
+    previews.deliveroo.forEach(u => URL.revokeObjectURL(u))
+    setPhotos({ pos: [], hd: [], deliveroo: [] })
+    setPreviews({ pos: [], hd: [], deliveroo: [] })
     setSectionStatus({ pos: 'idle', hd: 'idle', deliveroo: 'idle' })
-    setSectionError({ pos: null, hd: null, deliveroo: null })
   }
 
-  // Just store the photo — do NOT extract yet
   const handleCapture = (sectionKey, e) => {
     const file = e.target.files?.[0]
     if (!file) return
     if (fileRefs[sectionKey]?.current) fileRefs[sectionKey].current.value = ''
-    setPhotos(prev => ({ ...prev, [sectionKey]: file }))
-    setSectionStatus(prev => ({ ...prev, [sectionKey]: 'captured' }))
-    setSectionError(prev => ({ ...prev, [sectionKey]: null }))
+
+    setPhotos(prev => {
+      if (prev[sectionKey].length >= MAX_PHOTOS) return prev
+      return { ...prev, [sectionKey]: [...prev[sectionKey], file] }
+    })
+
+    const url = URL.createObjectURL(file)
+    setPreviews(prev => {
+      if (prev[sectionKey].length >= MAX_PHOTOS) return prev
+      return { ...prev, [sectionKey]: [...prev[sectionKey], url] }
+    })
   }
 
-  const retakePhoto = (sectionKey) => {
-    setPhotos(prev => ({ ...prev, [sectionKey]: null }))
-    setSectionStatus(prev => ({ ...prev, [sectionKey]: 'idle' }))
-    setSectionError(prev => ({ ...prev, [sectionKey]: null }))
+  const removePhoto = (sectionKey, index) => {
+    URL.revokeObjectURL(previews[sectionKey][index])
+    setPhotos(prev => ({
+      ...prev,
+      [sectionKey]: prev[sectionKey].filter((_, i) => i !== index),
+    }))
+    setPreviews(prev => ({
+      ...prev,
+      [sectionKey]: prev[sectionKey].filter((_, i) => i !== index),
+    }))
   }
 
-  // Extract ALL captured photos and save in one shot
+  // Extract all captured photos and save in one shot on Submit
   const handleSubmit = async () => {
-    if (!photos.pos) {
-      alert('Please capture POS receipt first')
+    if (photos.pos.length === 0) {
+      alert('Please capture at least one POS receipt photo')
       return
     }
     setSaving(true)
-
-    // Mark all captured sections as extracting
-    setSectionStatus(prev => ({
+    setSectionStatus({
       pos: 'extracting',
-      hd: prev.hd === 'captured' ? 'extracting' : prev.hd,
-      deliveroo: prev.deliveroo === 'captured' ? 'extracting' : prev.deliveroo,
-    }))
+      hd: photos.hd.length > 0 ? 'extracting' : 'idle',
+      deliveroo: photos.deliveroo.length > 0 ? 'extracting' : 'idle',
+    })
 
     try {
-      // Extract POS + categories in parallel from same photo
-      const [posResult, catResult] = await Promise.all([
-        api.extractReceipt(photos.pos, 'pos'),
-        api.extractReceipt(photos.pos, 'pos_categories').catch(() => null),
+      // Extract all POS photos (sales + categories) in parallel
+      const posPromises = photos.pos.map(f => api.extractReceipt(f, 'pos'))
+      const catPromises = photos.pos.map(f => api.extractReceipt(f, 'pos_categories').catch(() => null))
+      const [posResults, catResults] = await Promise.all([
+        Promise.all(posPromises),
+        Promise.all(catPromises),
       ])
-
       setSectionStatus(prev => ({ ...prev, pos: 'done' }))
 
-      const posData = posResult?.success ? posResult.data : {}
-      const catData = catResult?.success ? catResult.data : { categories: [], items: [] }
+      const posDataArray = posResults.filter(r => r?.success).map(r => r.data)
+      const catDataArray = catResults.filter(r => r?.success).map(r => r.data)
+      const posData = mergeNumericResults(posDataArray)
+      const catData = mergeCategoryResults(catDataArray)
 
-      // Extract HD if photo taken
+      // Extract all HD photos
       let hdData = {}
-      if (photos.hd) {
-        const hdResult = await api.extractReceipt(photos.hd, 'hd')
-        hdData = hdResult?.success ? hdResult.data : {}
+      if (photos.hd.length > 0) {
+        const hdResults = await Promise.all(photos.hd.map(f => api.extractReceipt(f, 'hd')))
+        const hdDataArray = hdResults.filter(r => r?.success).map(r => r.data)
+        hdData = mergeNumericResults(hdDataArray)
         setSectionStatus(prev => ({ ...prev, hd: 'done' }))
       }
 
-      // Extract Deliveroo if photo taken
+      // Extract all Deliveroo photos
       let deliverooData = {}
-      if (photos.deliveroo) {
-        const drResult = await api.extractReceipt(photos.deliveroo, 'deliveroo')
-        deliverooData = drResult?.success ? (drResult.data?.totals || drResult.data) : {}
+      if (photos.deliveroo.length > 0) {
+        const drResults = await Promise.all(photos.deliveroo.map(f => api.extractReceipt(f, 'deliveroo')))
+        const drDataArray = drResults.filter(r => r?.success).map(r => r.data?.totals || r.data)
+        deliverooData = mergeNumericResults(drDataArray)
         setSectionStatus(prev => ({ ...prev, deliveroo: 'done' }))
       }
 
@@ -152,10 +217,7 @@ export default function SalesPage() {
             name: c.name, qty: c.quantity || 0, sales: c.sales || 0, pct: c.contribution_pct || 0,
           })))
         : null
-
-      const itemsJson = catData.items?.length > 0
-        ? JSON.stringify(catData.items)
-        : null
+      const itemsJson = catData.items?.length > 0 ? JSON.stringify(catData.items) : null
 
       // Save to DB
       await api.submitSales({
@@ -189,20 +251,18 @@ export default function SalesPage() {
       loadSubmittedWindows()
     } catch (err) {
       console.error(err)
-      // Revert extracting → captured so user can retry
-      setSectionStatus(prev => ({
-        pos: prev.pos === 'extracting' ? 'captured' : prev.pos,
-        hd: prev.hd === 'extracting' ? 'captured' : prev.hd,
-        deliveroo: prev.deliveroo === 'extracting' ? 'captured' : prev.deliveroo,
-      }))
-      alert('Extraction/save failed: ' + err.message)
+      setSectionStatus({
+        pos: photos.pos.length > 0 ? 'captured' : 'idle',
+        hd: photos.hd.length > 0 ? 'captured' : 'idle',
+        deliveroo: photos.deliveroo.length > 0 ? 'captured' : 'idle',
+      })
+      alert('Failed: ' + err.message)
     } finally {
       setSaving(false)
     }
   }
 
-  const posReady = sectionStatus.pos === 'captured' || sectionStatus.pos === 'done'
-  const canSubmit = photos.pos !== null && !saving
+  const canSubmit = photos.pos.length > 0 && !saving
 
   return (
     <div className="min-h-screen bg-gray-50 pb-24">
@@ -266,17 +326,21 @@ export default function SalesPage() {
           ) : (
             <div className="space-y-3">
               {/* Info Banner */}
-              <div className="bg-blue-50 border border-blue-200 rounded-xl px-3 py-2 flex items-center gap-2">
-                <Sparkles className="w-4 h-4 text-blue-500 shrink-0" />
+              <div className="bg-blue-50 border border-blue-200 rounded-xl px-3 py-2 flex items-start gap-2">
+                <Sparkles className="w-4 h-4 text-blue-500 shrink-0 mt-0.5" />
                 <p className="text-[11px] text-blue-700">
-                  Capture all photos first, then tap <strong>Submit</strong> — AI will extract and save automatically.
+                  Capture up to <strong>5 photos per section</strong>, then tap <strong>Submit</strong> — AI will extract and save all automatically.
                 </p>
               </div>
 
               {/* Photo Sections */}
               {SECTIONS.map((s) => {
+                const sPhotos = photos[s.key]
+                const sPreviews = previews[s.key]
                 const status = sectionStatus[s.key]
-                const hasPhoto = photos[s.key] !== null
+                const hasPhotos = sPhotos.length > 0
+                const canAddMore = sPhotos.length < MAX_PHOTOS && !saving
+
                 return (
                   <div key={s.key} className={`bg-white rounded-xl p-3 border ${s.border}`}>
                     {/* Section Header */}
@@ -286,11 +350,7 @@ export default function SalesPage() {
                         {s.required && <span className="text-[10px] text-red-400 font-medium">Required</span>}
                         {!s.required && <span className="text-[10px] text-gray-400">Optional</span>}
                       </div>
-                      {hasPhoto && status !== 'extracting' && (
-                        <button onClick={() => retakePhoto(s.key)} className="text-[10px] text-orange-500 flex items-center gap-1">
-                          <RotateCcw className="w-3 h-3" /> Retake
-                        </button>
-                      )}
+                      <span className="text-[10px] text-gray-400">{sPhotos.length}/{MAX_PHOTOS} photos</span>
                     </div>
 
                     {/* Hidden file input */}
@@ -303,61 +363,72 @@ export default function SalesPage() {
                       onChange={(e) => handleCapture(s.key, e)}
                     />
 
-                    {/* Idle: show camera button */}
-                    {status === 'idle' && (
+                    {/* Extracting overlay */}
+                    {status === 'extracting' && (
+                      <div className="flex items-center justify-center gap-2 py-3 bg-orange-50 rounded-lg mb-2">
+                        <Loader2 className="w-4 h-4 animate-spin text-orange-400" />
+                        <span className="text-xs text-orange-600">Extracting {sPhotos.length} photo{sPhotos.length > 1 ? 's' : ''}...</span>
+                      </div>
+                    )}
+
+                    {/* Done state */}
+                    {status === 'done' && (
+                      <div className="flex items-center gap-2 py-2 px-2 bg-green-50 rounded-lg mb-2">
+                        <CheckCircle2 className="w-4 h-4 text-green-500" />
+                        <span className="text-xs text-green-700 font-medium">Data extracted & saved</span>
+                      </div>
+                    )}
+
+                    {/* Photo thumbnails grid */}
+                    {hasPhotos && status !== 'extracting' && status !== 'done' && (
+                      <div className="grid grid-cols-5 gap-1.5 mb-2">
+                        {sPreviews.map((url, idx) => (
+                          <div key={idx} className="relative aspect-square rounded-lg overflow-hidden bg-gray-100 border border-gray-200">
+                            <img src={url} alt={`photo ${idx + 1}`} className="w-full h-full object-cover" />
+                            <button
+                              onClick={() => removePhoto(s.key, idx)}
+                              className="absolute top-0.5 right-0.5 w-4 h-4 bg-red-500 rounded-full flex items-center justify-center"
+                            >
+                              <X className="w-2.5 h-2.5 text-white" />
+                            </button>
+                            <span className="absolute bottom-0.5 left-0.5 text-[9px] bg-black/50 text-white px-1 rounded">
+                              {idx + 1}
+                            </span>
+                          </div>
+                        ))}
+
+                        {/* Add more button (if under limit) */}
+                        {canAddMore && (
+                          <button
+                            onClick={() => fileRefs[s.key].current?.click()}
+                            className="aspect-square rounded-lg border-2 border-dashed border-gray-300 hover:border-orange-400 bg-gray-50 flex flex-col items-center justify-center gap-0.5 transition-all active:scale-95"
+                          >
+                            <Plus className="w-4 h-4 text-gray-400" />
+                            <span className="text-[9px] text-gray-400">Add</span>
+                          </button>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Idle: first camera button */}
+                    {!hasPhotos && status !== 'extracting' && status !== 'done' && (
                       <button
                         onClick={() => fileRefs[s.key].current?.click()}
                         className="w-full py-5 rounded-lg border-2 border-dashed border-gray-300 hover:border-gray-400 bg-gray-50 flex flex-col items-center gap-1 active:scale-95 transition-all"
                       >
                         <Camera className="w-7 h-7 text-gray-400" />
                         <span className="text-xs text-gray-500">Tap to capture {s.label}</span>
+                        <span className="text-[10px] text-gray-400">Up to {MAX_PHOTOS} photos</span>
                       </button>
                     )}
 
-                    {/* Captured: show ready state */}
-                    {status === 'captured' && (
-                      <div className="flex items-center gap-3 py-3 px-2 bg-green-50 rounded-lg border border-green-200">
-                        <CheckCircle2 className="w-5 h-5 text-green-500 shrink-0" />
-                        <div className="flex-1">
-                          <p className="text-sm font-medium text-green-700">Photo ready</p>
-                          <p className="text-[10px] text-green-600">{photos[s.key]?.name}</p>
-                        </div>
-                        <button
-                          onClick={() => fileRefs[s.key].current?.click()}
-                          className="text-[11px] text-orange-500 underline"
-                        >
-                          Change
-                        </button>
-                      </div>
-                    )}
-
-                    {/* Extracting: spinner */}
-                    {status === 'extracting' && (
-                      <div className="flex items-center justify-center gap-2 py-4">
-                        <Loader2 className="w-5 h-5 animate-spin text-orange-400" />
-                        <span className="text-sm text-gray-600">Extracting with AI...</span>
-                      </div>
-                    )}
-
-                    {/* Done: success */}
-                    {status === 'done' && (
-                      <div className="flex items-center gap-2 py-3 px-2 bg-green-50 rounded-lg border border-green-200">
-                        <CheckCircle2 className="w-5 h-5 text-green-500" />
-                        <p className="text-sm font-medium text-green-700">Data extracted & saved</p>
-                      </div>
-                    )}
-
-                    {/* Error */}
-                    {status === 'error' && (
-                      <div className="text-center py-3">
-                        <p className="text-xs text-red-500 mb-2">{sectionError[s.key] || 'Extraction failed'}</p>
-                        <button
-                          onClick={() => fileRefs[s.key].current?.click()}
-                          className="text-xs text-orange-500 underline"
-                        >
-                          Try again
-                        </button>
-                      </div>
+                    {/* Show photo count when captured */}
+                    {hasPhotos && status !== 'extracting' && status !== 'done' && (
+                      <p className="text-[10px] text-green-600 font-medium mt-1">
+                        <CheckCircle2 className="w-3 h-3 inline mr-1" />
+                        {sPhotos.length} photo{sPhotos.length > 1 ? 's' : ''} ready
+                        {sPhotos.length < MAX_PHOTOS && ' — tap + to add more'}
+                      </p>
                     )}
                   </div>
                 )
@@ -376,8 +447,8 @@ export default function SalesPage() {
                 )}
               </Button>
 
-              {!photos.pos && (
-                <p className="text-center text-[11px] text-gray-400">Capture POS receipt to enable submit</p>
+              {!photos.pos.length && (
+                <p className="text-center text-[11px] text-gray-400">Capture at least one POS photo to submit</p>
               )}
             </div>
           )
