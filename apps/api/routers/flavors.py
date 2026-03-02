@@ -16,7 +16,7 @@ from schemas.inventory import FlavorCreate, FlavorUpdate, FlavorResponse
 router = APIRouter()
 
 
-@router.get("/", response_model=List[FlavorResponse])
+@router.get("", response_model=List[FlavorResponse])
 async def list_flavors(
     category: Optional[str] = None,
     is_active: Optional[bool] = True,
@@ -75,7 +75,7 @@ async def get_flavor(
     return FlavorResponse.model_validate(flavor)
 
 
-@router.post("/", response_model=FlavorResponse, status_code=status.HTTP_201_CREATED)
+@router.post("", response_model=FlavorResponse, status_code=status.HTTP_201_CREATED)
 async def create_flavor(
     data: FlavorCreate,
     current_user: User = Depends(require_role([UserRole.SUPREME_ADMIN])),

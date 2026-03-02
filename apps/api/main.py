@@ -175,7 +175,8 @@ app = FastAPI(
     title="BR-RetailFlow API",
     description="Ice Cream Inventory & Analytics Solution for Baskin Robbins UAE",
     version="1.0.1",
-    lifespan=lifespan
+    lifespan=lifespan,
+    redirect_slashes=False
 )
 
 # CORS configuration

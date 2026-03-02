@@ -39,7 +39,7 @@ def enrich_branch_response(branch: Branch, db: Session) -> BranchResponse:
     return response
 
 
-@router.get("/", response_model=List[BranchResponse])
+@router.get("", response_model=List[BranchResponse])
 async def list_branches(
     area_id: Optional[int] = None,
     territory_id: Optional[int] = None,
@@ -115,7 +115,7 @@ def generate_password(length=10):
     return ''.join(secrets.choice(chars) for _ in range(length))
 
 
-@router.post("/", status_code=status.HTTP_201_CREATED)
+@router.post("", status_code=status.HTTP_201_CREATED)
 async def create_branch(
     data: BranchCreate,
     current_user: User = Depends(require_role([UserRole.SUPREME_ADMIN])),

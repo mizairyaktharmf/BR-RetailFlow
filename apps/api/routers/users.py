@@ -66,7 +66,7 @@ async def get_pending_approvals(
     return [enrich_user_response(u, db) for u in users]
 
 
-@router.get("/", response_model=List[UserResponse])
+@router.get("", response_model=List[UserResponse])
 async def list_users(
     role: Optional[UserRole] = None,
     branch_id: Optional[int] = None,
@@ -144,7 +144,7 @@ async def get_user(
     return enrich_user_response(user, db)
 
 
-@router.post("/", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
+@router.post("", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
 async def create_user(
     user_data: UserCreate,
     current_user: User = Depends(require_role([UserRole.SUPREME_ADMIN])),
