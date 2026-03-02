@@ -320,7 +320,7 @@ async def extract_budget_sheet(image_bytes: bytes) -> dict:
     response = client.models.generate_content(
         model="gemini-2.5-flash",
         contents=[img, BUDGET_SHEET_PROMPT],
-        config=types.GenerateContentConfig(temperature=0.1, max_output_tokens=8192),
+        config=types.GenerateContentConfig(temperature=0.1, max_output_tokens=65536),
     )
     budget_data = _parse_json_response(response.text)
 
