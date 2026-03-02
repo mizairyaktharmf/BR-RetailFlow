@@ -416,13 +416,13 @@ class ApiService {
   }
 
   // ============ BUDGET ============
-  async uploadBudgetSheet(file, branchId) {
+  async uploadBudgetExcel(file, branchId) {
     const formData = new FormData()
     formData.append('file', file)
 
     const token = this.getToken()
     const response = await fetch(
-      `${this.baseUrl}/budget/upload?branch_id=${branchId}`,
+      `${this.baseUrl}/budget/upload-excel?branch_id=${branchId}`,
       {
         method: 'POST',
         headers: { 'Authorization': `Bearer ${token}` },
@@ -430,7 +430,7 @@ class ApiService {
       }
     )
 
-    if (!response.ok) throw new Error('Budget extraction failed')
+    if (!response.ok) throw new Error('Budget parsing failed')
     return response.json()
   }
 

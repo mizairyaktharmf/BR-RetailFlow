@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from 'react'
 import {
   Target,
   Upload,
-  Camera,
+  FileSpreadsheet,
   Loader2,
   CheckCircle2,
   AlertTriangle,
@@ -89,7 +89,7 @@ export default function BudgetPage() {
     setExtracting(true)
     setExtractedData(null)
     try {
-      const result = await api.uploadBudgetSheet(file, selectedBranch.id)
+      const result = await api.uploadBudgetExcel(file, selectedBranch.id)
       if (result.success) {
         setExtractedData(result)
       } else {
@@ -341,8 +341,7 @@ export default function BudgetPage() {
                 <input
                   ref={fileRef}
                   type="file"
-                  accept="image/*"
-                  capture="environment"
+                  accept=".xlsx,.xls"
                   className="hidden"
                   onChange={handleFileSelect}
                 />
@@ -350,15 +349,15 @@ export default function BudgetPage() {
                 {extracting ? (
                   <div className="flex items-center justify-center gap-3 py-12 border-2 border-dashed border-slate-600 rounded-lg">
                     <Loader2 className="w-6 h-6 animate-spin text-purple-400" />
-                    <span className="text-sm text-slate-400">Extracting budget data from image...</span>
+                    <span className="text-sm text-slate-400">Reading budget data from Excel...</span>
                   </div>
                 ) : !extractedData ? (
                   <button
                     onClick={() => fileRef.current?.click()}
                     className="w-full py-12 border-2 border-dashed border-slate-600 hover:border-purple-500/50 rounded-lg flex flex-col items-center gap-2 transition-all"
                   >
-                    <Camera className="w-8 h-8 text-slate-500" />
-                    <span className="text-sm text-slate-400">Tap to capture or select budget sheet photo</span>
+                    <FileSpreadsheet className="w-8 h-8 text-slate-500" />
+                    <span className="text-sm text-slate-400">Upload Excel budget sheet (.xlsx)</span>
                     <span className="text-xs text-slate-500">{selectedBranch.name || selectedBranch.branch_name} — {selectedMonth}</span>
                   </button>
                 ) : null}
@@ -501,7 +500,7 @@ export default function BudgetPage() {
                     variant="outline"
                     className="border-slate-600 text-slate-300 hover:bg-slate-800"
                   >
-                    <RotateCcw className="w-4 h-4 mr-2" />Retake
+                    <RotateCcw className="w-4 h-4 mr-2" />Re-upload
                   </Button>
                 </div>
               </CardContent>

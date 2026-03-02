@@ -56,7 +56,76 @@ class BudgetExtractionResponse(BaseModel):
     error: Optional[str] = None
 
 
-# ============== 1. UPLOAD BUDGET SHEET PHOTO ==============
+# ============== 1A. UPLOAD BUDGET SHEET (EXCEL) ==============
+
+@router.post("/upload-excel", response_model=BudgetExtractionResponse)
+async def upload_budget_excel(
+    file: UploadFile = File(...),
+    branch_id: int = Query(...),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Upload a budget sheet Excel file (.xlsx) and parse data directly.
+    Much faster and more reliable than photo extraction."""
+    from services.budget_excel import parse_budget_excel
+
+    branch = db.query(Branch).filter(Branch.id == branch_id).first()
+    if not branch:
+        raise HTTPException(status_code=404, detail="Branch not found")
+
+    allowed_types = [
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        "application/vnd.ms-excel",
+        "application/octet-stream",
+    ]
+    if file.content_type not in allowed_types:
+        raise HTTPException(status_code=400, detail="Invalid file type. Please upload an Excel (.xlsx) file.")
+
+    try:
+        file_bytes = await file.read()
+        extracted = parse_budget_excel(file_bytes)
+
+        days = extracted.get("daily_data", [])
+        warnings = []
+
+        if len(days) == 0:
+            warnings.append("No daily data found in the Excel file")
+        elif len(days) < 28:
+            warnings.append(f"Only {len(days)} days extracted — expected 28-31")
+
+        kpis = extracted.get("kpis", {})
+
+        total_budget = sum((d.get("days_sales") or {}).get("budget") or 0 for d in days)
+        total_ly_sales = sum((d.get("days_sales") or {}).get("ly_2025") or 0 for d in days)
+        total_ly_gc = sum((d.get("days_guest_count") or {}).get("ly_2025") or 0 for d in days)
+        total_budget_gc = sum(d.get("_budget_gc") or 0 for d in days)
+        days_with_budget = [d for d in days if (d.get("days_sales") or {}).get("budget")]
+
+        calculated = {
+            "total_budget": total_budget,
+            "total_ly_sales": total_ly_sales,
+            "total_ly_gc": total_ly_gc,
+            "total_budget_gc": total_budget_gc,
+            "avg_daily_budget": round(total_budget / len(days_with_budget), 2) if days_with_budget else 0,
+            "ly_kpis": kpis,
+            "days_with_data": len(days_with_budget),
+        }
+
+        return BudgetExtractionResponse(
+            success=True,
+            extracted=extracted,
+            calculated=calculated,
+            warnings=warnings,
+        )
+    except Exception as e:
+        logger.error(f"Budget Excel parsing failed: {e}")
+        return BudgetExtractionResponse(
+            success=False,
+            error=str(e),
+        )
+
+
+# ============== 1B. UPLOAD BUDGET SHEET PHOTO (LEGACY) ==============
 
 @router.post("/upload", response_model=BudgetExtractionResponse)
 async def upload_budget_sheet(
