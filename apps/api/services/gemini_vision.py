@@ -273,7 +273,7 @@ async def extract_pos_sales(image_bytes: bytes) -> dict:
     client = _get_client()
     img = _image_from_bytes(image_bytes)
     response = client.models.generate_content(
-        model="gemini-2.0-flash",
+        model="gemini-2.5-flash",
         contents=[img, POS_SALES_PROMPT],
     )
     return _parse_json_response(response.text)
@@ -284,7 +284,7 @@ async def extract_pos_categories(image_bytes: bytes) -> dict:
     client = _get_client()
     img = _image_from_bytes(image_bytes)
     response = client.models.generate_content(
-        model="gemini-2.0-flash",
+        model="gemini-2.5-flash",
         contents=[img, CATEGORY_ITEMS_PROMPT],
     )
     return _parse_json_response(response.text)
@@ -295,7 +295,7 @@ async def extract_hd_sales(image_bytes: bytes) -> dict:
     client = _get_client()
     img = _image_from_bytes(image_bytes)
     response = client.models.generate_content(
-        model="gemini-2.0-flash",
+        model="gemini-2.5-flash",
         contents=[img, HOME_DELIVERY_PROMPT],
     )
     return _parse_json_response(response.text)
@@ -306,7 +306,7 @@ async def extract_deliveroo_sales(image_bytes: bytes) -> dict:
     client = _get_client()
     img = _image_from_bytes(image_bytes)
     response = client.models.generate_content(
-        model="gemini-2.0-flash",
+        model="gemini-2.5-flash",
         contents=[img, DELIVEROO_PROMPT],
     )
     return _parse_json_response(response.text)
@@ -318,7 +318,7 @@ async def extract_budget_sheet(image_bytes: bytes) -> dict:
     client = _get_client()
     img = _image_from_bytes(image_bytes)
     response = client.models.generate_content(
-        model="gemini-2.0-flash",
+        model="gemini-2.5-flash",
         contents=[img, BUDGET_SHEET_PROMPT],
         config=types.GenerateContentConfig(temperature=0.1, max_output_tokens=8192),
     )
