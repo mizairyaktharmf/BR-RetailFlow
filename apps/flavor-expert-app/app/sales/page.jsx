@@ -149,10 +149,13 @@ export default function SalesPage() {
       setBranch(b)
       // Load tracked promotion items for this branch
       api.getTrackedItems(b.id).then(items => {
+        console.log('Tracked items loaded:', items)
         if (Array.isArray(items)) {
-          setTrackedCodes(new Set(items.map(i => i.item_code)))
+          const codes = new Set(items.map(i => i.item_code))
+          console.log('Tracked codes:', [...codes])
+          setTrackedCodes(codes)
         }
-      }).catch(() => {})
+      }).catch(err => console.error('Failed to load tracked items:', err))
     }
     loadSubmittedWindows()
   }, [router])
@@ -241,6 +244,7 @@ export default function SalesPage() {
       }
 
       const successData = combinedResults.filter(r => r?.success).map(r => r.data)
+      console.log('All combined results:', JSON.stringify(combinedResults, null, 2))
 
       if (successData.length === 0) {
         throw new Error('Could not extract data from any photo. Please try again.')
@@ -250,8 +254,12 @@ export default function SalesPage() {
       const posDataArray = successData.map(d => d.sales_summary || {})
       const catDataArray = successData.map(d => ({ categories: d.categories || [], items: d.items || [] }))
 
+      console.log('Categories from each photo:', catDataArray.map(c => `cats=${c.categories.length}, items=${c.items.length}`))
+
       const posData = mergeNumericResults(posDataArray)
       const catData = mergeCategoryResults(catDataArray)
+
+      console.log('Merged catData:', JSON.stringify(catData, null, 2))
 
       setExtractedSales(posData)
       setExtractedCategories(catData)

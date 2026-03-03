@@ -268,6 +268,7 @@ async def extract_receipt(
             data = await extract_pos_categories(image_bytes)
         elif receipt_type == "pos_combined":
             data = await extract_pos_combined(image_bytes)
+            logger.info(f"POS Combined result: cats={len(data.get('categories', []))}, items={len(data.get('items', []))}, summary_keys={list(data.get('sales_summary', {}).keys())}")
         elif receipt_type == "hd":
             data = await extract_hd_sales(image_bytes)
         elif receipt_type == "deliveroo":
