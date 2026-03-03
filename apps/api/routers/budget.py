@@ -640,7 +640,7 @@ async def smart_advisor(
         "success": True,
         "date": str(date),
         "branch_id": branch_id,
-        "parlor_name": branch.branch_name if branch else None,
+        "parlor_name": branch.name if branch else None,
         "day_name": day_name,
         "windows_submitted": len(sales),
 
@@ -760,8 +760,8 @@ async def tracker_overview(
 
         overview.append({
             "branch_id": br.id,
-            "branch_code": br.branch_code,
-            "branch_name": br.branch_name,
+            "branch_code": br.code,
+            "branch_name": br.name,
             "day_name": bud.day_name if bud else None,
             "budget": budget_amt,
             "ly_sales": ly_sales_val,
