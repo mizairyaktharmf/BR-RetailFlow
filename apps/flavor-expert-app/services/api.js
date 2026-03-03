@@ -192,17 +192,25 @@ class ApiService {
     formData.append('file', file)
 
     const token = this.getToken()
-    const response = await fetch(
-      `${this.baseUrl}/sales/extract-receipt?receipt_type=${receiptType}`,
-      {
-        method: 'POST',
-        headers: { 'Authorization': `Bearer ${token}` },
-        body: formData,
-      }
-    )
+    const controller = new AbortController()
+    const timeoutId = setTimeout(() => controller.abort(), 120000) // 2 min timeout
 
-    if (!response.ok) throw new Error('Extraction failed')
-    return response.json()
+    try {
+      const response = await fetch(
+        `${this.baseUrl}/sales/extract-receipt?receipt_type=${receiptType}`,
+        {
+          method: 'POST',
+          headers: { 'Authorization': `Bearer ${token}` },
+          body: formData,
+          signal: controller.signal,
+        }
+      )
+
+      if (!response.ok) throw new Error('Extraction failed')
+      return response.json()
+    } finally {
+      clearTimeout(timeoutId)
+    }
   }
 
   async getBranchBudget(branchId, year, month) {

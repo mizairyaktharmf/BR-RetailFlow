@@ -222,12 +222,29 @@ export default function SalesPage() {
     setPosStatus('extracting')
 
     try {
-      // Single combined call per photo: extracts sales + categories + items together
-      const combinedPromises = posPhotos.map(f => api.extractReceipt(f, 'pos_combined'))
-      const combinedResults = await Promise.all(combinedPromises)
+      // Process photos ONE AT A TIME to avoid CloudFront/Gemini timeouts
+      const combinedResults = []
+      for (const file of posPhotos) {
+        let result = null
+        try {
+          result = await api.extractReceipt(file, 'pos_combined')
+        } catch (e1) {
+          // Retry once on failure
+          console.warn('First attempt failed, retrying...', e1.message)
+          try {
+            result = await api.extractReceipt(file, 'pos_combined')
+          } catch (e2) {
+            console.error('Retry also failed:', e2.message)
+          }
+        }
+        if (result) combinedResults.push(result)
+      }
 
       const successData = combinedResults.filter(r => r?.success).map(r => r.data)
-      console.log('Combined results:', combinedResults)
+
+      if (successData.length === 0) {
+        throw new Error('Could not extract data from any photo. Please try again.')
+      }
 
       // Split combined results into sales summaries and category data
       const posDataArray = successData.map(d => d.sales_summary || {})
@@ -235,8 +252,6 @@ export default function SalesPage() {
 
       const posData = mergeNumericResults(posDataArray)
       const catData = mergeCategoryResults(catDataArray)
-      console.log('Merged sales:', posData)
-      console.log('Merged categories:', catData)
 
       setExtractedSales(posData)
       setExtractedCategories(catData)

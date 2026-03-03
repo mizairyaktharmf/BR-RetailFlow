@@ -347,7 +347,7 @@ async def extract_pos_combined(image_bytes: bytes) -> dict:
     response = client.models.generate_content(
         model="gemini-2.5-flash",
         contents=[img, POS_COMBINED_PROMPT],
-        config=types.GenerateContentConfig(temperature=0.1, max_output_tokens=16384),
+        config=types.GenerateContentConfig(temperature=0.1, max_output_tokens=4096),
     )
     return _parse_json_response(response.text)
 
