@@ -9,7 +9,6 @@ import {
   CheckCircle2,
   Camera,
   X,
-  Sparkles,
   Plus,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -19,13 +18,7 @@ import api from '@/services/api'
 
 const MAX_PHOTOS = 5
 
-const SECTIONS = [
-  { key: 'pos', type: 'pos', label: 'POS Sales', bg: 'bg-orange-500', border: 'border-orange-200', required: true },
-  { key: 'hd', type: 'hd', label: 'Home Delivery', bg: 'bg-cyan-500', border: 'border-cyan-200', required: false },
-  { key: 'deliveroo', type: 'deliveroo', label: 'Deliveroo', bg: 'bg-teal-600', border: 'border-teal-200', required: false },
-]
-
-// Sum numeric fields from multiple extraction results
+// Merge numeric fields from multiple extraction results
 function mergeNumericResults(dataArray) {
   if (!dataArray.length) return {}
   return dataArray.reduce((acc, d) => {
@@ -69,18 +62,17 @@ export default function SalesPage() {
   const [submittedWindows, setSubmittedWindows] = useState([])
   const [loadingWindows, setLoadingWindows] = useState(true)
 
-  // photos: { pos: File[], hd: File[], deliveroo: File[] }
-  const [photos, setPhotos] = useState({ pos: [], hd: [], deliveroo: [] })
-  // previews: { pos: string[], hd: string[], deliveroo: string[] }
-  const [previews, setPreviews] = useState({ pos: [], hd: [], deliveroo: [] })
-  // section submitting status
-  const [sectionStatus, setSectionStatus] = useState({ pos: 'idle', hd: 'idle', deliveroo: 'idle' })
+  // POS photos
+  const [posPhotos, setPosPhotos] = useState([])
+  const [posPreviews, setPosPreviews] = useState([])
+  const [posStatus, setPosStatus] = useState('idle') // idle | extracting | done
+  const posFileRef = useRef(null)
 
-  const fileRefs = {
-    pos: useRef(null),
-    hd: useRef(null),
-    deliveroo: useRef(null),
-  }
+  // HD manual fields
+  const [hdData, setHdData] = useState({ gross_sales: '', net_sales: '', orders: '' })
+
+  // Deliveroo manual fields
+  const [delData, setDelData] = useState({ gross_sales: '', net_sales: '', orders: '' })
 
   useEffect(() => {
     const userData = localStorage.getItem('br_user')
@@ -92,11 +84,8 @@ export default function SalesPage() {
     loadSubmittedWindows()
   }, [router])
 
-  // Cleanup object URLs on unmount
   useEffect(() => {
-    return () => {
-      Object.values(previews).flat().forEach(url => URL.revokeObjectURL(url))
-    }
+    return () => { posPreviews.forEach(url => URL.revokeObjectURL(url)) }
   }, [])
 
   const loadSubmittedWindows = async () => {
@@ -128,90 +117,54 @@ export default function SalesPage() {
   }
 
   const resetAll = () => {
-    previews.pos.forEach(u => URL.revokeObjectURL(u))
-    previews.hd.forEach(u => URL.revokeObjectURL(u))
-    previews.deliveroo.forEach(u => URL.revokeObjectURL(u))
-    setPhotos({ pos: [], hd: [], deliveroo: [] })
-    setPreviews({ pos: [], hd: [], deliveroo: [] })
-    setSectionStatus({ pos: 'idle', hd: 'idle', deliveroo: 'idle' })
+    posPreviews.forEach(u => URL.revokeObjectURL(u))
+    setPosPhotos([])
+    setPosPreviews([])
+    setPosStatus('idle')
+    setHdData({ gross_sales: '', net_sales: '', orders: '' })
+    setDelData({ gross_sales: '', net_sales: '', orders: '' })
   }
 
-  const handleCapture = (sectionKey, e) => {
+  const handleCapture = (e) => {
     const file = e.target.files?.[0]
     if (!file) return
-    if (fileRefs[sectionKey]?.current) fileRefs[sectionKey].current.value = ''
+    if (posFileRef.current) posFileRef.current.value = ''
+    if (posPhotos.length >= MAX_PHOTOS) return
 
-    setPhotos(prev => {
-      if (prev[sectionKey].length >= MAX_PHOTOS) return prev
-      return { ...prev, [sectionKey]: [...prev[sectionKey], file] }
-    })
-
-    const url = URL.createObjectURL(file)
-    setPreviews(prev => {
-      if (prev[sectionKey].length >= MAX_PHOTOS) return prev
-      return { ...prev, [sectionKey]: [...prev[sectionKey], url] }
-    })
+    setPosPhotos(prev => [...prev, file])
+    setPosPreviews(prev => [...prev, URL.createObjectURL(file)])
   }
 
-  const removePhoto = (sectionKey, index) => {
-    URL.revokeObjectURL(previews[sectionKey][index])
-    setPhotos(prev => ({
-      ...prev,
-      [sectionKey]: prev[sectionKey].filter((_, i) => i !== index),
-    }))
-    setPreviews(prev => ({
-      ...prev,
-      [sectionKey]: prev[sectionKey].filter((_, i) => i !== index),
-    }))
+  const removePhoto = (index) => {
+    URL.revokeObjectURL(posPreviews[index])
+    setPosPhotos(prev => prev.filter((_, i) => i !== index))
+    setPosPreviews(prev => prev.filter((_, i) => i !== index))
   }
 
-  // Extract all captured photos and save in one shot on Submit
   const handleSubmit = async () => {
-    if (photos.pos.length === 0) {
+    if (posPhotos.length === 0) {
       alert('Please capture at least one POS receipt photo')
       return
     }
     setSaving(true)
-    setSectionStatus({
-      pos: 'extracting',
-      hd: photos.hd.length > 0 ? 'extracting' : 'idle',
-      deliveroo: photos.deliveroo.length > 0 ? 'extracting' : 'idle',
-    })
+    setPosStatus('extracting')
 
     try {
-      // Extract all POS photos (sales + categories) in parallel
-      const posPromises = photos.pos.map(f => api.extractReceipt(f, 'pos'))
-      const catPromises = photos.pos.map(f => api.extractReceipt(f, 'pos_categories').catch(() => null))
+      // Extract POS photos with Gemini Vision
+      const posPromises = posPhotos.map(f => api.extractReceipt(f, 'pos'))
+      const catPromises = posPhotos.map(f => api.extractReceipt(f, 'pos_categories').catch(() => null))
       const [posResults, catResults] = await Promise.all([
         Promise.all(posPromises),
         Promise.all(catPromises),
       ])
-      setSectionStatus(prev => ({ ...prev, pos: 'done' }))
+      setPosStatus('done')
 
       const posDataArray = posResults.filter(r => r?.success).map(r => r.data)
       const catDataArray = catResults.filter(r => r?.success).map(r => r.data)
       const posData = mergeNumericResults(posDataArray)
       const catData = mergeCategoryResults(catDataArray)
 
-      // Extract all HD photos
-      let hdData = {}
-      if (photos.hd.length > 0) {
-        const hdResults = await Promise.all(photos.hd.map(f => api.extractReceipt(f, 'hd')))
-        const hdDataArray = hdResults.filter(r => r?.success).map(r => r.data)
-        hdData = mergeNumericResults(hdDataArray)
-        setSectionStatus(prev => ({ ...prev, hd: 'done' }))
-      }
-
-      // Extract all Deliveroo photos
-      let deliverooData = {}
-      if (photos.deliveroo.length > 0) {
-        const drResults = await Promise.all(photos.deliveroo.map(f => api.extractReceipt(f, 'deliveroo')))
-        const drDataArray = drResults.filter(r => r?.success).map(r => r.data?.totals || r.data)
-        deliverooData = mergeNumericResults(drDataArray)
-        setSectionStatus(prev => ({ ...prev, deliveroo: 'done' }))
-      }
-
-      // Build JSON payloads
+      // Build category/items JSON
       const categoryJson = catData.categories?.length > 0
         ? JSON.stringify(catData.categories.map(c => ({
             name: c.name, qty: c.quantity || 0, sales: c.sales || 0, pct: c.contribution_pct || 0,
@@ -230,12 +183,12 @@ export default function SalesPage() {
         cash_sales: posData.cash_sales || 0,
         category_data: categoryJson,
         items_data: itemsJson,
-        hd_gross_sales: hdData.gross_sales || 0,
-        hd_net_sales: hdData.net_sales || 0,
-        hd_orders: hdData.orders || 0,
-        deliveroo_gross_sales: deliverooData.gross_sales || 0,
-        deliveroo_net_sales: deliverooData.net_sales || 0,
-        deliveroo_orders: deliverooData.total_orders || 0,
+        hd_gross_sales: parseFloat(hdData.gross_sales) || 0,
+        hd_net_sales: parseFloat(hdData.net_sales) || 0,
+        hd_orders: parseInt(hdData.orders) || 0,
+        deliveroo_gross_sales: parseFloat(delData.gross_sales) || 0,
+        deliveroo_net_sales: parseFloat(delData.net_sales) || 0,
+        deliveroo_orders: parseInt(delData.orders) || 0,
       })
 
       const updated = [...submittedWindows, selectedWindow]
@@ -251,18 +204,33 @@ export default function SalesPage() {
       loadSubmittedWindows()
     } catch (err) {
       console.error(err)
-      setSectionStatus({
-        pos: photos.pos.length > 0 ? 'captured' : 'idle',
-        hd: photos.hd.length > 0 ? 'captured' : 'idle',
-        deliveroo: photos.deliveroo.length > 0 ? 'captured' : 'idle',
-      })
+      setPosStatus(posPhotos.length > 0 ? 'idle' : 'idle')
       alert('Failed: ' + err.message)
     } finally {
       setSaving(false)
     }
   }
 
-  const canSubmit = photos.pos.length > 0 && !saving
+  const canSubmit = posPhotos.length > 0 && !saving
+
+  // Input field helper
+  const NumField = ({ label, value, onChange, placeholder, prefix = 'AED' }) => (
+    <div>
+      <label className="text-[10px] font-medium text-gray-500 uppercase tracking-wide">{label}</label>
+      <div className="flex items-center mt-0.5 border border-gray-200 rounded-lg bg-gray-50 overflow-hidden">
+        {prefix && <span className="text-[10px] text-gray-400 pl-2 pr-1">{prefix}</span>}
+        <input
+          type="number"
+          inputMode="decimal"
+          step="any"
+          value={value}
+          onChange={onChange}
+          placeholder={placeholder || '0'}
+          className="flex-1 px-2 py-2 text-sm bg-transparent outline-none text-gray-800"
+        />
+      </div>
+    </div>
+  )
 
   return (
     <div className="min-h-screen bg-gray-50 pb-24">
@@ -325,114 +293,132 @@ export default function SalesPage() {
             </Alert>
           ) : (
             <div className="space-y-3">
-              {/* Info Banner */}
-              <div className="bg-blue-50 border border-blue-200 rounded-xl px-3 py-2 flex items-start gap-2">
-                <Sparkles className="w-4 h-4 text-blue-500 shrink-0 mt-0.5" />
-                <p className="text-[11px] text-blue-700">
-                  Capture up to <strong>5 photos per section</strong>, then tap <strong>Submit</strong> — AI will extract and save all automatically.
-                </p>
-              </div>
 
-              {/* Photo Sections */}
-              {SECTIONS.map((s) => {
-                const sPhotos = photos[s.key]
-                const sPreviews = previews[s.key]
-                const status = sectionStatus[s.key]
-                const hasPhotos = sPhotos.length > 0
-                const canAddMore = sPhotos.length < MAX_PHOTOS && !saving
+              {/* ============== POS SECTION (Camera) ============== */}
+              <div className="bg-white rounded-xl p-3 border border-orange-200">
+                <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center gap-2">
+                    <span className="text-[11px] font-bold text-white px-2.5 py-0.5 rounded-full bg-orange-500">POS Sales</span>
+                    <span className="text-[10px] text-red-400 font-medium">Required</span>
+                  </div>
+                  <span className="text-[10px] text-gray-400">{posPhotos.length}/{MAX_PHOTOS} photos</span>
+                </div>
 
-                return (
-                  <div key={s.key} className={`bg-white rounded-xl p-3 border ${s.border}`}>
-                    {/* Section Header */}
-                    <div className="flex items-center justify-between mb-2">
-                      <div className="flex items-center gap-2">
-                        <span className={`text-[11px] font-bold text-white px-2.5 py-0.5 rounded-full ${s.bg}`}>{s.label}</span>
-                        {s.required && <span className="text-[10px] text-red-400 font-medium">Required</span>}
-                        {!s.required && <span className="text-[10px] text-gray-400">Optional</span>}
+                <input
+                  ref={posFileRef}
+                  type="file"
+                  accept="image/*"
+                  capture="environment"
+                  className="hidden"
+                  onChange={handleCapture}
+                />
+
+                {/* Extracting */}
+                {posStatus === 'extracting' && (
+                  <div className="flex items-center justify-center gap-2 py-3 bg-orange-50 rounded-lg mb-2">
+                    <Loader2 className="w-4 h-4 animate-spin text-orange-400" />
+                    <span className="text-xs text-orange-600">Extracting {posPhotos.length} photo{posPhotos.length > 1 ? 's' : ''}...</span>
+                  </div>
+                )}
+
+                {/* Done */}
+                {posStatus === 'done' && (
+                  <div className="flex items-center gap-2 py-2 px-2 bg-green-50 rounded-lg mb-2">
+                    <CheckCircle2 className="w-4 h-4 text-green-500" />
+                    <span className="text-xs text-green-700 font-medium">Data extracted & saved</span>
+                  </div>
+                )}
+
+                {/* Photo thumbnails */}
+                {posPhotos.length > 0 && posStatus === 'idle' && (
+                  <div className="grid grid-cols-5 gap-1.5 mb-2">
+                    {posPreviews.map((url, idx) => (
+                      <div key={idx} className="relative aspect-square rounded-lg overflow-hidden bg-gray-100 border border-gray-200">
+                        <img src={url} alt={`photo ${idx + 1}`} className="w-full h-full object-cover" />
+                        <button
+                          onClick={() => removePhoto(idx)}
+                          className="absolute top-0.5 right-0.5 w-4 h-4 bg-red-500 rounded-full flex items-center justify-center"
+                        >
+                          <X className="w-2.5 h-2.5 text-white" />
+                        </button>
                       </div>
-                      <span className="text-[10px] text-gray-400">{sPhotos.length}/{MAX_PHOTOS} photos</span>
-                    </div>
-
-                    {/* Hidden file input */}
-                    <input
-                      ref={fileRefs[s.key]}
-                      type="file"
-                      accept="image/*"
-                      capture="environment"
-                      className="hidden"
-                      onChange={(e) => handleCapture(s.key, e)}
-                    />
-
-                    {/* Extracting overlay */}
-                    {status === 'extracting' && (
-                      <div className="flex items-center justify-center gap-2 py-3 bg-orange-50 rounded-lg mb-2">
-                        <Loader2 className="w-4 h-4 animate-spin text-orange-400" />
-                        <span className="text-xs text-orange-600">Extracting {sPhotos.length} photo{sPhotos.length > 1 ? 's' : ''}...</span>
-                      </div>
-                    )}
-
-                    {/* Done state */}
-                    {status === 'done' && (
-                      <div className="flex items-center gap-2 py-2 px-2 bg-green-50 rounded-lg mb-2">
-                        <CheckCircle2 className="w-4 h-4 text-green-500" />
-                        <span className="text-xs text-green-700 font-medium">Data extracted & saved</span>
-                      </div>
-                    )}
-
-                    {/* Photo thumbnails grid */}
-                    {hasPhotos && status !== 'extracting' && status !== 'done' && (
-                      <div className="grid grid-cols-5 gap-1.5 mb-2">
-                        {sPreviews.map((url, idx) => (
-                          <div key={idx} className="relative aspect-square rounded-lg overflow-hidden bg-gray-100 border border-gray-200">
-                            <img src={url} alt={`photo ${idx + 1}`} className="w-full h-full object-cover" />
-                            <button
-                              onClick={() => removePhoto(s.key, idx)}
-                              className="absolute top-0.5 right-0.5 w-4 h-4 bg-red-500 rounded-full flex items-center justify-center"
-                            >
-                              <X className="w-2.5 h-2.5 text-white" />
-                            </button>
-                            <span className="absolute bottom-0.5 left-0.5 text-[9px] bg-black/50 text-white px-1 rounded">
-                              {idx + 1}
-                            </span>
-                          </div>
-                        ))}
-
-                        {/* Add more button (if under limit) */}
-                        {canAddMore && (
-                          <button
-                            onClick={() => fileRefs[s.key].current?.click()}
-                            className="aspect-square rounded-lg border-2 border-dashed border-gray-300 hover:border-orange-400 bg-gray-50 flex flex-col items-center justify-center gap-0.5 transition-all active:scale-95"
-                          >
-                            <Plus className="w-4 h-4 text-gray-400" />
-                            <span className="text-[9px] text-gray-400">Add</span>
-                          </button>
-                        )}
-                      </div>
-                    )}
-
-                    {/* Idle: first camera button */}
-                    {!hasPhotos && status !== 'extracting' && status !== 'done' && (
+                    ))}
+                    {posPhotos.length < MAX_PHOTOS && (
                       <button
-                        onClick={() => fileRefs[s.key].current?.click()}
-                        className="w-full py-5 rounded-lg border-2 border-dashed border-gray-300 hover:border-gray-400 bg-gray-50 flex flex-col items-center gap-1 active:scale-95 transition-all"
+                        onClick={() => posFileRef.current?.click()}
+                        className="aspect-square rounded-lg border-2 border-dashed border-gray-300 hover:border-orange-400 bg-gray-50 flex flex-col items-center justify-center gap-0.5"
                       >
-                        <Camera className="w-7 h-7 text-gray-400" />
-                        <span className="text-xs text-gray-500">Tap to capture {s.label}</span>
-                        <span className="text-[10px] text-gray-400">Up to {MAX_PHOTOS} photos</span>
+                        <Plus className="w-4 h-4 text-gray-400" />
+                        <span className="text-[9px] text-gray-400">Add</span>
                       </button>
                     )}
-
-                    {/* Show photo count when captured */}
-                    {hasPhotos && status !== 'extracting' && status !== 'done' && (
-                      <p className="text-[10px] text-green-600 font-medium mt-1">
-                        <CheckCircle2 className="w-3 h-3 inline mr-1" />
-                        {sPhotos.length} photo{sPhotos.length > 1 ? 's' : ''} ready
-                        {sPhotos.length < MAX_PHOTOS && ' — tap + to add more'}
-                      </p>
-                    )}
                   </div>
-                )
-              })}
+                )}
+
+                {/* Empty: camera button */}
+                {posPhotos.length === 0 && posStatus === 'idle' && (
+                  <button
+                    onClick={() => posFileRef.current?.click()}
+                    className="w-full py-5 rounded-lg border-2 border-dashed border-gray-300 hover:border-gray-400 bg-gray-50 flex flex-col items-center gap-1 active:scale-95 transition-all"
+                  >
+                    <Camera className="w-7 h-7 text-gray-400" />
+                    <span className="text-xs text-gray-500">Tap to capture POS Sales receipt</span>
+                    <span className="text-[10px] text-gray-400">Up to {MAX_PHOTOS} photos</span>
+                  </button>
+                )}
+              </div>
+
+              {/* ============== HOME DELIVERY SECTION (Manual Input) ============== */}
+              <div className="bg-white rounded-xl p-3 border border-cyan-200">
+                <div className="flex items-center gap-2 mb-3">
+                  <span className="text-[11px] font-bold text-white px-2.5 py-0.5 rounded-full bg-cyan-500">Home Delivery</span>
+                  <span className="text-[10px] text-gray-400">Optional</span>
+                </div>
+                <div className="grid grid-cols-3 gap-2">
+                  <NumField
+                    label="Gross Sales"
+                    value={hdData.gross_sales}
+                    onChange={(e) => setHdData(p => ({ ...p, gross_sales: e.target.value }))}
+                  />
+                  <NumField
+                    label="Net Sales"
+                    value={hdData.net_sales}
+                    onChange={(e) => setHdData(p => ({ ...p, net_sales: e.target.value }))}
+                  />
+                  <NumField
+                    label="Orders"
+                    value={hdData.orders}
+                    onChange={(e) => setHdData(p => ({ ...p, orders: e.target.value }))}
+                    prefix=""
+                  />
+                </div>
+              </div>
+
+              {/* ============== DELIVEROO SECTION (Manual Input) ============== */}
+              <div className="bg-white rounded-xl p-3 border border-teal-200">
+                <div className="flex items-center gap-2 mb-3">
+                  <span className="text-[11px] font-bold text-white px-2.5 py-0.5 rounded-full bg-teal-600">Deliveroo</span>
+                  <span className="text-[10px] text-gray-400">Optional</span>
+                </div>
+                <div className="grid grid-cols-3 gap-2">
+                  <NumField
+                    label="Gross Sales"
+                    value={delData.gross_sales}
+                    onChange={(e) => setDelData(p => ({ ...p, gross_sales: e.target.value }))}
+                  />
+                  <NumField
+                    label="Net Sales"
+                    value={delData.net_sales}
+                    onChange={(e) => setDelData(p => ({ ...p, net_sales: e.target.value }))}
+                  />
+                  <NumField
+                    label="Orders"
+                    value={delData.orders}
+                    onChange={(e) => setDelData(p => ({ ...p, orders: e.target.value }))}
+                    prefix=""
+                  />
+                </div>
+              </div>
 
               {/* Submit */}
               <Button
@@ -447,7 +433,7 @@ export default function SalesPage() {
                 )}
               </Button>
 
-              {!photos.pos.length && (
+              {!posPhotos.length && (
                 <p className="text-center text-[11px] text-gray-400">Capture at least one POS photo to submit</p>
               )}
             </div>
