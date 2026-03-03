@@ -230,9 +230,13 @@ export default function SalesPage() {
       ])
 
       const posDataArray = posResults.filter(r => r?.success).map(r => r.data)
-      const catDataArray = catResults.filter(r => r?.success).map(r => r.data)
+      const catDataArray = catResults.filter(r => r !== null && r?.success).map(r => r.data)
+      console.log('POS results:', posResults)
+      console.log('Category results:', catResults)
+      console.log('Category data array:', catDataArray)
       const posData = mergeNumericResults(posDataArray)
       const catData = mergeCategoryResults(catDataArray)
+      console.log('Merged categories:', catData)
 
       setExtractedSales(posData)
       setExtractedCategories(catData)
