@@ -290,6 +290,11 @@ class ApiService {
       body: JSON.stringify(data),
     })
   }
+
+  // ============ TRACKED PROMOTION ITEMS ============
+  async getTrackedItems(branchId) {
+    return this.request(`/sales/tracked-items?branch_id=${branchId}`)
+  }
 }
 
 export const api = new ApiService()

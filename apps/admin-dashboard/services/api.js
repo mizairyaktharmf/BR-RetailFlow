@@ -456,6 +456,24 @@ class ApiService {
   async getTrackerOverview(date) {
     return this.request(`/budget/tracker-overview?date=${date}`)
   }
+
+  // ============ TRACKED PROMOTION ITEMS ============
+  async getTrackedItems(branchId) {
+    return this.request(`/sales/tracked-items?branch_id=${branchId}`)
+  }
+
+  async addTrackedItem(data) {
+    return this.request('/sales/tracked-items', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    })
+  }
+
+  async removeTrackedItem(itemId) {
+    return this.request(`/sales/tracked-items/${itemId}`, {
+      method: 'DELETE',
+    })
+  }
 }
 
 const api = new ApiService()

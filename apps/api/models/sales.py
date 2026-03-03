@@ -310,3 +310,28 @@ class BudgetUpload(Base):
 
     def __repr__(self):
         return f"<BudgetUpload {self.branch_id} {self.month}>"
+
+
+class TrackedItem(Base):
+    """
+    Tracked Promotion Item
+    Area managers select POS items to track as promotion items.
+    When POS data is extracted, matching items get highlighted.
+    """
+    __tablename__ = "tracked_items"
+
+    id = Column(Integer, primary_key=True, index=True)
+    branch_id = Column(Integer, ForeignKey("branches.id"), nullable=False)
+    item_code = Column(String(20), nullable=False)
+    item_name = Column(String(255), nullable=False)
+    category = Column(String(100), nullable=True)
+    is_active = Column(Boolean, default=True)
+
+    created_by = Column(Integer, ForeignKey("users.id"), nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    # Relationships
+    branch = relationship("Branch")
+
+    def __repr__(self):
+        return f"<TrackedItem {self.branch_id} {self.item_code} {self.item_name}>"

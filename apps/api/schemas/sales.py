@@ -82,3 +82,25 @@ class ReceiptExtractionResponse(BaseModel):
     success: bool
     data: dict = {}
     error: Optional[str] = None
+
+
+class TrackedItemCreate(BaseModel):
+    """Schema for adding a tracked promotion item"""
+    branch_id: int
+    item_code: str
+    item_name: str
+    category: Optional[str] = None
+
+
+class TrackedItemResponse(BaseModel):
+    """Schema for tracked item response"""
+    id: int
+    branch_id: int
+    item_code: str
+    item_name: str
+    category: Optional[str] = None
+    is_active: bool
+    created_at: datetime
+
+    class Config:
+        from_attributes = True

@@ -125,6 +125,9 @@ export default function SalesPage() {
   const [posStatus, setPosStatus] = useState('idle') // idle | extracting | review
   const posFileRef = useRef(null)
 
+  // Tracked promotion items
+  const [trackedCodes, setTrackedCodes] = useState(new Set())
+
   // Extracted data for review
   const [extractedSales, setExtractedSales] = useState(null)
   const [extractedCategories, setExtractedCategories] = useState(null)
@@ -141,7 +144,16 @@ export default function SalesPage() {
     const u = JSON.parse(userData)
     setUser(u)
     const branchData = localStorage.getItem('br_branch')
-    if (branchData) setBranch(JSON.parse(branchData))
+    if (branchData) {
+      const b = JSON.parse(branchData)
+      setBranch(b)
+      // Load tracked promotion items for this branch
+      api.getTrackedItems(b.id).then(items => {
+        if (Array.isArray(items)) {
+          setTrackedCodes(new Set(items.map(i => i.item_code)))
+        }
+      }).catch(() => {})
+    }
     loadSubmittedWindows()
   }, [router])
 
@@ -577,17 +589,25 @@ export default function SalesPage() {
                               </tr>
                             </thead>
                             <tbody>
-                              {itemsWithCalc.map((item, i) => (
-                                <tr key={i} className="border-t border-gray-100">
-                                  <td className="py-1 px-1.5 text-gray-500 font-mono">{item.code}</td>
-                                  <td className="py-1 px-1 text-gray-800 truncate max-w-[100px]">{item.name}</td>
-                                  <td className="text-right py-1 px-1 text-gray-600">{item.quantity}</td>
-                                  <td className="text-right py-1 px-1 text-gray-800">{(item.sales || 0).toFixed(2)}</td>
-                                  <td className="text-right py-1 px-1 text-gray-600">{item.contribution_pct || 0}%</td>
-                                  <td className="text-right py-1 px-1 text-blue-600 font-medium">{item.auv}</td>
-                                  <td className="text-right py-1 px-1.5 text-purple-600 font-medium">{item.ir}</td>
-                                </tr>
-                              ))}
+                              {itemsWithCalc.map((item, i) => {
+                                const isPromo = trackedCodes.has(item.code)
+                                return (
+                                  <tr key={i} className={`border-t ${isPromo ? 'bg-purple-50 border-purple-200' : 'border-gray-100'}`}>
+                                    <td className="py-1 px-1.5 font-mono">
+                                      <span className={isPromo ? 'text-purple-600 font-bold' : 'text-gray-500'}>{item.code}</span>
+                                    </td>
+                                    <td className="py-1 px-1 truncate max-w-[100px]">
+                                      <span className={isPromo ? 'text-purple-700 font-semibold' : 'text-gray-800'}>{item.name}</span>
+                                      {isPromo && <span className="ml-1 text-[8px] bg-purple-200 text-purple-700 px-1 rounded font-bold">PROMO</span>}
+                                    </td>
+                                    <td className="text-right py-1 px-1 text-gray-600">{item.quantity}</td>
+                                    <td className="text-right py-1 px-1 text-gray-800">{(item.sales || 0).toFixed(2)}</td>
+                                    <td className="text-right py-1 px-1 text-gray-600">{item.contribution_pct || 0}%</td>
+                                    <td className="text-right py-1 px-1 text-blue-600 font-medium">{item.auv}</td>
+                                    <td className="text-right py-1 px-1.5 text-purple-600 font-medium">{item.ir}</td>
+                                  </tr>
+                                )
+                              })}
                             </tbody>
                           </table>
                         </div>

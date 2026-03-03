@@ -14,8 +14,11 @@ from utils.database import get_db
 from utils.security import get_current_user
 from models.user import User
 from models.location import Branch
-from models.sales import DailySales, SalesWindowType, BranchBudget
-from schemas.sales import DailySalesCreate, DailySalesResponse, ReceiptExtractionResponse
+from models.sales import DailySales, SalesWindowType, BranchBudget, TrackedItem
+from schemas.sales import (
+    DailySalesCreate, DailySalesResponse, ReceiptExtractionResponse,
+    TrackedItemCreate, TrackedItemResponse,
+)
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -272,3 +275,63 @@ async def extract_receipt(
             data={},
             error=f"Extraction failed: {str(e)}",
         )
+
+
+# ============== TRACKED PROMOTION ITEMS ==============
+
+@router.get("/tracked-items", response_model=List[TrackedItemResponse])
+async def get_tracked_items(
+    branch_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Get all tracked promotion items for a branch."""
+    items = db.query(TrackedItem).filter(
+        TrackedItem.branch_id == branch_id,
+        TrackedItem.is_active == True,
+    ).order_by(TrackedItem.created_at.desc()).all()
+    return items
+
+
+@router.post("/tracked-items", response_model=TrackedItemResponse)
+async def add_tracked_item(
+    data: TrackedItemCreate,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Add a POS item to the promotion tracking list."""
+    # Check if already tracked
+    existing = db.query(TrackedItem).filter(
+        TrackedItem.branch_id == data.branch_id,
+        TrackedItem.item_code == data.item_code,
+        TrackedItem.is_active == True,
+    ).first()
+    if existing:
+        raise HTTPException(status_code=400, detail=f"Item {data.item_code} is already tracked")
+
+    item = TrackedItem(
+        branch_id=data.branch_id,
+        item_code=data.item_code,
+        item_name=data.item_name,
+        category=data.category,
+        created_by=current_user.id,
+    )
+    db.add(item)
+    db.commit()
+    db.refresh(item)
+    return item
+
+
+@router.delete("/tracked-items/{item_id}")
+async def remove_tracked_item(
+    item_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Remove (deactivate) a tracked promotion item."""
+    item = db.query(TrackedItem).filter(TrackedItem.id == item_id).first()
+    if not item:
+        raise HTTPException(status_code=404, detail="Tracked item not found")
+    item.is_active = False
+    db.commit()
+    return {"success": True, "message": f"Stopped tracking {item.item_name}"}
