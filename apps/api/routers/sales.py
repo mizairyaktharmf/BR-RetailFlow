@@ -245,6 +245,23 @@ async def extract_receipt(
     try:
         image_bytes = await file.read()
 
+        # Resize large images to reduce Gemini processing time
+        from PIL import Image
+        import io
+        try:
+            img = Image.open(io.BytesIO(image_bytes))
+            max_dim = 2048
+            if max(img.size) > max_dim:
+                ratio = max_dim / max(img.size)
+                new_size = (int(img.size[0] * ratio), int(img.size[1] * ratio))
+                img = img.resize(new_size, Image.LANCZOS)
+                buf = io.BytesIO()
+                img.save(buf, format='JPEG', quality=85)
+                image_bytes = buf.getvalue()
+                logger.info(f"Resized image to {new_size}, {len(image_bytes)} bytes")
+        except Exception as resize_err:
+            logger.warning(f"Image resize skipped: {resize_err}")
+
         if receipt_type == "pos":
             data = await extract_pos_sales(image_bytes)
         elif receipt_type == "pos_categories":
