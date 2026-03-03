@@ -81,6 +81,45 @@ Rules:
 - contribution_pct is the percentage shown in the last column
 - Return ONLY the JSON object, no other text"""
 
+POS_COMBINED_PROMPT = """Analyze this POS sales receipt image. Extract ALL data visible.
+
+Return ONLY a valid JSON object with these sections:
+
+{
+  "sales_summary": {
+    "branch_code": "string",
+    "date": "string (YYYY-MM-DD)",
+    "gross_sales": 0.00,
+    "returns": 0.00,
+    "net_sales": 0.00,
+    "discount": 0.00,
+    "tax": 0.00,
+    "guest_count": 0,
+    "atv": 0.00,
+    "cancelled": 0.00,
+    "cash_sales": 0.00,
+    "cash_gc": 0
+  },
+  "categories": [
+    {"name": "Cups & Cones", "quantity": 66, "sales": 1096.11, "contribution_pct": 34.8}
+  ],
+  "items": [
+    {"code": "1142", "name": "Chc Pnt Bliss S", "category": "Cups & Cones", "quantity": 2, "sales": 36.20, "contribution_pct": 1.1}
+  ]
+}
+
+Rules:
+- sales_summary: Extract from the Sales Summary section at top
+- guest_count = GC from Sales Summary (NOT from Cash Sales section)
+- atv = ATV from Sales Summary
+- cash_sales = "Cash Sales" or "Grs CashSls" amount
+- cash_gc = GC from the Cash Sales section
+- categories: Strip "T>" prefix. List ALL category total rows (T>Cups & Cones etc.)
+- items: List ALL individual items with 4-digit code, name, quantity, sales, contribution %
+- If a section is not visible on this image, use empty array [] for categories/items or 0 for numbers
+- Extract numbers exactly as shown, do not calculate
+- Return ONLY the JSON object, no other text"""
+
 HOME_DELIVERY_PROMPT = """Analyze this Home Delivery sales report image. Extract the following information and return ONLY a valid JSON object:
 
 {
@@ -296,6 +335,19 @@ async def extract_pos_categories(image_bytes: bytes) -> dict:
     response = client.models.generate_content(
         model="gemini-2.5-flash",
         contents=[img, CATEGORY_ITEMS_PROMPT],
+    )
+    return _parse_json_response(response.text)
+
+
+async def extract_pos_combined(image_bytes: bytes) -> dict:
+    """Extract ALL POS data (sales summary + categories + items) in one call."""
+    from google.genai import types
+    client = _get_client()
+    img = _image_from_bytes(image_bytes)
+    response = client.models.generate_content(
+        model="gemini-2.5-flash",
+        contents=[img, POS_COMBINED_PROMPT],
+        config=types.GenerateContentConfig(temperature=0.1, max_output_tokens=16384),
     )
     return _parse_json_response(response.text)
 

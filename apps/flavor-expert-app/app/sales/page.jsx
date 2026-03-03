@@ -222,20 +222,20 @@ export default function SalesPage() {
     setPosStatus('extracting')
 
     try {
-      const posPromises = posPhotos.map(f => api.extractReceipt(f, 'pos'))
-      const catPromises = posPhotos.map(f => api.extractReceipt(f, 'pos_categories').catch(() => null))
-      const [posResults, catResults] = await Promise.all([
-        Promise.all(posPromises),
-        Promise.all(catPromises),
-      ])
+      // Single combined call per photo: extracts sales + categories + items together
+      const combinedPromises = posPhotos.map(f => api.extractReceipt(f, 'pos_combined'))
+      const combinedResults = await Promise.all(combinedPromises)
 
-      const posDataArray = posResults.filter(r => r?.success).map(r => r.data)
-      const catDataArray = catResults.filter(r => r !== null && r?.success).map(r => r.data)
-      console.log('POS results:', posResults)
-      console.log('Category results:', catResults)
-      console.log('Category data array:', catDataArray)
+      const successData = combinedResults.filter(r => r?.success).map(r => r.data)
+      console.log('Combined results:', combinedResults)
+
+      // Split combined results into sales summaries and category data
+      const posDataArray = successData.map(d => d.sales_summary || {})
+      const catDataArray = successData.map(d => ({ categories: d.categories || [], items: d.items || [] }))
+
       const posData = mergeNumericResults(posDataArray)
       const catData = mergeCategoryResults(catDataArray)
+      console.log('Merged sales:', posData)
       console.log('Merged categories:', catData)
 
       setExtractedSales(posData)

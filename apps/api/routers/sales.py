@@ -233,6 +233,7 @@ async def extract_receipt(
     from services.gemini_vision import (
         extract_pos_sales,
         extract_pos_categories,
+        extract_pos_combined,
         extract_hd_sales,
         extract_deliveroo_sales,
     )
@@ -248,12 +249,14 @@ async def extract_receipt(
             data = await extract_pos_sales(image_bytes)
         elif receipt_type == "pos_categories":
             data = await extract_pos_categories(image_bytes)
+        elif receipt_type == "pos_combined":
+            data = await extract_pos_combined(image_bytes)
         elif receipt_type == "hd":
             data = await extract_hd_sales(image_bytes)
         elif receipt_type == "deliveroo":
             data = await extract_deliveroo_sales(image_bytes)
         else:
-            raise HTTPException(status_code=400, detail=f"Invalid receipt_type: {receipt_type}. Use pos, pos_categories, hd, or deliveroo.")
+            raise HTTPException(status_code=400, detail=f"Invalid receipt_type: {receipt_type}.")
 
         return ReceiptExtractionResponse(
             receipt_type=receipt_type,
