@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import {
   ArrowLeft,
@@ -10,6 +10,8 @@ import {
   Camera,
   X,
   Plus,
+  Eye,
+  RotateCcw,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
@@ -18,18 +20,28 @@ import api from '@/services/api'
 
 const MAX_PHOTOS = 5
 
+// Color palette for pie chart
+const PIE_COLORS = [
+  '#F97316', '#0EA5E9', '#8B5CF6', '#10B981', '#EF4444',
+  '#F59E0B', '#EC4899', '#6366F1', '#14B8A6', '#84CC16',
+]
+
 // Merge numeric fields from multiple extraction results
 function mergeNumericResults(dataArray) {
   if (!dataArray.length) return {}
   return dataArray.reduce((acc, d) => {
     const keys = ['gross_sales', 'net_sales', 'total_sales', 'guest_count', 'cash_sales',
-                  'discount', 'tax', 'orders', 'total_orders', 'avg_sales_per_order']
+                  'cash_gc', 'discount', 'tax', 'atv', 'returns', 'cancelled',
+                  'total_sales_with_tax', 'orders', 'total_orders']
     const merged = { ...acc }
     for (const k of keys) {
-      if (d[k] !== undefined) {
+      if (d[k] !== undefined && d[k] !== null) {
         merged[k] = (merged[k] || 0) + (Number(d[k]) || 0)
       }
     }
+    // For branch_code and date, take first non-empty
+    if (d.branch_code && !merged.branch_code) merged.branch_code = d.branch_code
+    if (d.date && !merged.date) merged.date = d.date
     return merged
   }, {})
 }
@@ -53,6 +65,51 @@ function mergeCategoryResults(dataArray) {
   return merged
 }
 
+// Simple SVG pie chart component
+function PieChart({ categories }) {
+  if (!categories?.length) return null
+  const total = categories.reduce((s, c) => s + (c.sales || 0), 0)
+  if (total === 0) return null
+
+  let cumAngle = 0
+  const slices = categories.map((cat, i) => {
+    const pct = (cat.sales || 0) / total
+    const startAngle = cumAngle
+    cumAngle += pct * 360
+    const endAngle = cumAngle
+    const startRad = (startAngle - 90) * Math.PI / 180
+    const endRad = (endAngle - 90) * Math.PI / 180
+    const largeArc = pct > 0.5 ? 1 : 0
+    const x1 = 50 + 40 * Math.cos(startRad)
+    const y1 = 50 + 40 * Math.sin(startRad)
+    const x2 = 50 + 40 * Math.cos(endRad)
+    const y2 = 50 + 40 * Math.sin(endRad)
+    const path = pct >= 0.999
+      ? `M50,10 A40,40 0 1,1 49.99,10 Z`
+      : `M50,50 L${x1},${y1} A40,40 0 ${largeArc},1 ${x2},${y2} Z`
+    return { path, color: PIE_COLORS[i % PIE_COLORS.length], name: cat.name, pct: (pct * 100).toFixed(1) }
+  })
+
+  return (
+    <div className="flex items-start gap-3">
+      <svg viewBox="0 0 100 100" className="w-28 h-28 flex-shrink-0">
+        {slices.map((s, i) => (
+          <path key={i} d={s.path} fill={s.color} stroke="white" strokeWidth="0.5" />
+        ))}
+      </svg>
+      <div className="flex-1 space-y-1 pt-1">
+        {slices.map((s, i) => (
+          <div key={i} className="flex items-center gap-1.5 text-[10px]">
+            <span className="w-2.5 h-2.5 rounded-sm flex-shrink-0" style={{ backgroundColor: s.color }} />
+            <span className="text-gray-700 truncate flex-1">{s.name}</span>
+            <span className="font-medium text-gray-900">{s.pct}%</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
 export default function SalesPage() {
   const router = useRouter()
   const [user, setUser] = useState(null)
@@ -65,8 +122,12 @@ export default function SalesPage() {
   // POS photos
   const [posPhotos, setPosPhotos] = useState([])
   const [posPreviews, setPosPreviews] = useState([])
-  const [posStatus, setPosStatus] = useState('idle') // idle | extracting | done
+  const [posStatus, setPosStatus] = useState('idle') // idle | extracting | review
   const posFileRef = useRef(null)
+
+  // Extracted data for review
+  const [extractedSales, setExtractedSales] = useState(null)
+  const [extractedCategories, setExtractedCategories] = useState(null)
 
   // HD manual fields
   const [hdData, setHdData] = useState({ gross_sales: '', net_sales: '', orders: '' })
@@ -121,6 +182,8 @@ export default function SalesPage() {
     setPosPhotos([])
     setPosPreviews([])
     setPosStatus('idle')
+    setExtractedSales(null)
+    setExtractedCategories(null)
     setHdData({ gross_sales: '', net_sales: '', orders: '' })
     setDelData({ gross_sales: '', net_sales: '', orders: '' })
   }
@@ -141,47 +204,93 @@ export default function SalesPage() {
     setPosPreviews(prev => prev.filter((_, i) => i !== index))
   }
 
-  const handleSubmit = async () => {
-    if (posPhotos.length === 0) {
-      alert('Please capture at least one POS receipt photo')
-      return
-    }
-    setSaving(true)
+  // Extract POS data from photos (step 1)
+  const handleExtract = async () => {
+    if (posPhotos.length === 0) return
     setPosStatus('extracting')
 
     try {
-      // Extract POS photos with Gemini Vision
       const posPromises = posPhotos.map(f => api.extractReceipt(f, 'pos'))
       const catPromises = posPhotos.map(f => api.extractReceipt(f, 'pos_categories').catch(() => null))
       const [posResults, catResults] = await Promise.all([
         Promise.all(posPromises),
         Promise.all(catPromises),
       ])
-      setPosStatus('done')
 
       const posDataArray = posResults.filter(r => r?.success).map(r => r.data)
       const catDataArray = catResults.filter(r => r?.success).map(r => r.data)
       const posData = mergeNumericResults(posDataArray)
       const catData = mergeCategoryResults(catDataArray)
 
-      // Build category/items JSON
-      const categoryJson = catData.categories?.length > 0
-        ? JSON.stringify(catData.categories.map(c => ({
+      setExtractedSales(posData)
+      setExtractedCategories(catData)
+      setPosStatus('review')
+    } catch (err) {
+      console.error(err)
+      setPosStatus('idle')
+      alert('Extraction failed: ' + err.message)
+    }
+  }
+
+  // Calculate AUV and IR for items
+  const itemsWithCalc = useMemo(() => {
+    if (!extractedCategories?.items?.length || !extractedSales) return []
+    const gc = extractedSales.guest_count || 0
+    return extractedCategories.items.map(item => {
+      const qty = item.quantity || 0
+      const sales = item.sales || 0
+      return {
+        ...item,
+        auv: qty > 0 ? (sales / qty).toFixed(2) : '0.00',
+        ir: gc > 0 ? ((qty / gc) * 100).toFixed(1) : '0.0',
+      }
+    })
+  }, [extractedCategories, extractedSales])
+
+  // Calculate category-level AUV and IR
+  const categoriesWithCalc = useMemo(() => {
+    if (!extractedCategories?.categories?.length || !extractedSales) return []
+    const gc = extractedSales.guest_count || 0
+    return extractedCategories.categories.map(cat => {
+      const qty = cat.quantity || 0
+      const sales = cat.sales || 0
+      return {
+        ...cat,
+        auv: qty > 0 ? (sales / qty).toFixed(2) : '0.00',
+        ir: gc > 0 ? ((qty / gc) * 100).toFixed(1) : '0.0',
+      }
+    })
+  }, [extractedCategories, extractedSales])
+
+  // Save all data (step 2)
+  const handleSubmit = async () => {
+    if (!extractedSales) {
+      alert('Please extract POS data first')
+      return
+    }
+    setSaving(true)
+
+    try {
+      const catData = extractedCategories?.categories?.length > 0
+        ? JSON.stringify(extractedCategories.categories.map(c => ({
             name: c.name, qty: c.quantity || 0, sales: c.sales || 0, pct: c.contribution_pct || 0,
           })))
         : null
-      const itemsJson = catData.items?.length > 0 ? JSON.stringify(catData.items) : null
+      const itemsJson = extractedCategories?.items?.length > 0
+        ? JSON.stringify(extractedCategories.items)
+        : null
 
-      // Save to DB
       await api.submitSales({
         branch_id: user.branch_id || 1,
         date: new Date().toISOString().split('T')[0],
         sales_window: selectedWindow,
-        gross_sales: posData.gross_sales || 0,
-        total_sales: posData.net_sales || posData.total_sales || 0,
-        transaction_count: posData.guest_count || 0,
-        cash_sales: posData.cash_sales || 0,
-        category_data: categoryJson,
+        gross_sales: extractedSales.gross_sales || 0,
+        total_sales: extractedSales.net_sales || extractedSales.total_sales || 0,
+        transaction_count: extractedSales.guest_count || 0,
+        cash_sales: extractedSales.cash_sales || 0,
+        cash_gc: extractedSales.cash_gc || 0,
+        atv: extractedSales.atv || 0,
+        category_data: catData,
         items_data: itemsJson,
         hd_gross_sales: parseFloat(hdData.gross_sales) || 0,
         hd_net_sales: parseFloat(hdData.net_sales) || 0,
@@ -204,14 +313,11 @@ export default function SalesPage() {
       loadSubmittedWindows()
     } catch (err) {
       console.error(err)
-      setPosStatus(posPhotos.length > 0 ? 'idle' : 'idle')
       alert('Failed: ' + err.message)
     } finally {
       setSaving(false)
     }
   }
-
-  const canSubmit = posPhotos.length > 0 && !saving
 
   // Input field helper
   const NumField = ({ label, value, onChange, placeholder, prefix = 'AED' }) => (
@@ -229,6 +335,17 @@ export default function SalesPage() {
           className="flex-1 px-2 py-2 text-sm bg-transparent outline-none text-gray-800"
         />
       </div>
+    </div>
+  )
+
+  // Summary card helper
+  const SummaryCard = ({ label, value, prefix = 'AED', color = 'text-gray-900' }) => (
+    <div className="bg-gray-50 rounded-lg p-2 text-center">
+      <p className="text-[9px] font-medium text-gray-500 uppercase tracking-wide">{label}</p>
+      <p className={`text-sm font-bold ${color} mt-0.5`}>
+        {prefix && <span className="text-[10px] font-normal text-gray-400">{prefix} </span>}
+        {typeof value === 'number' ? value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : value}
+      </p>
     </div>
   )
 
@@ -294,7 +411,7 @@ export default function SalesPage() {
           ) : (
             <div className="space-y-3">
 
-              {/* ============== POS SECTION (Camera) ============== */}
+              {/* ============== POS SECTION ============== */}
               <div className="bg-white rounded-xl p-3 border border-orange-200">
                 <div className="flex items-center justify-between mb-2">
                   <div className="flex items-center gap-2">
@@ -313,58 +430,170 @@ export default function SalesPage() {
                   onChange={handleCapture}
                 />
 
-                {/* Extracting */}
-                {posStatus === 'extracting' && (
-                  <div className="flex items-center justify-center gap-2 py-3 bg-orange-50 rounded-lg mb-2">
-                    <Loader2 className="w-4 h-4 animate-spin text-orange-400" />
-                    <span className="text-xs text-orange-600">Extracting {posPhotos.length} photo{posPhotos.length > 1 ? 's' : ''}...</span>
-                  </div>
-                )}
-
-                {/* Done */}
-                {posStatus === 'done' && (
-                  <div className="flex items-center gap-2 py-2 px-2 bg-green-50 rounded-lg mb-2">
-                    <CheckCircle2 className="w-4 h-4 text-green-500" />
-                    <span className="text-xs text-green-700 font-medium">Data extracted & saved</span>
-                  </div>
-                )}
-
-                {/* Photo thumbnails */}
-                {posPhotos.length > 0 && posStatus === 'idle' && (
-                  <div className="grid grid-cols-5 gap-1.5 mb-2">
-                    {posPreviews.map((url, idx) => (
-                      <div key={idx} className="relative aspect-square rounded-lg overflow-hidden bg-gray-100 border border-gray-200">
-                        <img src={url} alt={`photo ${idx + 1}`} className="w-full h-full object-cover" />
-                        <button
-                          onClick={() => removePhoto(idx)}
-                          className="absolute top-0.5 right-0.5 w-4 h-4 bg-red-500 rounded-full flex items-center justify-center"
-                        >
-                          <X className="w-2.5 h-2.5 text-white" />
-                        </button>
+                {/* ---- IDLE: Capture photos ---- */}
+                {posStatus === 'idle' && (
+                  <>
+                    {posPhotos.length > 0 && (
+                      <div className="grid grid-cols-5 gap-1.5 mb-2">
+                        {posPreviews.map((url, idx) => (
+                          <div key={idx} className="relative aspect-square rounded-lg overflow-hidden bg-gray-100 border border-gray-200">
+                            <img src={url} alt={`photo ${idx + 1}`} className="w-full h-full object-cover" />
+                            <button
+                              onClick={() => removePhoto(idx)}
+                              className="absolute top-0.5 right-0.5 w-4 h-4 bg-red-500 rounded-full flex items-center justify-center"
+                            >
+                              <X className="w-2.5 h-2.5 text-white" />
+                            </button>
+                          </div>
+                        ))}
+                        {posPhotos.length < MAX_PHOTOS && (
+                          <button
+                            onClick={() => posFileRef.current?.click()}
+                            className="aspect-square rounded-lg border-2 border-dashed border-gray-300 hover:border-orange-400 bg-gray-50 flex flex-col items-center justify-center gap-0.5"
+                          >
+                            <Plus className="w-4 h-4 text-gray-400" />
+                            <span className="text-[9px] text-gray-400">Add</span>
+                          </button>
+                        )}
                       </div>
-                    ))}
-                    {posPhotos.length < MAX_PHOTOS && (
+                    )}
+
+                    {posPhotos.length === 0 && (
                       <button
                         onClick={() => posFileRef.current?.click()}
-                        className="aspect-square rounded-lg border-2 border-dashed border-gray-300 hover:border-orange-400 bg-gray-50 flex flex-col items-center justify-center gap-0.5"
+                        className="w-full py-5 rounded-lg border-2 border-dashed border-gray-300 hover:border-gray-400 bg-gray-50 flex flex-col items-center gap-1 active:scale-95 transition-all"
                       >
-                        <Plus className="w-4 h-4 text-gray-400" />
-                        <span className="text-[9px] text-gray-400">Add</span>
+                        <Camera className="w-7 h-7 text-gray-400" />
+                        <span className="text-xs text-gray-500">Tap to capture POS receipt</span>
+                        <span className="text-[10px] text-gray-400">Up to {MAX_PHOTOS} photos</span>
                       </button>
                     )}
+
+                    {posPhotos.length > 0 && (
+                      <Button
+                        onClick={handleExtract}
+                        className="w-full h-10 text-xs bg-blue-500 hover:bg-blue-600"
+                      >
+                        <Eye className="w-4 h-4 mr-1.5" />Extract Data from {posPhotos.length} Photo{posPhotos.length > 1 ? 's' : ''}
+                      </Button>
+                    )}
+                  </>
+                )}
+
+                {/* ---- EXTRACTING ---- */}
+                {posStatus === 'extracting' && (
+                  <div className="flex items-center justify-center gap-2 py-6 bg-orange-50 rounded-lg">
+                    <Loader2 className="w-5 h-5 animate-spin text-orange-400" />
+                    <span className="text-xs text-orange-600">Extracting data from {posPhotos.length} photo{posPhotos.length > 1 ? 's' : ''}...</span>
                   </div>
                 )}
 
-                {/* Empty: camera button */}
-                {posPhotos.length === 0 && posStatus === 'idle' && (
-                  <button
-                    onClick={() => posFileRef.current?.click()}
-                    className="w-full py-5 rounded-lg border-2 border-dashed border-gray-300 hover:border-gray-400 bg-gray-50 flex flex-col items-center gap-1 active:scale-95 transition-all"
-                  >
-                    <Camera className="w-7 h-7 text-gray-400" />
-                    <span className="text-xs text-gray-500">Tap to capture POS Sales receipt</span>
-                    <span className="text-[10px] text-gray-400">Up to {MAX_PHOTOS} photos</span>
-                  </button>
+                {/* ---- REVIEW: Show extracted data ---- */}
+                {posStatus === 'review' && extractedSales && (
+                  <div className="space-y-3">
+                    {/* Re-extract button */}
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-1.5">
+                        <CheckCircle2 className="w-4 h-4 text-green-500" />
+                        <span className="text-xs text-green-700 font-medium">Data extracted</span>
+                      </div>
+                      <button
+                        onClick={() => { setPosStatus('idle'); setExtractedSales(null); setExtractedCategories(null) }}
+                        className="flex items-center gap-1 text-[10px] text-gray-500 hover:text-orange-600"
+                      >
+                        <RotateCcw className="w-3 h-3" />Re-extract
+                      </button>
+                    </div>
+
+                    {/* Sales Summary Cards */}
+                    <div>
+                      <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider mb-1.5">Sales Summary</p>
+                      <div className="grid grid-cols-3 gap-1.5">
+                        <SummaryCard label="Gross Sales" value={extractedSales.gross_sales || 0} />
+                        <SummaryCard label="Net Sales" value={extractedSales.net_sales || extractedSales.total_sales || 0} color="text-green-700" />
+                        <SummaryCard label="ATV" value={extractedSales.atv || 0} />
+                      </div>
+                      <div className="grid grid-cols-3 gap-1.5 mt-1.5">
+                        <SummaryCard label="Guest Count" value={extractedSales.guest_count || 0} prefix="" color="text-blue-700" />
+                        <SummaryCard label="Cash Sales" value={extractedSales.cash_sales || 0} />
+                        <SummaryCard label="Cash GC" value={extractedSales.cash_gc || 0} prefix="" color="text-blue-700" />
+                      </div>
+                    </div>
+
+                    {/* Category Pie Chart */}
+                    {categoriesWithCalc.length > 0 && (
+                      <div>
+                        <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider mb-1.5">Category Breakdown</p>
+                        <div className="bg-gray-50 rounded-lg p-2.5">
+                          <PieChart categories={categoriesWithCalc} />
+                        </div>
+                        {/* Category table with AUV/IR */}
+                        <div className="mt-2 overflow-x-auto">
+                          <table className="w-full text-[10px]">
+                            <thead>
+                              <tr className="border-b border-gray-200">
+                                <th className="text-left py-1 text-gray-500 font-medium">Category</th>
+                                <th className="text-right py-1 text-gray-500 font-medium">Qty</th>
+                                <th className="text-right py-1 text-gray-500 font-medium">Sales</th>
+                                <th className="text-right py-1 text-gray-500 font-medium">%</th>
+                                <th className="text-right py-1 text-gray-500 font-medium">AUV</th>
+                                <th className="text-right py-1 text-gray-500 font-medium">IR</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {categoriesWithCalc.map((cat, i) => (
+                                <tr key={i} className="border-b border-gray-100">
+                                  <td className="py-1 text-gray-800 font-medium">{cat.name}</td>
+                                  <td className="text-right py-1 text-gray-600">{cat.quantity}</td>
+                                  <td className="text-right py-1 text-gray-800">{(cat.sales || 0).toFixed(2)}</td>
+                                  <td className="text-right py-1 text-gray-600">{cat.contribution_pct || 0}%</td>
+                                  <td className="text-right py-1 text-blue-600 font-medium">{cat.auv}</td>
+                                  <td className="text-right py-1 text-purple-600 font-medium">{cat.ir}</td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Items Table */}
+                    {itemsWithCalc.length > 0 && (
+                      <div>
+                        <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider mb-1.5">
+                          Item Sales ({itemsWithCalc.length} items)
+                        </p>
+                        <div className="overflow-x-auto max-h-48 overflow-y-auto border border-gray-200 rounded-lg">
+                          <table className="w-full text-[10px]">
+                            <thead className="sticky top-0 bg-gray-100">
+                              <tr>
+                                <th className="text-left py-1.5 px-1.5 text-gray-500 font-medium">Code</th>
+                                <th className="text-left py-1.5 px-1 text-gray-500 font-medium">Item</th>
+                                <th className="text-right py-1.5 px-1 text-gray-500 font-medium">Qty</th>
+                                <th className="text-right py-1.5 px-1 text-gray-500 font-medium">Sales</th>
+                                <th className="text-right py-1.5 px-1 text-gray-500 font-medium">%</th>
+                                <th className="text-right py-1.5 px-1 text-gray-500 font-medium">AUV</th>
+                                <th className="text-right py-1.5 px-1.5 text-gray-500 font-medium">IR</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {itemsWithCalc.map((item, i) => (
+                                <tr key={i} className="border-t border-gray-100">
+                                  <td className="py-1 px-1.5 text-gray-500 font-mono">{item.code}</td>
+                                  <td className="py-1 px-1 text-gray-800 truncate max-w-[100px]">{item.name}</td>
+                                  <td className="text-right py-1 px-1 text-gray-600">{item.quantity}</td>
+                                  <td className="text-right py-1 px-1 text-gray-800">{(item.sales || 0).toFixed(2)}</td>
+                                  <td className="text-right py-1 px-1 text-gray-600">{item.contribution_pct || 0}%</td>
+                                  <td className="text-right py-1 px-1 text-blue-600 font-medium">{item.auv}</td>
+                                  <td className="text-right py-1 px-1.5 text-purple-600 font-medium">{item.ir}</td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    )}
+                  </div>
                 )}
               </div>
 
@@ -423,18 +652,20 @@ export default function SalesPage() {
               {/* Submit */}
               <Button
                 onClick={handleSubmit}
-                disabled={!canSubmit}
+                disabled={posStatus !== 'review' || saving}
                 className="w-full h-12 text-sm bg-orange-500 hover:bg-orange-600 disabled:bg-gray-300"
               >
                 {saving ? (
-                  <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Extracting &amp; Saving...</>
+                  <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Saving...</>
                 ) : (
                   <><Save className="w-4 h-4 mr-2" />Submit {SALES_WINDOWS.find(w => w.id === selectedWindow)?.label}</>
                 )}
               </Button>
 
-              {!posPhotos.length && (
-                <p className="text-center text-[11px] text-gray-400">Capture at least one POS photo to submit</p>
+              {posStatus === 'idle' && (
+                <p className="text-center text-[11px] text-gray-400">
+                  {posPhotos.length === 0 ? 'Capture POS photos, then extract data to submit' : 'Extract data from photos to review before submitting'}
+                </p>
               )}
             </div>
           )

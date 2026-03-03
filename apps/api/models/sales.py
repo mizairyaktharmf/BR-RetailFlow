@@ -40,6 +40,8 @@ class DailySales(Base):
     total_sales = Column(Float, nullable=False, default=0)  # Net sales amount in AED
     transaction_count = Column(Integer, nullable=False, default=0)  # Guest count
     cash_sales = Column(Float, nullable=True, default=0)  # Cash sales amount
+    cash_gc = Column(Integer, nullable=True, default=0)  # Cash sales guest count
+    atv = Column(Float, nullable=True, default=0)  # Average Transaction Value
 
     # Category sales data (JSON: [{name, qty, sales, pct}, ...])
     category_data = Column(Text, nullable=True)

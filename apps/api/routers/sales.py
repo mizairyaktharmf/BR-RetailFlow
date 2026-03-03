@@ -34,6 +34,8 @@ def _build_sales_response(s) -> DailySalesResponse:
         total_sales=s.total_sales,
         transaction_count=s.transaction_count,
         cash_sales=getattr(s, 'cash_sales', None),
+        cash_gc=getattr(s, 'cash_gc', None),
+        atv=getattr(s, 'atv', None),
         ly_sale=getattr(s, 'ly_sale', None),
         cake_units=getattr(s, 'cake_units', None),
         hand_pack_units=getattr(s, 'hand_pack_units', None),
@@ -95,6 +97,8 @@ async def submit_daily_sales(
         existing.transaction_count = data.transaction_count
         _set(existing, 'gross_sales', data.gross_sales or 0)
         _set(existing, 'cash_sales', data.cash_sales or 0)
+        _set(existing, 'cash_gc', data.cash_gc or 0)
+        _set(existing, 'atv', data.atv or 0)
         _set(existing, 'ly_sale', data.ly_sale or 0)
         _set(existing, 'cake_units', data.cake_units or 0)
         _set(existing, 'hand_pack_units', data.hand_pack_units or 0)
@@ -136,6 +140,8 @@ async def submit_daily_sales(
 
     _set(sales_entry, 'gross_sales', data.gross_sales or 0)
     _set(sales_entry, 'cash_sales', data.cash_sales or 0)
+    _set(sales_entry, 'cash_gc', data.cash_gc or 0)
+    _set(sales_entry, 'atv', data.atv or 0)
     _set(sales_entry, 'ly_sale', data.ly_sale or 0)
     _set(sales_entry, 'cake_units', data.cake_units or 0)
     _set(sales_entry, 'hand_pack_units', data.hand_pack_units or 0)

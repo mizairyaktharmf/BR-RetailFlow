@@ -16,10 +16,11 @@ logger = logging.getLogger(__name__)
 
 # ============== PROMPTS ==============
 
-POS_SALES_PROMPT = """Analyze this POS sales receipt image carefully. Extract the following information and return ONLY a valid JSON object:
+POS_SALES_PROMPT = """Analyze this POS sales receipt image carefully. Extract the Sales Summary section.
+Return ONLY a valid JSON object:
 
 {
-  "branch_code": "string - branch code/name shown",
+  "branch_code": "string - branch code/name shown at top",
   "date": "string - date shown on receipt (YYYY-MM-DD format)",
   "gross_sales": 0.00,
   "returns": 0.00,
@@ -31,44 +32,53 @@ POS_SALES_PROMPT = """Analyze this POS sales receipt image carefully. Extract th
   "guest_count": 0,
   "atv": 0.00,
   "cancelled": 0.00,
-  "cash_sales": 0.00
+  "cash_sales": 0.00,
+  "cash_gc": 0
 }
 
 Rules:
 - Extract numbers exactly as shown, do not calculate
 - If a field is not visible, use 0
-- guest_count is the number of transactions/guests/bills
-- atv = Average Transaction Value
+- guest_count is the GC number from the Sales Summary section (NOT from Cash Sales)
+- atv is the ATV from the Sales Summary section
+- cash_sales is the "Cash Sales" or "Grs CashSls" amount
+- cash_gc is the GC number from the Cash Sales section
 - Return ONLY the JSON object, no other text"""
 
-CATEGORY_ITEMS_PROMPT = """Analyze this POS sales receipt image. Extract the category breakdown and item details. Return ONLY a valid JSON object:
+CATEGORY_ITEMS_PROMPT = """Analyze this POS sales receipt image. Extract ALL category totals and ALL individual items.
+
+The receipt shows categories like "T>Cups & Cones", "T>Sundaes", "T>Beverages", "T>Take Home" etc.
+Under each category are individual items with code, name, quantity, sales, and percentage.
+
+Return ONLY a valid JSON object:
 
 {
   "categories": [
     {
-      "name": "string - category name (e.g. Cups & Cones, Sundaes, Beverages, Cakes, etc.)",
-      "quantity": 0,
-      "sales": 0.00,
-      "contribution_pct": 0.0
+      "name": "Cups & Cones",
+      "quantity": 66,
+      "sales": 1096.11,
+      "contribution_pct": 34.8
     }
   ],
   "items": [
     {
-      "code": "string - item code if shown",
-      "name": "string - item name",
-      "category": "string - which category it belongs to",
-      "quantity": 0,
-      "sales": 0.00,
-      "contribution_pct": 0.0
+      "code": "1142",
+      "name": "Chc Pnt Bliss S",
+      "category": "Cups & Cones",
+      "quantity": 2,
+      "sales": 36.20,
+      "contribution_pct": 1.1
     }
   ]
 }
 
 Rules:
-- List ALL categories visible in the image
-- List ALL individual items if visible
-- contribution_pct is the percentage contribution to total sales
-- If items are not visible (only categories), return empty items array
+- Category names: strip the "T>" prefix (e.g. "T>Cups & Cones" → "Cups & Cones")
+- List EVERY category total row visible (the rows starting with T>)
+- List EVERY individual item under each category
+- Extract item code (4-digit number), name, quantity, sales amount, contribution %
+- contribution_pct is the percentage shown in the last column
 - Return ONLY the JSON object, no other text"""
 
 HOME_DELIVERY_PROMPT = """Analyze this Home Delivery sales report image. Extract the following information and return ONLY a valid JSON object:

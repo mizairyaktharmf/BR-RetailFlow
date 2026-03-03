@@ -121,6 +121,13 @@ def run_migrations():
                 conn.commit()
                 logger.info("Migration: items_data added successfully")
 
+            if 'cash_gc' not in ds_columns:
+                logger.info("Migration: Adding cash_gc and atv to daily_sales table")
+                conn.execute(text("ALTER TABLE daily_sales ADD COLUMN cash_gc INTEGER DEFAULT 0"))
+                conn.execute(text("ALTER TABLE daily_sales ADD COLUMN atv FLOAT DEFAULT 0"))
+                conn.commit()
+                logger.info("Migration: cash_gc and atv added successfully")
+
         # Migrate daily_budgets table
         if 'daily_budgets' in inspector.get_table_names():
             db_columns = [c['name'] for c in inspector.get_columns('daily_budgets')]

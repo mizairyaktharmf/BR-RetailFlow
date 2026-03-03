@@ -17,6 +17,8 @@ class DailySalesCreate(BaseModel):
     transaction_count: int = Field(default=0, ge=0)
     gross_sales: Optional[float] = 0
     cash_sales: Optional[float] = 0
+    cash_gc: Optional[int] = 0
+    atv: Optional[float] = 0
     ly_sale: Optional[float] = 0
     cake_units: Optional[int] = 0
     hand_pack_units: Optional[int] = 0
@@ -48,6 +50,8 @@ class DailySalesResponse(BaseModel):
     transaction_count: int
     gross_sales: Optional[float] = None
     cash_sales: Optional[float] = None
+    cash_gc: Optional[int] = None
+    atv: Optional[float] = None
     ly_sale: Optional[float] = None
     cake_units: Optional[int] = None
     hand_pack_units: Optional[int] = None
