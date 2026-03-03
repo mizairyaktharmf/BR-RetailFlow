@@ -53,16 +53,15 @@ export default function BudgetPage() {
 
   useEffect(() => {
     loadData()
-  }, [])
+  }, [selectedMonth])
 
-  const loadData = async () => {
+  const loadData = async (monthOverride) => {
     setLoading(true)
     try {
       const branchList = await api.getBranches()
       setBranches(Array.isArray(branchList) ? branchList : [])
 
-      const now = new Date()
-      const month = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
+      const month = monthOverride || selectedMonth
       const statusMap = {}
       for (const b of (Array.isArray(branchList) ? branchList : [])) {
         try {
@@ -126,20 +125,24 @@ export default function BudgetPage() {
       }))
       .filter(d => d.date)
 
+    // Auto-detect month from actual data dates (e.g. "2026-02-01" → "2026-02")
+    const detectedMonth = days.length > 0 ? days[0].date.substring(0, 7) : selectedMonth
+
     setSaving(true)
     try {
       await api.confirmBudget({
         branch_id: selectedBranch.id,
-        month: header.month_code || selectedMonth,
+        month: detectedMonth,
         parlor_name: header.parlor_name || (selectedBranch.name || selectedBranch.branch_name),
         area_manager: header.area_manager || null,
         kpis: kpis,
         days: days,
       })
       alert(`Budget saved for ${header.parlor_name || selectedBranch.name || selectedBranch.branch_name} — ${days.length} days`)
+      setSelectedMonth(detectedMonth)
       setExtractedData(null)
       setSelectedBranch(null)
-      loadData()
+      loadData(detectedMonth)
     } catch (err) {
       alert('Failed to save: ' + err.message)
     } finally {
