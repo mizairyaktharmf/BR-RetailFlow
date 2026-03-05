@@ -262,6 +262,10 @@ export default function SalesReportsPage() {
 
       const matchedItems = branchItems.filter(it => {
         if (!isNameTrack && it.code === tracked.item_code) return true
+        // For name tracking, use contains match — item name should contain the base name
+        if (isNameTrack) {
+          return it.name && it.name.toLowerCase().includes(baseName.toLowerCase())
+        }
         const itBase = it.name?.replace(/\s+(Sgl|Val|Dbl|Kids|S|M|L|XL|Single|Value|Double|Regular|Large|Small)$/i, '').trim()
         return itBase && itBase.toLowerCase() === baseName.toLowerCase()
       })
