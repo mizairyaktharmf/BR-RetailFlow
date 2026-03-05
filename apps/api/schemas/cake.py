@@ -47,7 +47,7 @@ class CakeStockResponse(BaseModel):
     branch_id: int
     cake_product_id: int
     current_quantity: int
-    last_updated_at: datetime
+    last_updated_at: Optional[datetime] = None
     cake_name: Optional[str] = None
     cake_code: Optional[str] = None
     category: Optional[str] = None

@@ -144,30 +144,36 @@ async def get_cake_stock(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Get current cake stock for a branch"""
+    """Get current cake stock for a branch (includes all active products)"""
     branch = db.query(Branch).filter(Branch.id == branch_id).first()
     if not branch:
         raise HTTPException(status_code=404, detail="Branch not found")
 
     verify_branch_access(current_user, branch)
 
+    # Get existing stock records for this branch
     stocks = db.query(CakeStock).filter(CakeStock.branch_id == branch_id).all()
+    stock_by_product = {s.cake_product_id: s for s in stocks}
+
+    # Get ALL active cake products so new products appear immediately
+    all_products = db.query(CakeProduct).filter(CakeProduct.is_active == True).order_by(CakeProduct.name).all()
 
     result = []
-    for stock in stocks:
-        product = stock.cake_product
+    for product in all_products:
+        stock = stock_by_product.get(product.id)
         threshold = get_effective_threshold(db, branch_id, product.id, product.default_alert_threshold)
+        current_qty = stock.current_quantity if stock else 0
         response = CakeStockResponse(
-            id=stock.id,
-            branch_id=stock.branch_id,
-            cake_product_id=stock.cake_product_id,
-            current_quantity=stock.current_quantity,
-            last_updated_at=stock.last_updated_at,
+            id=stock.id if stock else 0,
+            branch_id=branch_id,
+            cake_product_id=product.id,
+            current_quantity=current_qty,
+            last_updated_at=stock.last_updated_at if stock else None,
             cake_name=product.name,
             cake_code=product.code,
             category=product.category,
             alert_threshold=threshold,
-            is_low_stock=stock.current_quantity <= threshold,
+            is_low_stock=current_qty <= threshold,
         )
         result.append(response)
 
