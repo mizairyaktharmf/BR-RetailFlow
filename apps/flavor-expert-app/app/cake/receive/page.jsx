@@ -9,16 +9,14 @@ import {
   Minus,
   Save,
   Loader2,
-  Search,
   Cake,
-  Trash2,
   CheckCircle2,
   Info,
   Package
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { Label } from '@/components/ui/label'
 import { Separator } from '@/components/ui/separator'
@@ -29,23 +27,20 @@ export default function CakeReceivePage() {
   const router = useRouter()
   const [user, setUser] = useState(null)
   const [cakeProducts, setCakeProducts] = useState([])
-  const [searchQuery, setSearchQuery] = useState('')
   const [saving, setSaving] = useState(false)
-  const [receipts, setReceipts] = useState([])
+  const [quantities, setQuantities] = useState({})
   const [referenceNumber, setReferenceNumber] = useState('')
   const [todaysReceipts, setTodaysReceipts] = useState([])
   const [loading, setLoading] = useState(true)
+  const [successMessage, setSuccessMessage] = useState('')
 
   useEffect(() => {
-    // Load user data
     const userData = localStorage.getItem('br_user')
     if (!userData) {
       router.push('/login')
       return
     }
     setUser(JSON.parse(userData))
-
-    // Load cake products
     loadCakeProducts()
   }, [router])
 
@@ -63,76 +58,72 @@ export default function CakeReceivePage() {
     }
   }
 
-  const addReceipt = (product) => {
-    // Check if product already in list
-    const existing = receipts.find(r => r.cake_product_id === product.id)
-    if (existing) {
-      // Increment quantity
-      setReceipts(prev => prev.map(r =>
-        r.cake_product_id === product.id
-          ? { ...r, quantity: r.quantity + 1 }
-          : r
-      ))
-    } else {
-      // Add new
-      setReceipts(prev => [...prev, {
-        cake_product_id: product.id,
-        cake_name: product.name,
-        cake_code: product.code,
-        quantity: 1,
-      }])
-    }
-    setSearchQuery('')
-  }
-
   const updateQuantity = (productId, delta) => {
-    setReceipts(prev => prev.map(r => {
-      if (r.cake_product_id === productId) {
-        const newQty = Math.max(0, r.quantity + delta)
-        return { ...r, quantity: newQty }
+    setQuantities(prev => {
+      const current = prev[productId] || 0
+      const newQty = Math.max(0, current + delta)
+      if (newQty === 0) {
+        const { [productId]: _, ...rest } = prev
+        return rest
       }
-      return r
-    }).filter(r => r.quantity > 0))
+      return { ...prev, [productId]: newQty }
+    })
   }
 
-  const removeReceipt = (productId) => {
-    setReceipts(prev => prev.filter(r => r.cake_product_id !== productId))
+  const setDirectQuantity = (productId, value) => {
+    const num = parseInt(value) || 0
+    if (num <= 0) {
+      setQuantities(prev => {
+        const { [productId]: _, ...rest } = prev
+        return rest
+      })
+    } else {
+      setQuantities(prev => ({ ...prev, [productId]: num }))
+    }
   }
 
   const getTotalItems = () => {
-    return receipts.reduce((sum, r) => sum + r.quantity, 0)
+    return Object.values(quantities).reduce((sum, qty) => sum + qty, 0)
+  }
+
+  const getItemCount = () => {
+    return Object.keys(quantities).length
   }
 
   const handleSubmit = async () => {
-    if (receipts.length === 0) {
-      alert('Please add at least one cake to submit')
+    const items = Object.entries(quantities)
+      .filter(([_, qty]) => qty > 0)
+      .map(([productId, qty]) => ({
+        cake_product_id: parseInt(productId),
+        quantity: qty,
+      }))
+
+    if (items.length === 0) {
+      alert('Please add quantities for at least one cake product')
       return
     }
 
     setSaving(true)
-
     try {
-      const submitData = {
-        branch_id: user.branch_id || 1,
+      await api.receiveCakes({
+        branch_id: user.branch_id,
         date: new Date().toISOString().split('T')[0],
         reference_number: referenceNumber || null,
-        items: receipts.map(r => ({
-          cake_product_id: r.cake_product_id,
-          quantity: r.quantity,
-        }))
-      }
+        items,
+      })
 
-      await api.receiveCakes(submitData)
-
-      // Add to today's receipts display
-      setTodaysReceipts(prev => [...prev, ...receipts])
+      // Save to today's display
+      const received = items.map(item => {
+        const product = cakeProducts.find(p => p.id === item.cake_product_id)
+        return { name: product?.name || 'Unknown', quantity: item.quantity }
+      })
+      setTodaysReceipts(prev => [...prev, ...received])
 
       // Clear form
-      setReceipts([])
+      setQuantities({})
       setReferenceNumber('')
-
-      alert('Cake receipts submitted successfully!')
-
+      setSuccessMessage('Cakes received and stock updated!')
+      setTimeout(() => setSuccessMessage(''), 4000)
     } catch (error) {
       console.error('Error submitting receipts:', error)
       alert('Failed to submit receipts. Please try again.')
@@ -140,14 +131,6 @@ export default function CakeReceivePage() {
       setSaving(false)
     }
   }
-
-  const filteredProducts = cakeProducts.filter(product => {
-    const name = (product.name || '').toLowerCase()
-    const code = (product.code || '').toLowerCase()
-    const matchesSearch = name.includes(searchQuery.toLowerCase()) || code.includes(searchQuery.toLowerCase())
-    const notAlreadyAdded = !receipts.find(r => r.cake_product_id === product.id)
-    return matchesSearch && notAlreadyAdded
-  })
 
   return (
     <div className="min-h-screen bg-gray-50 pb-24">
@@ -174,190 +157,156 @@ export default function CakeReceivePage() {
         </div>
       </div>
 
-      {/* Info Alert */}
+      {/* Success Message */}
+      {successMessage && (
+        <div className="px-4 py-3">
+          <Alert className="bg-green-50 border-green-200">
+            <CheckCircle2 className="h-4 w-4 text-green-600" />
+            <AlertTitle className="text-green-800">Success</AlertTitle>
+            <AlertDescription className="text-green-700">{successMessage}</AlertDescription>
+          </Alert>
+        </div>
+      )}
+
+      {/* Info */}
       <div className="px-4 py-4">
-        <Alert variant="info" className="bg-blue-50 border-blue-200">
+        <Alert className="bg-blue-50 border-blue-200">
           <Info className="h-4 w-4 text-blue-600" />
           <AlertTitle className="text-blue-800">Recording Cake Delivery</AlertTitle>
           <AlertDescription className="text-blue-700">
-            Record all cakes received from the warehouse today.
-            Search and add cake products, set quantities, then submit.
+            Enter the quantity received for each cake product from warehouse delivery.
           </AlertDescription>
         </Alert>
       </div>
 
-      {/* Main Content */}
+      {/* Content */}
       <div className="px-4">
         {loading ? (
           <div className="flex items-center justify-center py-20">
             <Loader2 className="w-8 h-8 animate-spin text-green-500" />
           </div>
+        ) : cakeProducts.length === 0 ? (
+          <Card>
+            <CardContent className="p-8 text-center">
+              <Cake className="w-12 h-12 mx-auto text-gray-300 mb-2" />
+              <p className="text-gray-500">No cake products found. Ask admin to add products.</p>
+            </CardContent>
+          </Card>
         ) : (
           <>
-            {/* Search & Add */}
-            <Card className="mb-4">
-              <CardHeader className="pb-2">
-                <CardTitle className="text-base flex items-center gap-2">
-                  <Plus className="w-5 h-5 text-green-500" />
-                  Add Received Cakes
-                </CardTitle>
-                <CardDescription>
-                  Search for cake products and tap to add to your receipt list
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="relative">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                  <Input
-                    placeholder="Search cakes..."
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    className="pl-10"
-                  />
-                </div>
-
-                {/* Search Results */}
-                {searchQuery && (
-                  <div className="mt-3 max-h-60 overflow-y-auto">
-                    {filteredProducts.length > 0 ? (
-                      <div className="space-y-2">
-                        {filteredProducts.slice(0, 5).map(product => (
-                          <button
-                            key={product.id}
-                            onClick={() => addReceipt(product)}
-                            className="w-full flex items-center gap-3 p-3 bg-gray-50 rounded-lg hover:bg-green-50 transition-colors"
-                          >
-                            <div className="w-10 h-10 rounded-full bg-green-100 flex items-center justify-center">
-                              <Cake className="w-5 h-5 text-green-500" />
-                            </div>
-                            <div className="text-left">
-                              <p className="font-medium text-gray-900">{product.name}</p>
-                              <p className="text-xs text-gray-500">{product.code}</p>
-                            </div>
-                            <Plus className="w-5 h-5 text-green-500 ml-auto" />
-                          </button>
-                        ))}
-                      </div>
-                    ) : (
-                      <p className="text-center text-gray-500 py-4">No cake products found</p>
-                    )}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-
-            {/* Receipt List */}
+            {/* All Cake Products */}
             <Card className="mb-4">
               <CardHeader className="pb-2">
                 <CardTitle className="text-base flex items-center justify-between">
                   <span className="flex items-center gap-2">
                     <Package className="w-5 h-5 text-green-500" />
-                    Cakes to Receive
+                    Cake Products
                   </span>
                   <span className="text-sm font-normal text-gray-500">
-                    {getTotalItems()} items
+                    {getItemCount()} selected
                   </span>
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                {receipts.length === 0 ? (
-                  <div className="text-center py-8">
-                    <Package className="w-12 h-12 mx-auto text-gray-300 mb-2" />
-                    <p className="text-gray-500">No cakes added yet</p>
-                    <p className="text-sm text-gray-400">Search above to add cake products</p>
-                  </div>
-                ) : (
-                  <div className="space-y-3">
-                    {receipts.map(receipt => (
+                <div className="space-y-2">
+                  {cakeProducts.map(product => {
+                    const qty = quantities[product.id] || 0
+                    const isActive = qty > 0
+
+                    return (
                       <div
-                        key={receipt.cake_product_id}
-                        className="flex items-center justify-between p-3 bg-gray-50 rounded-lg"
+                        key={product.id}
+                        className={`flex items-center justify-between p-3 rounded-lg transition-colors ${
+                          isActive ? 'bg-green-50 border border-green-200' : 'bg-gray-50'
+                        }`}
                       >
-                        <div className="flex items-center gap-3">
-                          <div className="w-10 h-10 rounded-full bg-green-100 flex items-center justify-center">
-                            <Cake className="w-5 h-5 text-green-500" />
+                        <div className="flex items-center gap-3 flex-1 min-w-0">
+                          <div className={`w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 ${
+                            isActive ? 'bg-green-200' : 'bg-gray-200'
+                          }`}>
+                            <Cake className={`w-4 h-4 ${isActive ? 'text-green-600' : 'text-gray-500'}`} />
                           </div>
-                          <div>
-                            <p className="font-medium text-gray-900">{receipt.cake_name}</p>
-                            <p className="text-xs text-gray-500">
-                              {receipt.cake_code} - {receipt.quantity} unit{receipt.quantity > 1 ? 's' : ''}
-                            </p>
+                          <div className="min-w-0">
+                            <p className="font-medium text-gray-900 text-sm truncate">{product.name}</p>
+                            <p className="text-[10px] text-gray-500">{product.code}</p>
                           </div>
                         </div>
-                        <div className="flex items-center gap-2">
-                          <Button
-                            variant="outline"
-                            size="icon"
-                            className="h-8 w-8"
-                            onClick={() => updateQuantity(receipt.cake_product_id, -1)}
+                        <div className="flex items-center gap-1 flex-shrink-0">
+                          <button
+                            onClick={() => updateQuantity(product.id, -1)}
+                            disabled={qty <= 0}
+                            className={`w-8 h-8 rounded-lg flex items-center justify-center transition-colors ${
+                              qty > 0
+                                ? 'bg-red-100 text-red-600 hover:bg-red-200'
+                                : 'bg-gray-100 text-gray-300'
+                            }`}
                           >
                             <Minus className="w-4 h-4" />
-                          </Button>
-                          <span className="w-8 text-center font-medium">{receipt.quantity}</span>
-                          <Button
-                            variant="outline"
-                            size="icon"
-                            className="h-8 w-8"
-                            onClick={() => updateQuantity(receipt.cake_product_id, 1)}
+                          </button>
+                          <input
+                            type="number"
+                            inputMode="numeric"
+                            min="0"
+                            value={qty || ''}
+                            placeholder="0"
+                            onChange={(e) => setDirectQuantity(product.id, e.target.value)}
+                            className="w-12 h-8 text-center text-sm font-medium border rounded-lg bg-white outline-none"
+                          />
+                          <button
+                            onClick={() => updateQuantity(product.id, 1)}
+                            className="w-8 h-8 rounded-lg flex items-center justify-center bg-green-100 text-green-600 hover:bg-green-200 transition-colors"
                           >
                             <Plus className="w-4 h-4" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8 text-red-500 hover:text-red-600 hover:bg-red-50"
-                            onClick={() => removeReceipt(receipt.cake_product_id)}
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </Button>
+                          </button>
                         </div>
                       </div>
-                    ))}
-
-                    <Separator className="my-4" />
-
-                    {/* Summary */}
-                    <div className="bg-green-50 rounded-lg p-4">
-                      <div className="flex justify-between items-center">
-                        <span className="text-gray-600">Total Items:</span>
-                        <span className="font-bold text-green-600">{getTotalItems()}</span>
-                      </div>
-                    </div>
-                  </div>
-                )}
+                    )
+                  })}
+                </div>
               </CardContent>
             </Card>
 
             {/* Reference Number */}
-            <Card className="mb-4">
-              <CardContent className="p-4">
-                <Label>Delivery Reference Number (Optional)</Label>
-                <Input
-                  placeholder="Enter delivery note or invoice number"
-                  value={referenceNumber}
-                  onChange={(e) => setReferenceNumber(e.target.value)}
-                  className="mt-2"
-                />
-              </CardContent>
-            </Card>
+            {getItemCount() > 0 && (
+              <Card className="mb-4">
+                <CardContent className="p-4">
+                  <Label className="text-sm text-gray-700">Delivery Reference (Optional)</Label>
+                  <Input
+                    placeholder="Delivery note or invoice number"
+                    value={referenceNumber}
+                    onChange={(e) => setReferenceNumber(e.target.value)}
+                    className="mt-1"
+                  />
+                </CardContent>
+              </Card>
+            )}
 
-            {/* Submit Button */}
+            {/* Summary & Submit */}
+            {getItemCount() > 0 && (
+              <Card className="mb-4 bg-green-50 border-green-200">
+                <CardContent className="p-4">
+                  <div className="flex justify-between items-center mb-3">
+                    <span className="text-sm text-gray-600">Products:</span>
+                    <span className="font-medium text-green-700">{getItemCount()}</span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm text-gray-600">Total Units:</span>
+                    <span className="font-bold text-green-700 text-lg">{getTotalItems()}</span>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
             <Button
               onClick={handleSubmit}
-              disabled={saving || receipts.length === 0}
+              disabled={saving || getItemCount() === 0}
               className="w-full h-14 text-base bg-green-500 hover:bg-green-600"
               size="lg"
             >
               {saving ? (
-                <>
-                  <Loader2 className="w-5 h-5 mr-2 animate-spin" />
-                  Submitting...
-                </>
+                <><Loader2 className="w-5 h-5 mr-2 animate-spin" /> Submitting...</>
               ) : (
-                <>
-                  <Save className="w-5 h-5 mr-2" />
-                  Submit {getTotalItems()} Cakes Received
-                </>
+                <><Save className="w-5 h-5 mr-2" /> Submit {getTotalItems()} Cakes Received</>
               )}
             </Button>
 
@@ -374,30 +323,17 @@ export default function CakeReceivePage() {
                   <div className="space-y-2">
                     {todaysReceipts.map((receipt, index) => (
                       <div
-                        key={`${receipt.cake_product_id}-${index}`}
+                        key={index}
                         className="flex items-center justify-between p-2 bg-green-50 rounded"
                       >
-                        <span className="text-green-800">{receipt.cake_name}</span>
-                        <span className="text-green-600 font-medium">{receipt.quantity} units</span>
+                        <span className="text-green-800 text-sm">{receipt.name}</span>
+                        <span className="text-green-600 font-medium text-sm">{receipt.quantity} units</span>
                       </div>
                     ))}
                   </div>
                 </CardContent>
               </Card>
             )}
-
-            {/* Help Info */}
-            <Card className="mt-6 bg-gray-50">
-              <CardContent className="p-4">
-                <h3 className="font-medium text-gray-900 mb-2">Tips for Receiving Cakes</h3>
-                <ul className="text-sm text-gray-600 space-y-1">
-                  <li>- Record all cakes immediately when they arrive</li>
-                  <li>- Verify the count matches the delivery note</li>
-                  <li>- Keep the delivery note for reference</li>
-                  <li>- Contact your manager if quantities don't match</li>
-                </ul>
-              </CardContent>
-            </Card>
           </>
         )}
       </div>

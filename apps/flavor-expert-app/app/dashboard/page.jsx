@@ -15,8 +15,7 @@ import {
   ClipboardList,
   AlertCircle,
   Cake,
-  PackagePlus,
-  Bell
+  PackagePlus
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -137,14 +136,6 @@ export default function DashboardPage() {
           href: '/cake/receive',
           iconBg: 'bg-emerald-100',
           iconColor: 'text-emerald-600',
-        },
-        {
-          title: 'Alert Settings',
-          description: 'Set low-stock alert thresholds',
-          icon: Bell,
-          href: '/cake/alerts',
-          iconBg: 'bg-amber-100',
-          iconColor: 'text-amber-600',
         },
       ],
     },
