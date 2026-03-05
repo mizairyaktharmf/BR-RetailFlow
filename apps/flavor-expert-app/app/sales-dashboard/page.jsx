@@ -654,10 +654,15 @@ export default function SalesDashboardPage() {
             {!advisorLoading && advisorData && (
               <div className="space-y-4">
                 {/* Title */}
-                <div className="flex items-center gap-2 text-sm text-gray-600">
+                <div className="flex items-center gap-2 text-sm text-gray-600 flex-wrap">
                   <Sparkles className="w-4 h-4 text-purple-500" />
                   <span className="font-medium">{advisorData.parlor_name || branch?.name}</span>
                   <span className="text-gray-400">— {advisorData.day_name} {advisorData.date}</span>
+                  {advisorData.latest_window && (
+                    <span className="text-[10px] px-2 py-0.5 bg-purple-100 text-purple-700 rounded-full font-medium uppercase">
+                      {advisorData.latest_window === 'closing' ? 'Closing' : advisorData.latest_window.toUpperCase()} Report
+                    </span>
+                  )}
                 </div>
 
                 {/* Daily Stats Grid */}

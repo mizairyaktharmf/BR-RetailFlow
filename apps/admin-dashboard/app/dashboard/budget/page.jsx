@@ -633,10 +633,15 @@ export default function BudgetPage() {
           {advisorData && !advisorLoading && (
             <div className="space-y-4">
               {/* Title */}
-              <div className="flex items-center gap-2 text-sm text-slate-300">
+              <div className="flex items-center gap-2 text-sm text-slate-300 flex-wrap">
                 <Sparkles className="w-4 h-4 text-purple-400" />
                 <span className="font-medium">{advisorData.parlor_name}</span>
                 <span className="text-slate-500">— {advisorData.day_name} {advisorData.date}</span>
+                {advisorData.latest_window && (
+                  <span className="text-[10px] px-2 py-0.5 bg-purple-900/50 text-purple-300 rounded-full font-medium uppercase">
+                    {advisorData.latest_window === 'closing' ? 'Closing' : advisorData.latest_window.toUpperCase()} Report
+                  </span>
+                )}
               </div>
 
               {/* Daily Stats Grid */}

@@ -465,16 +465,20 @@ async def smart_advisor(
         BudgetUpload.branch_id == branch_id,
     ).order_by(BudgetUpload.created_at.desc()).first()
 
-    # Aggregate sales across all windows
-    actual_gross = sum(getattr(s, 'gross_sales', 0) or 0 for s in sales)
-    actual_net = sum(s.total_sales or 0 for s in sales)
-    actual_gc = sum(s.transaction_count or 0 for s in sales)
-    hd_gross = sum(getattr(s, 'hd_gross_sales', 0) or 0 for s in sales)
-    hd_net = sum(getattr(s, 'hd_net_sales', 0) or 0 for s in sales)
-    hd_orders = sum(getattr(s, 'hd_orders', 0) or 0 for s in sales)
-    del_gross = sum(getattr(s, 'deliveroo_gross_sales', 0) or 0 for s in sales)
-    del_net = sum(getattr(s, 'deliveroo_net_sales', 0) or 0 for s in sales)
-    del_orders = sum(getattr(s, 'deliveroo_orders', 0) or 0 for s in sales)
+    # Use the LATEST submitted window (POS data is cumulative — each window includes all previous)
+    window_priority = {"closing": 4, "9pm": 3, "7pm": 2, "3pm": 1}
+    latest_sale = max(sales, key=lambda s: window_priority.get(s.sales_window.value if hasattr(s.sales_window, 'value') else s.sales_window, 0)) if sales else None
+    latest_window_name = (latest_sale.sales_window.value if hasattr(latest_sale.sales_window, 'value') else latest_sale.sales_window) if latest_sale else None
+
+    actual_gross = (getattr(latest_sale, 'gross_sales', 0) or 0) if latest_sale else 0
+    actual_net = (latest_sale.total_sales or 0) if latest_sale else 0
+    actual_gc = (latest_sale.transaction_count or 0) if latest_sale else 0
+    hd_gross = (getattr(latest_sale, 'hd_gross_sales', 0) or 0) if latest_sale else 0
+    hd_net = (getattr(latest_sale, 'hd_net_sales', 0) or 0) if latest_sale else 0
+    hd_orders = (getattr(latest_sale, 'hd_orders', 0) or 0) if latest_sale else 0
+    del_gross = (getattr(latest_sale, 'deliveroo_gross_sales', 0) or 0) if latest_sale else 0
+    del_net = (getattr(latest_sale, 'deliveroo_net_sales', 0) or 0) if latest_sale else 0
+    del_orders = (getattr(latest_sale, 'deliveroo_orders', 0) or 0) if latest_sale else 0
 
     combined_gross = actual_gross + hd_gross + del_gross
     combined_net = actual_net + hd_net + del_net
@@ -505,7 +509,7 @@ async def smart_advisor(
     vs_ly_growth = ((combined_gross - ly_sales) / ly_sales * 100) if ly_sales > 0 else 0
     vs_ly_gc_growth = ((combined_gc - ly_gc) / ly_gc * 100) if ly_gc > 0 else 0
 
-    # MTD actuals
+    # MTD actuals — use only the latest window per day (POS data is cumulative)
     month_start = date.replace(day=1)
     mtd_sales_rows = db.query(DailySales).filter(
         and_(
@@ -515,31 +519,41 @@ async def smart_advisor(
         )
     ).all()
 
+    # Group by date, keep only the latest window per day
+    mtd_by_date = {}
+    for s in mtd_sales_rows:
+        d = str(s.date)
+        w = s.sales_window.value if hasattr(s.sales_window, 'value') else s.sales_window
+        prio = window_priority.get(w, 0)
+        if d not in mtd_by_date or prio > mtd_by_date[d][0]:
+            mtd_by_date[d] = (prio, s)
+
+    mtd_latest_rows = [v[1] for v in mtd_by_date.values()]
+
     mtd_actual_gross = sum(
         (getattr(s, 'gross_sales', 0) or 0) +
         (getattr(s, 'hd_gross_sales', 0) or 0) +
         (getattr(s, 'deliveroo_gross_sales', 0) or 0)
-        for s in mtd_sales_rows
+        for s in mtd_latest_rows
     )
     mtd_actual_gc = sum(
         (s.transaction_count or 0) +
         (getattr(s, 'hd_orders', 0) or 0) +
         (getattr(s, 'deliveroo_orders', 0) or 0)
-        for s in mtd_sales_rows
+        for s in mtd_latest_rows
     )
     mtd_ach_pct = (mtd_actual_gross / mtd_budget_val * 100) if mtd_budget_val > 0 else 0
     mtd_growth = ((mtd_actual_gross - mtd_ly_sales) / mtd_ly_sales * 100) if mtd_ly_sales > 0 else 0
 
-    # Parse category data from latest sales
+    # Parse category data from latest window only
     categories = []
-    for s in sales:
-        if s.category_data:
-            try:
-                cats = json.loads(s.category_data) if isinstance(s.category_data, str) else s.category_data
-                if isinstance(cats, list):
-                    categories = cats  # Use latest window's categories
-            except (json.JSONDecodeError, TypeError):
-                pass
+    if latest_sale and latest_sale.category_data:
+        try:
+            cats = json.loads(latest_sale.category_data) if isinstance(latest_sale.category_data, str) else latest_sale.category_data
+            if isinstance(cats, list):
+                categories = cats
+        except (json.JSONDecodeError, TypeError):
+            pass
 
     # ---- BUILD ADVICE ----
     advice = []
@@ -643,6 +657,7 @@ async def smart_advisor(
         "parlor_name": branch.name if branch else None,
         "day_name": day_name,
         "windows_submitted": len(sales),
+        "latest_window": latest_window_name,
 
         "daily": {
             "budget": budget_amt,

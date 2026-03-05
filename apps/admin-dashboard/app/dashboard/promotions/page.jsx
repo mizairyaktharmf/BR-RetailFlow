@@ -13,6 +13,7 @@ import {
   Search,
   Package,
   Layers,
+  Type,
 } from 'lucide-react'
 import api from '@/services/api'
 
@@ -25,11 +26,12 @@ export default function PromotionsPage() {
   const [adding, setAdding] = useState(false)
 
   // Form fields
-  const [trackMode, setTrackMode] = useState('item') // 'item' or 'category'
+  const [trackMode, setTrackMode] = useState('name') // 'name', 'item', or 'category'
   const [itemCode, setItemCode] = useState('')
   const [itemName, setItemName] = useState('')
   const [category, setCategory] = useState('')
-  const [categoryName, setCategoryName] = useState('') // for category tracking
+  const [categoryName, setCategoryName] = useState('')
+  const [trackName, setTrackName] = useState('')
   const [addingAll, setAddingAll] = useState(false)
 
   useEffect(() => {
@@ -69,32 +71,49 @@ export default function PromotionsPage() {
     }
   }
 
+  const getPayload = () => {
+    if (trackMode === 'name') {
+      if (!trackName.trim()) return null
+      return {
+        item_code: `NAME:${trackName.trim()}`,
+        item_name: trackName.trim(),
+        category: null,
+      }
+    }
+    if (trackMode === 'category') {
+      if (!categoryName.trim()) return null
+      return {
+        item_code: `CAT:${categoryName.trim()}`,
+        item_name: categoryName.trim(),
+        category: categoryName.trim(),
+      }
+    }
+    // item mode
+    if (!itemCode.trim() || !itemName.trim()) return null
+    return {
+      item_code: itemCode.trim(),
+      item_name: itemName.trim(),
+      category: category.trim() || null,
+    }
+  }
+
+  const clearForm = () => {
+    setTrackName('')
+    setItemCode('')
+    setItemName('')
+    setCategory('')
+    setCategoryName('')
+  }
+
   const handleAdd = async (e) => {
     e.preventDefault()
     if (!selectedBranch) return
-    if (trackMode === 'item' && (!itemCode.trim() || !itemName.trim())) return
-    if (trackMode === 'category' && !categoryName.trim()) return
+    const payload = getPayload()
+    if (!payload) return
     setAdding(true)
     try {
-      if (trackMode === 'category') {
-        await api.addTrackedItem({
-          branch_id: selectedBranch.id,
-          item_code: `CAT:${categoryName.trim()}`,
-          item_name: categoryName.trim(),
-          category: categoryName.trim(),
-        })
-        setCategoryName('')
-      } else {
-        await api.addTrackedItem({
-          branch_id: selectedBranch.id,
-          item_code: itemCode.trim(),
-          item_name: itemName.trim(),
-          category: category.trim() || null,
-        })
-        setItemCode('')
-        setItemName('')
-        setCategory('')
-      }
+      await api.addTrackedItem({ branch_id: selectedBranch.id, ...payload })
+      clearForm()
       loadTrackedItems()
     } catch (err) {
       alert(err.message || 'Failed to add')
@@ -114,32 +133,30 @@ export default function PromotionsPage() {
   }
 
   const handleAddToAll = async () => {
-    const isCategory = trackMode === 'category'
-    if (isCategory && !categoryName.trim()) return
-    if (!isCategory && (!itemCode.trim() || !itemName.trim())) return
-    const code = isCategory ? `CAT:${categoryName.trim()}` : itemCode.trim()
-    const name = isCategory ? categoryName.trim() : itemName.trim()
-    if (!confirm(`Add "${name}" (${code}) to ALL ${branches.length} branches?`)) return
+    const payload = getPayload()
+    if (!payload) return
+    if (!confirm(`Add "${payload.item_name}" to ALL ${branches.length} branches?`)) return
     setAddingAll(true)
     let added = 0
     let skipped = 0
     for (const branch of branches) {
       try {
-        await api.addTrackedItem({
-          branch_id: branch.id,
-          item_code: code,
-          item_name: name,
-          category: isCategory ? name : (category.trim() || null),
-        })
+        await api.addTrackedItem({ branch_id: branch.id, ...payload })
         added++
       } catch {
         skipped++
       }
     }
-    if (isCategory) { setCategoryName('') } else { setItemCode(''); setItemName(''); setCategory('') }
+    clearForm()
     setAddingAll(false)
     loadTrackedItems()
     alert(`Added to ${added} branches${skipped > 0 ? ` (${skipped} already had it)` : ''}`)
+  }
+
+  const isFormValid = () => {
+    if (trackMode === 'name') return trackName.trim().length > 0
+    if (trackMode === 'category') return categoryName.trim().length > 0
+    return itemCode.trim().length > 0 && itemName.trim().length > 0
   }
 
   return (
@@ -151,7 +168,7 @@ export default function PromotionsPage() {
           Promotion Item Tracker
         </h1>
         <p className="text-gray-400 mt-1">
-          Select POS items to track as promotion items. Tracked items will be highlighted in sales reports.
+          Track POS items by name, code, or category. Tracked items are highlighted in sales reports.
         </p>
       </div>
 
@@ -181,7 +198,7 @@ export default function PromotionsPage() {
 
       {selectedBranch && (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Add Item / Category Form */}
+          {/* Add Form */}
           <Card className="bg-gray-800/50 border-gray-700">
             <CardHeader>
               <CardTitle className="text-base text-white flex items-center gap-2">
@@ -190,22 +207,32 @@ export default function PromotionsPage() {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              {/* Mode Toggle */}
+              {/* Mode Toggle — 3 options */}
               <div className="flex rounded-lg bg-gray-700 p-0.5 mb-4">
                 <button
                   type="button"
+                  onClick={() => setTrackMode('name')}
+                  className={`flex-1 px-2 py-1.5 rounded-md text-[11px] font-medium transition-all flex items-center justify-center gap-1 ${
+                    trackMode === 'name' ? 'bg-green-600 text-white' : 'text-gray-400 hover:text-white'
+                  }`}
+                >
+                  <Type className="w-3 h-3" />
+                  By Name
+                </button>
+                <button
+                  type="button"
                   onClick={() => setTrackMode('item')}
-                  className={`flex-1 px-3 py-1.5 rounded-md text-xs font-medium transition-all flex items-center justify-center gap-1.5 ${
+                  className={`flex-1 px-2 py-1.5 rounded-md text-[11px] font-medium transition-all flex items-center justify-center gap-1 ${
                     trackMode === 'item' ? 'bg-purple-600 text-white' : 'text-gray-400 hover:text-white'
                   }`}
                 >
                   <Tag className="w-3 h-3" />
-                  Item
+                  By Code
                 </button>
                 <button
                   type="button"
                   onClick={() => setTrackMode('category')}
-                  className={`flex-1 px-3 py-1.5 rounded-md text-xs font-medium transition-all flex items-center justify-center gap-1.5 ${
+                  className={`flex-1 px-2 py-1.5 rounded-md text-[11px] font-medium transition-all flex items-center justify-center gap-1 ${
                     trackMode === 'category' ? 'bg-orange-600 text-white' : 'text-gray-400 hover:text-white'
                   }`}
                 >
@@ -215,7 +242,21 @@ export default function PromotionsPage() {
               </div>
 
               <form onSubmit={handleAdd} className="space-y-4">
-                {trackMode === 'item' ? (
+                {trackMode === 'name' ? (
+                  <div>
+                    <Label className="text-gray-400 text-xs">Product Name *</Label>
+                    <Input
+                      value={trackName}
+                      onChange={(e) => setTrackName(e.target.value)}
+                      placeholder="e.g. Umm Ali"
+                      className="bg-gray-700 border-gray-600 text-white mt-1"
+                      required
+                    />
+                    <p className="text-[10px] text-gray-500 mt-1.5">
+                      Matches ALL sizes/variants — Sgl, Val, Dbl, Kids, etc. Just type the base product name.
+                    </p>
+                  </div>
+                ) : trackMode === 'item' ? (
                   <>
                     <div>
                       <Label className="text-gray-400 text-xs">Item Code *</Label>
@@ -232,7 +273,7 @@ export default function PromotionsPage() {
                       <Input
                         value={itemName}
                         onChange={(e) => setItemName(e.target.value)}
-                        placeholder="e.g. Chc Pnt Bliss S"
+                        placeholder="e.g. Chc Pnt Bliss Sgl"
                         className="bg-gray-700 border-gray-600 text-white mt-1"
                         required
                       />
@@ -262,21 +303,22 @@ export default function PromotionsPage() {
                     </p>
                   </div>
                 )}
+
                 <Button
                   type="submit"
-                  disabled={adding || addingAll || (trackMode === 'item' ? (!itemCode.trim() || !itemName.trim()) : !categoryName.trim())}
+                  disabled={adding || addingAll || !isFormValid()}
                   className="w-full bg-purple-600 hover:bg-purple-700"
                 >
                   {adding ? (
                     <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Adding...</>
                   ) : (
-                    <><Plus className="w-4 h-4 mr-2" />{trackMode === 'item' ? 'Add Item' : 'Add Category'}</>
+                    <><Plus className="w-4 h-4 mr-2" />Add to {selectedBranch.name}</>
                   )}
                 </Button>
                 <Button
                   type="button"
                   onClick={handleAddToAll}
-                  disabled={adding || addingAll || (trackMode === 'item' ? (!itemCode.trim() || !itemName.trim()) : !categoryName.trim())}
+                  disabled={adding || addingAll || !isFormValid()}
                   className="w-full bg-gradient-to-r from-pink-600 to-purple-600 hover:from-pink-700 hover:to-purple-700 text-white"
                 >
                   {addingAll ? (
@@ -315,13 +357,16 @@ export default function PromotionsPage() {
                 <div className="space-y-2">
                   {trackedItems.map((item) => {
                     const isCategory = item.item_code?.startsWith('CAT:')
+                    const isName = item.item_code?.startsWith('NAME:')
                     return (
                       <div
                         key={item.id}
                         className={`flex items-center justify-between p-3 rounded-lg border transition-colors ${
                           isCategory
                             ? 'bg-orange-900/20 border-orange-800/40 hover:border-orange-500/50'
-                            : 'bg-gray-700/50 border-gray-600 hover:border-purple-500/50'
+                            : isName
+                              ? 'bg-green-900/20 border-green-800/40 hover:border-green-500/50'
+                              : 'bg-gray-700/50 border-gray-600 hover:border-purple-500/50'
                         }`}
                       >
                         <div className="flex items-center gap-3">
@@ -330,6 +375,11 @@ export default function PromotionsPage() {
                               <Layers className="w-3 h-3" />
                               Category
                             </span>
+                          ) : isName ? (
+                            <span className="text-xs font-medium text-green-400 bg-green-900/30 px-2 py-1 rounded flex items-center gap-1">
+                              <Type className="w-3 h-3" />
+                              Name
+                            </span>
                           ) : (
                             <span className="text-xs font-mono text-purple-400 bg-purple-900/30 px-2 py-1 rounded">
                               {item.item_code}
@@ -337,11 +387,14 @@ export default function PromotionsPage() {
                           )}
                           <div>
                             <p className="text-sm text-white font-medium">{item.item_name}</p>
-                            {!isCategory && item.category && (
-                              <p className="text-xs text-gray-500">{item.category}</p>
-                            )}
                             {isCategory && (
                               <p className="text-[10px] text-orange-400/60">All items in this category</p>
+                            )}
+                            {isName && (
+                              <p className="text-[10px] text-green-400/60">All sizes &amp; variants</p>
+                            )}
+                            {!isCategory && !isName && item.category && (
+                              <p className="text-xs text-gray-500">{item.category}</p>
                             )}
                           </div>
                         </div>
