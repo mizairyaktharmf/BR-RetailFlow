@@ -480,7 +480,7 @@ async def smart_advisor(
     del_net = (getattr(latest_sale, 'deliveroo_net_sales', 0) or 0) if latest_sale else 0
     del_orders = (getattr(latest_sale, 'deliveroo_orders', 0) or 0) if latest_sale else 0
 
-    combined_gross = actual_gross + hd_gross + del_gross
+    combined_net = actual_gross + hd_gross + del_gross
     combined_net = actual_net + hd_net + del_net
     combined_gc = actual_gc + hd_orders + del_orders
 
@@ -497,16 +497,16 @@ async def smart_advisor(
     mtd_ly_sales = budget.mtd_ly_sales if budget else 0
     mtd_budget_val = budget.mtd_budget if budget else 0
 
-    # Current metrics
-    current_atv = combined_gross / combined_gc if combined_gc > 0 else 0
+    # Current metrics — use NET sales for all budget comparisons
+    current_atv = combined_net / combined_gc if combined_gc > 0 else 0
 
     # Achievement
-    ach_pct = (combined_gross / budget_amt * 100) if budget_amt > 0 else 0
-    remaining = max(0, budget_amt - combined_gross)
+    ach_pct = (combined_net / budget_amt * 100) if budget_amt > 0 else 0
+    remaining = max(0, budget_amt - combined_net)
     gc_remaining = max(0, budget_gc_target - combined_gc)
 
     # Growth vs LY
-    vs_ly_growth = ((combined_gross - ly_sales) / ly_sales * 100) if ly_sales > 0 else 0
+    vs_ly_growth = ((combined_net - ly_sales) / ly_sales * 100) if ly_sales > 0 else 0
     vs_ly_gc_growth = ((combined_gc - ly_gc) / ly_gc * 100) if ly_gc > 0 else 0
 
     # MTD actuals — use only the latest window per day (POS data is cumulative)
@@ -530,10 +530,10 @@ async def smart_advisor(
 
     mtd_latest_rows = [v[1] for v in mtd_by_date.values()]
 
-    mtd_actual_gross = sum(
-        (getattr(s, 'gross_sales', 0) or 0) +
-        (getattr(s, 'hd_gross_sales', 0) or 0) +
-        (getattr(s, 'deliveroo_gross_sales', 0) or 0)
+    mtd_actual_net = sum(
+        (s.total_sales or 0) +
+        (getattr(s, 'hd_net_sales', 0) or 0) +
+        (getattr(s, 'deliveroo_net_sales', 0) or 0)
         for s in mtd_latest_rows
     )
     mtd_actual_gc = sum(
@@ -542,8 +542,8 @@ async def smart_advisor(
         (getattr(s, 'deliveroo_orders', 0) or 0)
         for s in mtd_latest_rows
     )
-    mtd_ach_pct = (mtd_actual_gross / mtd_budget_val * 100) if mtd_budget_val > 0 else 0
-    mtd_growth = ((mtd_actual_gross - mtd_ly_sales) / mtd_ly_sales * 100) if mtd_ly_sales > 0 else 0
+    mtd_ach_pct = (mtd_actual_net / mtd_budget_val * 100) if mtd_budget_val > 0 else 0
+    mtd_growth = ((mtd_actual_net - mtd_ly_sales) / mtd_ly_sales * 100) if mtd_ly_sales > 0 else 0
 
     # Parse category data from latest window only
     categories = []
@@ -569,19 +569,19 @@ async def smart_advisor(
         advice.append({
             "type": "achievement", "priority": "success", "icon": "trophy",
             "title": f"Budget ACHIEVED! {ach_pct:.1f}%",
-            "detail": f"{combined_gross:,.0f} vs {budget_amt:,.0f} target. Exceeded by {(combined_gross - budget_amt):,.0f} AED!",
+            "detail": f"{combined_net:,.0f} vs {budget_amt:,.0f} target. Exceeded by {(combined_net - budget_amt):,.0f} AED!",
         })
     elif ach_pct >= 75:
         advice.append({
             "type": "achievement", "priority": "warning", "icon": "fire",
             "title": f"{ach_pct:.1f}% — Only {remaining:,.0f} AED to go!",
-            "detail": f"Push hard! {combined_gross:,.0f} / {budget_amt:,.0f} AED",
+            "detail": f"Push hard! {combined_net:,.0f} / {budget_amt:,.0f} AED",
         })
     else:
         advice.append({
             "type": "achievement", "priority": "critical", "icon": "alert",
             "title": f"{ach_pct:.1f}% achieved — Need {remaining:,.0f} AED more",
-            "detail": f"Current: {combined_gross:,.0f} → Target: {budget_amt:,.0f} AED",
+            "detail": f"Current: {combined_net:,.0f} → Target: {budget_amt:,.0f} AED",
         })
 
     # ATV Focus
@@ -602,7 +602,7 @@ async def smart_advisor(
 
         # Guest Count strategy
         if gc_remaining > 0:
-            projected = combined_gross + (gc_remaining * current_atv)
+            projected = combined_net + (gc_remaining * current_atv)
             advice.append({
                 "type": "gc", "priority": "info", "icon": "users",
                 "title": f"Need {gc_remaining} more guests to hit target GC ({budget_gc_target})",
@@ -639,14 +639,14 @@ async def smart_advisor(
             "type": "ly", "priority": "success" if vs_ly_growth >= 0 else "warning",
             "icon": "trending_up" if vs_ly_growth >= 0 else "trending_down",
             "title": f"vs LY: {'+' if vs_ly_growth >= 0 else ''}{vs_ly_growth:.1f}% sales | {'+' if vs_ly_gc_growth >= 0 else ''}{vs_ly_gc_growth:.1f}% GC",
-            "detail": f"LY {day_name}: {ly_sales:,.0f} AED ({ly_gc} GC) → Today: {combined_gross:,.0f} AED ({combined_gc} GC)",
+            "detail": f"LY {day_name}: {ly_sales:,.0f} AED ({ly_gc} GC) → Today: {combined_net:,.0f} AED ({combined_gc} GC)",
         })
 
     # MTD summary
-    if mtd_actual_gross > 0:
+    if mtd_actual_net > 0:
         advice.append({
             "type": "mtd", "priority": "success" if mtd_ach_pct >= 90 else "info", "icon": "calendar",
-            "title": f"MTD: {mtd_actual_gross:,.0f} / {mtd_budget_val:,.0f} AED ({mtd_ach_pct:.1f}%)",
+            "title": f"MTD: {mtd_actual_net:,.0f} / {mtd_budget_val:,.0f} AED ({mtd_ach_pct:.1f}%)",
             "detail": f"MTD Growth vs LY: {'+' if mtd_growth >= 0 else ''}{mtd_growth:.1f}% | MTD GC: {mtd_actual_gc}",
         })
 
@@ -666,7 +666,7 @@ async def smart_advisor(
             "ly_sales": ly_sales,
             "ly_gc": ly_gc,
             "ly_atv": round(ly_atv_val, 2),
-            "actual_gross": round(combined_gross, 2),
+            "actual_gross": round(combined_net, 2),
             "actual_net": round(combined_net, 2),
             "actual_gc": combined_gc,
             "current_atv": round(current_atv, 2),
@@ -679,7 +679,7 @@ async def smart_advisor(
         },
 
         "mtd": {
-            "actual_sales": round(mtd_actual_gross, 2),
+            "actual_sales": round(mtd_actual_net, 2),
             "budget": mtd_budget_val,
             "ly_sales": mtd_ly_sales,
             "achievement_pct": round(mtd_ach_pct, 1),
