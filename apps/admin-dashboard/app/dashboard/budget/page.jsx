@@ -20,6 +20,8 @@ import {
   Trophy,
   Clock,
   Calendar,
+  ChevronLeft,
+  ChevronRight,
 } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -47,9 +49,12 @@ export default function BudgetPage() {
   const [advisorData, setAdvisorData] = useState(null)
   const [advisorLoading, setAdvisorLoading] = useState(false)
 
+  const [advisorDate, setAdvisorDate] = useState(() => new Date().toISOString().split('T')[0])
+
   // Tracker overview
   const [trackerData, setTrackerData] = useState(null)
   const [trackerLoading, setTrackerLoading] = useState(false)
+  const [trackerDate, setTrackerDate] = useState(() => new Date().toISOString().split('T')[0])
 
   useEffect(() => {
     loadData()
@@ -171,12 +176,11 @@ export default function BudgetPage() {
   }
 
   // ---- Advisor ----
-  const loadAdvisor = async (branch) => {
+  const loadAdvisor = async (branch, date) => {
     setAdvisorBranch(branch)
     setAdvisorLoading(true)
     try {
-      const today = new Date().toISOString().split('T')[0]
-      const data = await api.getSmartAdvisor(branch.id, today)
+      const data = await api.getSmartAdvisor(branch.id, date || advisorDate)
       setAdvisorData(data)
     } catch (err) {
       setAdvisorData(null)
@@ -185,12 +189,19 @@ export default function BudgetPage() {
     }
   }
 
+  const changeAdvisorDate = (days) => {
+    const d = new Date(advisorDate)
+    d.setDate(d.getDate() + days)
+    const newDate = d.toISOString().split('T')[0]
+    setAdvisorDate(newDate)
+    if (advisorBranch) loadAdvisor(advisorBranch, newDate)
+  }
+
   // ---- Tracker ----
-  const loadTracker = async () => {
+  const loadTracker = async (date) => {
     setTrackerLoading(true)
     try {
-      const today = new Date().toISOString().split('T')[0]
-      const data = await api.getTrackerOverview(today)
+      const data = await api.getTrackerOverview(date || trackerDate)
       setTrackerData(data)
     } catch (err) {
       setTrackerData(null)
@@ -199,8 +210,16 @@ export default function BudgetPage() {
     }
   }
 
+  const changeTrackerDate = (days) => {
+    const d = new Date(trackerDate)
+    d.setDate(d.getDate() + days)
+    const newDate = d.toISOString().split('T')[0]
+    setTrackerDate(newDate)
+    loadTracker(newDate)
+  }
+
   useEffect(() => {
-    if (activeTab === 'tracker' && !trackerData) loadTracker()
+    if (activeTab === 'tracker') loadTracker()
   }, [activeTab])
 
   const fmt = (n) => {
@@ -555,10 +574,33 @@ export default function BudgetPage() {
       {/* ============== ADVISOR TAB ============== */}
       {activeTab === 'advisor' && (
         <div className="space-y-4">
-          {/* Branch Selector */}
+          {/* Date Navigation + Branch Selector */}
           <Card className="bg-slate-800/50 border-slate-700">
             <CardHeader className="pb-3">
-              <CardTitle className="text-sm text-slate-300">Select Branch</CardTitle>
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-sm text-slate-300">Select Branch</CardTitle>
+                <div className="flex items-center gap-2">
+                  <button onClick={() => changeAdvisorDate(-1)} className="p-1.5 rounded-lg hover:bg-slate-700 text-slate-400 hover:text-white transition-all">
+                    <ChevronLeft className="w-4 h-4" />
+                  </button>
+                  <div className="flex items-center gap-1.5 bg-slate-900/50 rounded-lg px-3 py-1.5">
+                    <Calendar className="w-3.5 h-3.5 text-purple-400" />
+                    <input
+                      type="date"
+                      value={advisorDate}
+                      onChange={(e) => { setAdvisorDate(e.target.value); if (advisorBranch) loadAdvisor(advisorBranch, e.target.value) }}
+                      className="bg-transparent text-sm text-white focus:outline-none [color-scheme:dark]"
+                    />
+                  </div>
+                  <button
+                    onClick={() => changeAdvisorDate(1)}
+                    disabled={advisorDate === new Date().toISOString().split('T')[0]}
+                    className="p-1.5 rounded-lg hover:bg-slate-700 text-slate-400 hover:text-white transition-all disabled:opacity-30"
+                  >
+                    <ChevronRight className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
             </CardHeader>
             <CardContent>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
@@ -771,6 +813,32 @@ export default function BudgetPage() {
       {/* ============== TRACKER OVERVIEW TAB ============== */}
       {activeTab === 'tracker' && (
         <div className="space-y-4">
+          {/* Date Navigation */}
+          <div className="flex items-center justify-between">
+            <h3 className="text-sm font-medium text-slate-300">All Branches Overview</h3>
+            <div className="flex items-center gap-2">
+              <button onClick={() => changeTrackerDate(-1)} className="p-1.5 rounded-lg hover:bg-slate-700 text-slate-400 hover:text-white transition-all">
+                <ChevronLeft className="w-4 h-4" />
+              </button>
+              <div className="flex items-center gap-1.5 bg-slate-800/50 border border-slate-700 rounded-lg px-3 py-1.5">
+                <Calendar className="w-3.5 h-3.5 text-purple-400" />
+                <input
+                  type="date"
+                  value={trackerDate}
+                  onChange={(e) => { setTrackerDate(e.target.value); loadTracker(e.target.value) }}
+                  className="bg-transparent text-sm text-white focus:outline-none [color-scheme:dark]"
+                />
+              </div>
+              <button
+                onClick={() => changeTrackerDate(1)}
+                disabled={trackerDate === new Date().toISOString().split('T')[0]}
+                className="p-1.5 rounded-lg hover:bg-slate-700 text-slate-400 hover:text-white transition-all disabled:opacity-30"
+              >
+                <ChevronRight className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+
           {trackerLoading && (
             <div className="flex items-center justify-center py-12">
               <Loader2 className="w-6 h-6 animate-spin text-purple-400" />

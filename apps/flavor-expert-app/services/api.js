@@ -217,6 +217,10 @@ class ApiService {
     return this.request(`/sales/budget?branch_id=${branchId}&year=${year}&month=${month}`)
   }
 
+  async getSmartAdvisor(branchId, date) {
+    return this.request(`/budget/advisor/${branchId}?date=${date}`)
+  }
+
   // ============== CUP USAGE ==============
 
   async submitCupUsage(data) {

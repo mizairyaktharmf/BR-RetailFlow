@@ -19,8 +19,11 @@ import {
   ChevronRight,
   Calendar,
   Layers,
+  Sparkles,
+  AlertTriangle,
+  Zap,
 } from 'lucide-react'
-import { Card, CardContent } from '@/components/ui/card'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { formatDate, SALES_WINDOWS } from '@/lib/utils'
 import api from '@/services/api'
 
@@ -71,6 +74,9 @@ export default function SalesDashboardPage() {
   const [budget, setBudget] = useState(null)
   const [trackedItems, setTrackedItems] = useState([])
   const [activeWindowId, setActiveWindowId] = useState(null)
+  const [activeTab, setActiveTab] = useState('sales') // 'sales' | 'advisor'
+  const [advisorData, setAdvisorData] = useState(null)
+  const [advisorLoading, setAdvisorLoading] = useState(false)
 
   useEffect(() => {
     const userData = localStorage.getItem('br_user')
@@ -111,6 +117,33 @@ export default function SalesDashboardPage() {
     const d = new Date(selectedDate)
     d.setDate(d.getDate() + days)
     setSelectedDate(d.toISOString().split('T')[0])
+  }
+
+  const loadAdvisor = async () => {
+    if (!branch?.id) return
+    setAdvisorLoading(true)
+    try {
+      const data = await api.getSmartAdvisor(branch.id, selectedDate)
+      setAdvisorData(data)
+    } catch {
+      setAdvisorData(null)
+    } finally {
+      setAdvisorLoading(false)
+    }
+  }
+
+  // Load advisor when tab switches to advisor or date changes
+  useEffect(() => {
+    if (activeTab === 'advisor' && branch?.id) loadAdvisor()
+  }, [activeTab, selectedDate, branch])
+
+  const fmt = (v) => v != null ? Number(v).toFixed(v % 1 === 0 ? 0 : 2) : '—'
+
+  const adviceIcon = (a) => {
+    if (a.priority === 'success') return <CheckCircle2 className="w-4 h-4 text-green-400" />
+    if (a.priority === 'critical') return <AlertTriangle className="w-4 h-4 text-red-400" />
+    if (a.priority === 'warning') return <Zap className="w-4 h-4 text-amber-400" />
+    return <TrendingUp className="w-4 h-4 text-blue-400" />
   }
 
   const isToday = selectedDate === new Date().toISOString().split('T')[0]
@@ -298,8 +331,37 @@ export default function SalesDashboardPage() {
         </div>
       </div>
 
+      {/* Sales / Advisor Tabs */}
+      <div className="px-4 pt-3 pb-0">
+        <div className="flex bg-gray-100 rounded-xl p-1">
+          <button
+            onClick={() => setActiveTab('sales')}
+            className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-lg text-sm font-semibold transition-all ${
+              activeTab === 'sales'
+                ? 'bg-white text-green-600 shadow-sm'
+                : 'text-gray-500 hover:text-gray-700'
+            }`}
+          >
+            <BarChart3 className="w-4 h-4" />
+            Sales
+          </button>
+          <button
+            onClick={() => setActiveTab('advisor')}
+            className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-lg text-sm font-semibold transition-all ${
+              activeTab === 'advisor'
+                ? 'bg-white text-purple-600 shadow-sm'
+                : 'text-gray-500 hover:text-gray-700'
+            }`}
+          >
+            <Sparkles className="w-4 h-4" />
+            Advisor
+          </button>
+        </div>
+      </div>
+
       <div className="px-4 py-4 space-y-4">
-        {loading ? (
+        {/* ============== SALES TAB ============== */}
+        {activeTab === 'sales' && (loading ? (
           <div className="flex items-center justify-center py-20"><Loader2 className="w-8 h-8 animate-spin text-green-500" /></div>
         ) : todaySales.length === 0 ? (
           <Card className="bg-gradient-to-br from-gray-50 to-white">
@@ -577,6 +639,211 @@ export default function SalesDashboardPage() {
               </div>
             )}
           </>
+        ))}
+
+        {/* ============== ADVISOR TAB ============== */}
+        {activeTab === 'advisor' && (
+          <div className="space-y-4">
+            {advisorLoading && (
+              <div className="flex items-center justify-center py-16">
+                <Loader2 className="w-6 h-6 animate-spin text-purple-500" />
+                <span className="ml-2 text-sm text-gray-500">Loading advisor...</span>
+              </div>
+            )}
+
+            {!advisorLoading && advisorData && (
+              <div className="space-y-4">
+                {/* Title */}
+                <div className="flex items-center gap-2 text-sm text-gray-600">
+                  <Sparkles className="w-4 h-4 text-purple-500" />
+                  <span className="font-medium">{advisorData.parlor_name || branch?.name}</span>
+                  <span className="text-gray-400">— {advisorData.day_name} {advisorData.date}</span>
+                </div>
+
+                {/* Daily Stats Grid */}
+                <div className="grid grid-cols-2 gap-3">
+                  <Card className="bg-gradient-to-br from-green-50 to-white">
+                    <CardContent className="p-4">
+                      <p className="text-[10px] text-gray-500 uppercase font-medium">Actual Sales</p>
+                      <p className="text-xl font-bold text-gray-900">{fmt(advisorData.daily?.actual_gross)}</p>
+                      <p className="text-[10px] text-gray-400">{advisorData.daily?.actual_gc || 0} GC</p>
+                    </CardContent>
+                  </Card>
+                  <Card className="bg-gradient-to-br from-purple-50 to-white">
+                    <CardContent className="p-4">
+                      <p className="text-[10px] text-gray-500 uppercase font-medium">Budget</p>
+                      <p className="text-xl font-bold text-purple-600">{fmt(advisorData.daily?.budget)}</p>
+                      <p className="text-[10px] text-gray-400">{advisorData.daily?.budget_gc || 0} GC target</p>
+                    </CardContent>
+                  </Card>
+                  <Card className={`bg-gradient-to-br ${
+                    (advisorData.daily?.achievement_pct || 0) >= 100 ? 'from-green-50'
+                    : (advisorData.daily?.achievement_pct || 0) >= 75 ? 'from-amber-50'
+                    : 'from-red-50'
+                  } to-white`}>
+                    <CardContent className="p-4">
+                      <p className="text-[10px] text-gray-500 uppercase font-medium">Achievement</p>
+                      <p className={`text-xl font-bold ${
+                        (advisorData.daily?.achievement_pct || 0) >= 100 ? 'text-green-600'
+                        : (advisorData.daily?.achievement_pct || 0) >= 75 ? 'text-amber-600'
+                        : 'text-red-600'
+                      }`}>
+                        {fmt(advisorData.daily?.achievement_pct)}%
+                      </p>
+                    </CardContent>
+                  </Card>
+                  <Card className="bg-gradient-to-br from-amber-50 to-white">
+                    <CardContent className="p-4">
+                      <p className="text-[10px] text-gray-500 uppercase font-medium">Remaining</p>
+                      <p className="text-xl font-bold text-amber-600">{fmt(advisorData.daily?.remaining)}</p>
+                      <p className="text-[10px] text-gray-400">{advisorData.daily?.remaining_gc || 0} GC needed</p>
+                    </CardContent>
+                  </Card>
+                </div>
+
+                {/* Progress Bar */}
+                <Card>
+                  <CardContent className="p-4">
+                    <div className="flex justify-between text-xs text-gray-400 mb-2">
+                      <span>0</span>
+                      <span>{fmt(advisorData.daily?.budget)} AED target</span>
+                    </div>
+                    <div className="w-full bg-gray-200 rounded-full h-3">
+                      <div
+                        className={`h-3 rounded-full transition-all ${
+                          (advisorData.daily?.achievement_pct || 0) >= 100 ? 'bg-green-500'
+                          : (advisorData.daily?.achievement_pct || 0) >= 75 ? 'bg-purple-500'
+                          : (advisorData.daily?.achievement_pct || 0) >= 50 ? 'bg-amber-500'
+                          : 'bg-red-500'
+                        }`}
+                        style={{ width: `${Math.min(advisorData.daily?.achievement_pct || 0, 100)}%` }}
+                      />
+                    </div>
+                  </CardContent>
+                </Card>
+
+                {/* Advice Cards */}
+                {advisorData.advice?.map((a, i) => (
+                  <Card key={i} className={`border ${
+                    a.priority === 'success' ? 'bg-green-50 border-green-200'
+                    : a.priority === 'critical' ? 'bg-red-50 border-red-200'
+                    : a.priority === 'warning' ? 'bg-amber-50 border-amber-200'
+                    : 'bg-white border-gray-200'
+                  }`}>
+                    <CardContent className="p-4">
+                      <div className="flex items-start gap-3">
+                        <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${
+                          a.priority === 'success' ? 'bg-green-100'
+                          : a.priority === 'critical' ? 'bg-red-100'
+                          : a.priority === 'warning' ? 'bg-amber-100'
+                          : 'bg-gray-100'
+                        }`}>
+                          {adviceIcon(a)}
+                        </div>
+                        <div>
+                          <p className="text-sm font-medium text-gray-900">{a.title}</p>
+                          <p className="text-xs text-gray-500 mt-0.5">{a.detail}</p>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+
+                {/* ATV & KPI Comparison */}
+                <Card>
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-sm text-gray-600">ATV & KPI Comparison</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="grid grid-cols-3 gap-3 text-center">
+                      <div>
+                        <p className="text-[10px] text-gray-500">Current ATV</p>
+                        <p className="text-lg font-bold text-gray-900">{fmt(advisorData.daily?.current_atv)}</p>
+                      </div>
+                      <div>
+                        <p className="text-[10px] text-gray-500">Budget ATV</p>
+                        <p className="text-lg font-bold text-purple-600">{fmt(advisorData.daily?.budget_atv)}</p>
+                      </div>
+                      <div>
+                        <p className="text-[10px] text-gray-500">LY ATV</p>
+                        <p className="text-lg font-bold text-blue-600">{fmt(advisorData.daily?.ly_atv)}</p>
+                      </div>
+                    </div>
+                    {advisorData.ly_kpis && (
+                      <div className="grid grid-cols-4 gap-2 mt-3 pt-3 border-t border-gray-200">
+                        <div className="text-center">
+                          <p className="text-[10px] text-gray-500">LY AUV</p>
+                          <p className="text-sm font-medium text-gray-700">{fmt(advisorData.ly_kpis.auv)}</p>
+                        </div>
+                        <div className="text-center">
+                          <p className="text-[10px] text-gray-500">LY Cake</p>
+                          <p className="text-sm font-medium text-gray-700">{fmt(advisorData.ly_kpis.cake_qty)}</p>
+                        </div>
+                        <div className="text-center">
+                          <p className="text-[10px] text-gray-500">LY HP</p>
+                          <p className="text-sm font-medium text-gray-700">{fmt(advisorData.ly_kpis.hp_qty)}</p>
+                        </div>
+                        <div className="text-center">
+                          <p className="text-[10px] text-gray-500">vs LY</p>
+                          <p className={`text-sm font-medium ${(advisorData.daily?.growth_vs_ly || 0) >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                            {advisorData.daily?.growth_vs_ly >= 0 ? '+' : ''}{fmt(advisorData.daily?.growth_vs_ly)}%
+                          </p>
+                        </div>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+
+                {/* MTD Summary */}
+                {advisorData.mtd?.actual_sales > 0 && (
+                  <Card>
+                    <CardHeader className="pb-2">
+                      <CardTitle className="text-sm text-gray-600">MTD Summary</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="grid grid-cols-3 gap-3 text-center">
+                        <div>
+                          <p className="text-[10px] text-gray-500">MTD Actual</p>
+                          <p className="text-lg font-bold text-gray-900">{fmt(advisorData.mtd.actual_sales)}</p>
+                        </div>
+                        <div>
+                          <p className="text-[10px] text-gray-500">MTD Budget</p>
+                          <p className="text-lg font-bold text-purple-600">{fmt(advisorData.mtd.budget)}</p>
+                        </div>
+                        <div>
+                          <p className="text-[10px] text-gray-500">MTD Ach %</p>
+                          <p className={`text-lg font-bold ${(advisorData.mtd.achievement_pct || 0) >= 90 ? 'text-green-600' : 'text-amber-600'}`}>
+                            {fmt(advisorData.mtd.achievement_pct)}%
+                          </p>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
+
+                {/* No budget warning */}
+                {!advisorData.budget_loaded && (
+                  <Card className="bg-amber-50 border-amber-200">
+                    <CardContent className="p-4 text-center">
+                      <AlertTriangle className="w-6 h-6 text-amber-500 mx-auto mb-2" />
+                      <p className="text-sm text-amber-700 font-medium">No budget uploaded for this branch</p>
+                      <p className="text-xs text-gray-500 mt-1">Ask your area manager to upload the budget sheet first</p>
+                    </CardContent>
+                  </Card>
+                )}
+              </div>
+            )}
+
+            {!advisorLoading && !advisorData && (
+              <Card className="bg-gradient-to-br from-purple-50 to-white">
+                <CardContent className="p-8 text-center">
+                  <Sparkles className="w-14 h-14 mx-auto text-purple-300 mb-4" />
+                  <h3 className="text-base font-semibold text-gray-900 mb-1">Budget Advisor</h3>
+                  <p className="text-sm text-gray-500">No advisor data available for this date. Budget may not be uploaded yet.</p>
+                </CardContent>
+              </Card>
+            )}
+          </div>
         )}
       </div>
 

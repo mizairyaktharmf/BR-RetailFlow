@@ -111,6 +111,36 @@ function PieChart({ categories }) {
   )
 }
 
+// Input field helper — defined OUTSIDE component to avoid remount on re-render
+const NumField = ({ label, value, onChange, placeholder, prefix = 'AED' }) => (
+  <div>
+    <label className="text-[10px] font-medium text-gray-500 uppercase tracking-wide">{label}</label>
+    <div className="flex items-center mt-0.5 border border-gray-200 rounded-lg bg-gray-50 overflow-hidden">
+      {prefix && <span className="text-[10px] text-gray-400 pl-2 pr-1">{prefix}</span>}
+      <input
+        type="number"
+        inputMode="decimal"
+        step="any"
+        value={value}
+        onChange={onChange}
+        placeholder={placeholder || '0'}
+        className="flex-1 px-2 py-2 text-sm bg-transparent outline-none text-gray-800"
+      />
+    </div>
+  </div>
+)
+
+// Summary card helper — defined OUTSIDE component to avoid remount on re-render
+const SummaryCard = ({ label, value, prefix = 'AED', color = 'text-gray-900' }) => (
+  <div className="bg-gray-50 rounded-lg p-2 text-center">
+    <p className="text-[9px] font-medium text-gray-500 uppercase tracking-wide">{label}</p>
+    <p className={`text-sm font-bold ${color} mt-0.5`}>
+      {prefix && <span className="text-[10px] font-normal text-gray-400">{prefix} </span>}
+      {typeof value === 'number' ? value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : value}
+    </p>
+  </div>
+)
+
 export default function SalesPage() {
   const router = useRouter()
   const [user, setUser] = useState(null)
@@ -436,36 +466,6 @@ export default function SalesPage() {
       setSaving(false)
     }
   }
-
-  // Input field helper
-  const NumField = ({ label, value, onChange, placeholder, prefix = 'AED' }) => (
-    <div>
-      <label className="text-[10px] font-medium text-gray-500 uppercase tracking-wide">{label}</label>
-      <div className="flex items-center mt-0.5 border border-gray-200 rounded-lg bg-gray-50 overflow-hidden">
-        {prefix && <span className="text-[10px] text-gray-400 pl-2 pr-1">{prefix}</span>}
-        <input
-          type="number"
-          inputMode="decimal"
-          step="any"
-          value={value}
-          onChange={onChange}
-          placeholder={placeholder || '0'}
-          className="flex-1 px-2 py-2 text-sm bg-transparent outline-none text-gray-800"
-        />
-      </div>
-    </div>
-  )
-
-  // Summary card helper
-  const SummaryCard = ({ label, value, prefix = 'AED', color = 'text-gray-900' }) => (
-    <div className="bg-gray-50 rounded-lg p-2 text-center">
-      <p className="text-[9px] font-medium text-gray-500 uppercase tracking-wide">{label}</p>
-      <p className={`text-sm font-bold ${color} mt-0.5`}>
-        {prefix && <span className="text-[10px] font-normal text-gray-400">{prefix} </span>}
-        {typeof value === 'number' ? value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : value}
-      </p>
-    </div>
-  )
 
   return (
     <div className="min-h-screen bg-gray-50 pb-24">
