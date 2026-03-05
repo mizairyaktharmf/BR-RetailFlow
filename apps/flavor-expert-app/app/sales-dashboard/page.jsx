@@ -1,10 +1,9 @@
 "use client"
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import {
   TrendingUp,
-  TrendingDown,
   ArrowLeft,
   Clock,
   DollarSign,
@@ -16,6 +15,10 @@ import {
   Users,
   PieChart,
   Target,
+  ChevronLeft,
+  ChevronRight,
+  Calendar,
+  Layers,
 } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 import { formatDate, SALES_WINDOWS } from '@/lib/utils'
@@ -64,8 +67,10 @@ export default function SalesDashboardPage() {
   const [branch, setBranch] = useState(null)
   const [loading, setLoading] = useState(true)
   const [todaySales, setTodaySales] = useState([])
-  const [todayDate] = useState(new Date().toISOString().split('T')[0])
+  const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0])
   const [budget, setBudget] = useState(null)
+  const [trackedItems, setTrackedItems] = useState([])
+  const [activeWindowId, setActiveWindowId] = useState(null)
 
   useEffect(() => {
     const userData = localStorage.getItem('br_user')
@@ -73,78 +78,187 @@ export default function SalesDashboardPage() {
     const parsedUser = JSON.parse(userData)
     setUser(parsedUser)
     const branchData = localStorage.getItem('br_branch')
-    if (branchData) setBranch(JSON.parse(branchData))
-    loadSalesData(parsedUser)
+    if (branchData) {
+      const b = JSON.parse(branchData)
+      setBranch(b)
+      api.getTrackedItems(b.id)
+        .then(items => setTrackedItems(Array.isArray(items) ? items : []))
+        .catch(() => setTrackedItems([]))
+    }
   }, [router])
 
-  const loadSalesData = async (userData) => {
+  // Reload sales when date changes
+  useEffect(() => {
+    if (branch?.id) loadSalesData()
+  }, [selectedDate, branch])
+
+  const loadSalesData = async () => {
     setLoading(true)
     try {
-      const branchData = localStorage.getItem('br_branch')
-      const branchInfo = branchData ? JSON.parse(branchData) : null
-      if (branchInfo?.id) {
-        const sales = await api.getDailySales(branchInfo.id, todayDate)
+      if (branch?.id) {
+        const sales = await api.getDailySales(branch.id, selectedDate)
         setTodaySales(Array.isArray(sales) ? sales : [])
         try {
-          const now = new Date()
-          const b = await api.getBranchBudget(branchInfo.id, now.getFullYear(), now.getMonth() + 1)
+          const d = new Date(selectedDate)
+          const b = await api.getBranchBudget(branch.id, d.getFullYear(), d.getMonth() + 1)
           if (b) setBudget(b)
         } catch {}
       }
     } catch {} finally { setLoading(false) }
   }
 
-  // Combined totals
-  const totalNetSales = todaySales.reduce((s, r) => s + (r.total_sales || 0), 0)
-  const totalHdNet = todaySales.reduce((s, r) => s + (r.hd_net_sales || 0), 0)
-  const totalHdGross = todaySales.reduce((s, r) => s + (r.hd_gross_sales || 0), 0)
-  const totalHdOrders = todaySales.reduce((s, r) => s + (r.hd_orders || 0), 0)
-  const totalDelNet = todaySales.reduce((s, r) => s + (r.deliveroo_net_sales || 0), 0)
-  const totalDelGross = todaySales.reduce((s, r) => s + (r.deliveroo_gross_sales || 0), 0)
-  const totalDelOrders = todaySales.reduce((s, r) => s + (r.deliveroo_orders || 0), 0)
-  const totalGC = todaySales.reduce((s, r) => s + (r.transaction_count || 0), 0)
+  const changeDate = (days) => {
+    const d = new Date(selectedDate)
+    d.setDate(d.getDate() + days)
+    setSelectedDate(d.toISOString().split('T')[0])
+  }
 
-  const combinedNet = totalNetSales + totalHdNet + totalDelNet
-  const combinedGC = totalGC + totalHdOrders + totalDelOrders
-  const currentATV = combinedGC > 0 ? combinedNet / combinedGC : 0
+  const isToday = selectedDate === new Date().toISOString().split('T')[0]
   const submittedWindows = todaySales.map(s => s.sales_window)
-  const hasHd = totalHdNet > 0
-  const hasDel = totalDelNet > 0
+  const windowOrder = SALES_WINDOWS.map(w => w.id)
 
-  // Category data
-  const allCategories = todaySales.reduce((acc, s) => {
-    if (s.category_data) {
-      try {
-        JSON.parse(s.category_data).forEach(cat => {
-          const ex = acc.find(a => a.name === cat.name)
-          if (ex) { ex.qty += (cat.qty || cat.quantity || 0); ex.sales += (cat.sales || 0) }
-          else acc.push({ name: cat.name, qty: cat.qty || cat.quantity || 0, sales: cat.sales || 0, pct: 0 })
-        })
-      } catch {}
+  // Find the latest submitted window (POS data is cumulative)
+  const latestWindowId = useMemo(() => {
+    for (let i = windowOrder.length - 1; i >= 0; i--) {
+      if (todaySales.find(s => s.sales_window === windowOrder[i])) return windowOrder[i]
     }
-    return acc
-  }, [])
-  const catTotal = allCategories.reduce((s, c) => s + c.sales, 0)
-  allCategories.forEach(c => { c.pct = catTotal > 0 ? c.sales / catTotal * 100 : 0 })
+    return todaySales[0]?.sales_window || null
+  }, [todaySales])
 
-  // Items data for promo tracker
-  const allItems = todaySales.reduce((acc, s) => {
-    if (s.items_data) {
-      try {
-        JSON.parse(s.items_data).forEach(item => {
-          const ex = acc.find(a => a.name === item.name)
-          if (ex) { ex.qty += (item.quantity || 0); ex.sales += (item.sales || 0) }
-          else acc.push({ ...item, qty: item.quantity || 0 })
-        })
-      } catch {}
+  // Auto-select latest window when sales load
+  useEffect(() => {
+    setActiveWindowId(latestWindowId)
+  }, [latestWindowId])
+
+  // The active record based on selected window
+  const activeRecord = useMemo(() => {
+    if (todaySales.length === 0) return null
+    if (activeWindowId) {
+      const found = todaySales.find(s => s.sales_window === activeWindowId)
+      if (found) return found
     }
-    return acc
-  }, [])
+    return todaySales.find(s => s.sales_window === latestWindowId) || todaySales[0]
+  }, [todaySales, activeWindowId, latestWindowId])
+
+  // POS values from active window
+  const posNet = activeRecord?.total_sales || 0
+  const posGross = activeRecord?.gross_sales || 0
+  const branchGC = activeRecord?.transaction_count || 0
+  const branchCash = activeRecord?.cash_sales || 0
+  const branchCashGC = activeRecord?.cash_gc || 0
+  const branchATV = activeRecord?.atv || (branchGC > 0 ? posNet / branchGC : 0)
+
+  // HD & Deliveroo from active window
+  const hdGross = activeRecord?.hd_gross_sales || 0
+  const hdNet = activeRecord?.hd_net_sales || 0
+  const hdOrders = activeRecord?.hd_orders || 0
+  const delGross = activeRecord?.deliveroo_gross_sales || 0
+  const delNet = activeRecord?.deliveroo_net_sales || 0
+  const delOrders = activeRecord?.deliveroo_orders || 0
+
+  // Combined totals
+  const totalNet = posNet + hdNet + delNet
+  const totalGross = posGross + hdGross + delGross
+  const totalGC = branchGC + hdOrders + delOrders
+
+  // Categories from active window
+  const branchCategories = useMemo(() => {
+    if (!activeRecord?.category_data) return []
+    try {
+      return JSON.parse(activeRecord.category_data).map(cat => ({
+        name: cat.name, qty: cat.qty || cat.quantity || 0, sales: cat.sales || 0, pct: cat.pct || 0,
+      }))
+    } catch { return [] }
+  }, [activeRecord])
+
+  // Items from active window
+  const branchItems = useMemo(() => {
+    if (!activeRecord?.items_data) return []
+    try { return JSON.parse(activeRecord.items_data) } catch { return [] }
+  }, [activeRecord])
+
+  const catTotal = branchCategories.reduce((s, c) => s + c.sales, 0)
+  branchCategories.forEach(c => { c.pct = catTotal > 0 ? c.sales / catTotal * 100 : c.pct })
+
+  // Promotion tracking data from active window
+  const promotionData = useMemo(() => {
+    if (!trackedItems.length || !branchItems.length) return []
+    const totalQty = branchItems.reduce((s, it) => s + (it.quantity || 0), 0)
+
+    return trackedItems.map(tracked => {
+      const isCategory = tracked.item_code?.startsWith('CAT:')
+
+      if (isCategory) {
+        const catName = tracked.item_code.replace('CAT:', '')
+        const catRow = branchCategories.find(c => c.name && c.name.toLowerCase() === catName.toLowerCase())
+        const catQty = catRow?.qty || 0
+        const catSales = catRow?.sales || 0
+        const catItems = branchItems.filter(it => it.category && it.category.toLowerCase() === catName.toLowerCase())
+
+        const columns = [{
+          code: 'CAT', name: catName, qty: catQty,
+          countPct: totalQty > 0 ? ((catQty / totalQty) * 100) : 0,
+          auv: catQty > 0 ? (catSales / catQty) : 0,
+          ir: branchGC > 0 ? ((catQty / branchGC) * 100) : 0,
+          sales: catSales, isMain: true, isCategory: true, itemCount: catItems.length,
+        }]
+        catItems.forEach(it => {
+          const qty = it.quantity || 0
+          const sales = it.sales || 0
+          columns.push({
+            code: it.code, name: it.name, qty,
+            countPct: totalQty > 0 ? ((qty / totalQty) * 100) : 0,
+            auv: qty > 0 ? (sales / qty) : 0,
+            ir: branchGC > 0 ? ((qty / branchGC) * 100) : 0,
+            sales, isMain: false,
+          })
+        })
+        return { trackedName: catName, trackedCode: tracked.item_code, columns, isCategory: true }
+      }
+
+      const baseName = tracked.item_name.replace(/\s+(Sgl|Val|Dbl|Kids|S|M|L|XL|Single|Value|Double|Regular|Large|Small)$/i, '').trim()
+      const matchedItems = branchItems.filter(it => {
+        if (it.code === tracked.item_code) return true
+        const itBase = it.name?.replace(/\s+(Sgl|Val|Dbl|Kids|S|M|L|XL|Single|Value|Double|Regular|Large|Small)$/i, '').trim()
+        return itBase && itBase.toLowerCase() === baseName.toLowerCase() && it.code !== tracked.item_code
+      })
+
+      const exactMatch = matchedItems.find(it => it.code === tracked.item_code)
+      const variants = matchedItems.filter(it => it.code !== tracked.item_code)
+      const columns = []
+
+      if (exactMatch) {
+        const qty = exactMatch.quantity || 0
+        const sales = exactMatch.sales || 0
+        columns.push({
+          code: exactMatch.code, name: exactMatch.name, qty,
+          countPct: totalQty > 0 ? ((qty / totalQty) * 100) : 0,
+          auv: qty > 0 ? (sales / qty) : 0,
+          ir: branchGC > 0 ? ((qty / branchGC) * 100) : 0,
+          sales, isMain: true,
+        })
+      } else {
+        columns.push({ code: tracked.item_code, name: tracked.item_name, qty: 0, countPct: 0, auv: 0, ir: 0, sales: 0, isMain: true })
+      }
+      variants.forEach(v => {
+        const qty = v.quantity || 0
+        const sales = v.sales || 0
+        columns.push({
+          code: v.code, name: v.name, qty,
+          countPct: totalQty > 0 ? ((qty / totalQty) * 100) : 0,
+          auv: qty > 0 ? (sales / qty) : 0,
+          ir: branchGC > 0 ? ((qty / branchGC) * 100) : 0,
+          sales, isMain: false,
+        })
+      })
+      return { trackedName: tracked.item_name, trackedCode: tracked.item_code, columns }
+    })
+  }, [trackedItems, branchItems, branchCategories, branchGC])
 
   // Budget
   const daysInMonth = budget ? new Date(budget.year, budget.month, 0).getDate() : 30
   const dailyBudget = budget ? budget.target_sales / daysInMonth : 0
-  const achievement = dailyBudget > 0 ? combinedNet / dailyBudget * 100 : 0
+  const achievement = dailyBudget > 0 ? totalNet / dailyBudget * 100 : 0
 
   if (!user) return <div className="min-h-screen flex items-center justify-center bg-gray-50"><Loader2 className="w-8 h-8 animate-spin text-green-500" /></div>
 
@@ -152,7 +266,7 @@ export default function SalesDashboardPage() {
     <div className="min-h-screen bg-gray-50 pb-20">
       {/* Header */}
       <div className="bg-gradient-to-r from-green-500 to-emerald-600 text-white safe-area-top">
-        <div className="px-4 py-5">
+        <div className="px-4 py-4">
           <div className="flex items-center gap-3">
             <button onClick={() => router.push('/dashboard')} className="p-1.5 rounded-lg hover:bg-white/20"><ArrowLeft className="w-5 h-5" /></button>
             <div className="flex-1">
@@ -160,111 +274,267 @@ export default function SalesDashboardPage() {
               <p className="text-green-100 text-sm">{branch?.name || 'My Branch'}</p>
             </div>
             <div className="text-right">
-              <p className="text-green-100 text-xs">Today</p>
-              <p className="font-medium text-sm">{formatDate(new Date())}</p>
+              {isToday && <span className="text-[10px] px-1.5 py-0.5 bg-white/20 rounded-full">Today</span>}
             </div>
+          </div>
+          {/* Date Navigation */}
+          <div className="flex items-center justify-center gap-2 mt-3">
+            <button onClick={() => changeDate(-1)} className="p-1.5 rounded-lg hover:bg-white/20 active:scale-95 transition-all">
+              <ChevronLeft className="w-5 h-5" />
+            </button>
+            <div className="flex items-center gap-2 bg-white/15 backdrop-blur-sm rounded-lg px-3 py-1.5 min-w-[160px] justify-center">
+              <Calendar className="w-3.5 h-3.5 text-green-100" />
+              <input
+                type="date"
+                value={selectedDate}
+                onChange={(e) => setSelectedDate(e.target.value)}
+                className="bg-transparent text-sm text-white focus:outline-none [color-scheme:dark]"
+              />
+            </div>
+            <button onClick={() => changeDate(1)} disabled={isToday} className="p-1.5 rounded-lg hover:bg-white/20 active:scale-95 transition-all disabled:opacity-30">
+              <ChevronRight className="w-5 h-5" />
+            </button>
           </div>
         </div>
       </div>
 
-      <div className="px-4 py-5 space-y-5">
+      <div className="px-4 py-4 space-y-4">
         {loading ? (
           <div className="flex items-center justify-center py-20"><Loader2 className="w-8 h-8 animate-spin text-green-500" /></div>
+        ) : todaySales.length === 0 ? (
+          <Card className="bg-gradient-to-br from-gray-50 to-white">
+            <CardContent className="p-8 text-center">
+              <TrendingUp className="w-14 h-14 mx-auto text-gray-300 mb-4" />
+              <h3 className="text-base font-semibold text-gray-900 mb-1">No Sales Data</h3>
+              <p className="text-sm text-gray-500 mb-4">
+                {isToday ? 'Submit your first sales report to see data here.' : 'No sales were submitted for this date.'}
+              </p>
+              {isToday && (
+                <button onClick={() => router.push('/dashboard')} className="px-4 py-2 rounded-lg bg-green-500 text-white text-sm font-medium hover:bg-green-600">Go to Home</button>
+              )}
+            </CardContent>
+          </Card>
         ) : (
           <>
-            {/* Summary Cards */}
+            {/* ===== WINDOW SELECTOR (at top) ===== */}
             <div>
-              <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-3">Today's Summary</h2>
-              <div className="grid grid-cols-2 gap-3">
-                <Card className="bg-gradient-to-br from-green-50 to-white">
-                  <CardContent className="p-4">
-                    <div className="flex items-center gap-2 text-green-600 mb-2"><DollarSign className="w-4 h-4" /><span className="text-xs font-medium">Combined Net</span></div>
-                    <p className="text-2xl font-bold text-gray-900">{combinedNet > 0 ? combinedNet.toFixed(0) : '—'}</p>
-                    {(hasHd || hasDel) && <p className="text-[10px] text-gray-400 mt-0.5">POS {totalNetSales.toFixed(0)}{hasHd ? ` +HD ${totalHdNet.toFixed(0)}` : ''}{hasDel ? ` +Del ${totalDelNet.toFixed(0)}` : ''}</p>}
-                  </CardContent>
-                </Card>
-
-                <Card className="bg-gradient-to-br from-blue-50 to-white">
-                  <CardContent className="p-4">
-                    <div className="flex items-center gap-2 text-blue-600 mb-2"><Users className="w-4 h-4" /><span className="text-xs font-medium">Total GC</span></div>
-                    <p className="text-2xl font-bold text-gray-900">{combinedGC > 0 ? combinedGC : '—'}</p>
-                    <p className="text-[10px] text-gray-400 mt-0.5">ATV: {currentATV > 0 ? currentATV.toFixed(2) : '—'}</p>
-                  </CardContent>
-                </Card>
-
-                <Card className="bg-gradient-to-br from-purple-50 to-white">
-                  <CardContent className="p-4">
-                    <div className="flex items-center gap-2 text-purple-600 mb-2"><BarChart3 className="w-4 h-4" /><span className="text-xs font-medium">Windows</span></div>
-                    <p className="text-2xl font-bold text-gray-900">{submittedWindows.length} / {SALES_WINDOWS.length}</p>
-                  </CardContent>
-                </Card>
-
-                {budget ? (
-                  <Card className={`bg-gradient-to-br ${achievement >= 100 ? 'from-green-50' : achievement >= 75 ? 'from-amber-50' : 'from-red-50'} to-white`}>
-                    <CardContent className="p-4">
-                      <div className="flex items-center gap-2 mb-2"><Target className={`w-4 h-4 ${achievement >= 100 ? 'text-green-600' : achievement >= 75 ? 'text-amber-600' : 'text-red-600'}`} /><span className="text-xs font-medium text-gray-600">Budget</span></div>
-                      <p className={`text-2xl font-bold ${achievement >= 100 ? 'text-green-600' : achievement >= 75 ? 'text-amber-600' : 'text-red-600'}`}>{achievement.toFixed(0)}%</p>
-                      <p className="text-[10px] text-gray-400 mt-0.5">{dailyBudget.toFixed(0)} target</p>
-                    </CardContent>
-                  </Card>
-                ) : (
-                  <Card className="bg-gradient-to-br from-gray-50 to-white">
-                    <CardContent className="p-4">
-                      <div className="flex items-center gap-2 text-gray-500 mb-2"><DollarSign className="w-4 h-4" /><span className="text-xs font-medium">Gross</span></div>
-                      <p className="text-2xl font-bold text-gray-900">{todaySales.reduce((s, r) => s + (r.gross_sales || 0), 0).toFixed(0) || '—'}</p>
-                    </CardContent>
-                  </Card>
-                )}
+              <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-2">Window Status</h2>
+              <div className="grid grid-cols-4 gap-2">
+                {SALES_WINDOWS.map((w) => {
+                  const done = submittedWindows.includes(w.id)
+                  const isActive = activeWindowId === w.id
+                  const rec = todaySales.find(s => s.sales_window === w.id)
+                  return (
+                    <button
+                      key={w.id}
+                      onClick={() => { if (done) setActiveWindowId(w.id) }}
+                      disabled={!done}
+                      className={`p-2.5 rounded-xl text-center transition-all ${
+                        isActive && done
+                          ? 'bg-green-500 text-white shadow-lg shadow-green-500/30 scale-[1.02]'
+                          : done
+                            ? 'bg-green-50 border-2 border-green-300 hover:border-green-400'
+                            : 'bg-gray-50 border-2 border-gray-200 opacity-60'
+                      }`}
+                    >
+                      <p className={`text-xs font-bold ${isActive && done ? 'text-white' : done ? 'text-green-700' : 'text-gray-400'}`}>
+                        {w.label.split(' ')[0]}
+                      </p>
+                      {done ? (
+                        <>
+                          <CheckCircle2 className={`w-4 h-4 mx-auto mt-0.5 ${isActive ? 'text-white' : 'text-green-500'}`} />
+                          <p className={`text-[9px] mt-0.5 font-medium ${isActive ? 'text-green-100' : 'text-green-600'}`}>
+                            {((rec?.total_sales || 0) + (rec?.hd_net_sales || 0) + (rec?.deliveroo_net_sales || 0)).toFixed(0)}
+                          </p>
+                        </>
+                      ) : (
+                        <>
+                          <Clock className="w-4 h-4 mx-auto mt-0.5 text-gray-400" />
+                          <p className="text-[9px] mt-0.5 text-gray-400">Pending</p>
+                        </>
+                      )}
+                    </button>
+                  )
+                })}
               </div>
             </div>
 
-            {/* Category Donut */}
-            {allCategories.length > 0 && (
+            {/* Show which window is active */}
+            {activeRecord && (
+              <p className="text-[10px] text-gray-500 uppercase tracking-wider">
+                Showing: <span className="text-green-600 font-semibold">{SALES_WINDOWS.find(w => w.id === activeRecord.sales_window)?.label || activeRecord.sales_window}</span> report
+              </p>
+            )}
+
+            {/* ===== SUMMARY CARDS ===== */}
+            <div className="grid grid-cols-2 gap-3">
+              <Card className="bg-gradient-to-br from-green-50 to-white">
+                <CardContent className="p-4">
+                  <div className="flex items-center gap-2 text-green-600 mb-2"><DollarSign className="w-4 h-4" /><span className="text-xs font-medium">Total Net</span></div>
+                  <p className="text-2xl font-bold text-gray-900">{totalNet > 0 ? totalNet.toFixed(0) : '—'}</p>
+                  {(hdNet > 0 || delNet > 0) && <p className="text-[10px] text-gray-400 mt-0.5">POS {posNet.toFixed(0)}{hdNet > 0 ? ` +HD ${hdNet.toFixed(0)}` : ''}{delNet > 0 ? ` +Del ${delNet.toFixed(0)}` : ''}</p>}
+                </CardContent>
+              </Card>
+
+              <Card className="bg-gradient-to-br from-blue-50 to-white">
+                <CardContent className="p-4">
+                  <div className="flex items-center gap-2 text-blue-600 mb-2"><Users className="w-4 h-4" /><span className="text-xs font-medium">Total GC</span></div>
+                  <p className="text-2xl font-bold text-gray-900">{totalGC > 0 ? totalGC : '—'}</p>
+                  <p className="text-[10px] text-gray-400 mt-0.5">ATV: {branchATV > 0 ? branchATV.toFixed(2) : '—'}</p>
+                </CardContent>
+              </Card>
+
+              <Card className="bg-gradient-to-br from-amber-50 to-white">
+                <CardContent className="p-4">
+                  <div className="flex items-center gap-2 text-amber-600 mb-2"><DollarSign className="w-4 h-4" /><span className="text-xs font-medium">Total Gross</span></div>
+                  <p className="text-2xl font-bold text-gray-900">{totalGross > 0 ? totalGross.toFixed(0) : '—'}</p>
+                </CardContent>
+              </Card>
+
+              <Card className={`bg-gradient-to-br ${budget ? (achievement >= 100 ? 'from-green-50' : achievement >= 75 ? 'from-amber-50' : 'from-red-50') : 'from-gray-50'} to-white`}>
+                <CardContent className="p-4">
+                  {budget ? (
+                    <>
+                      <div className="flex items-center gap-2 mb-2"><Target className={`w-4 h-4 ${achievement >= 100 ? 'text-green-600' : achievement >= 75 ? 'text-amber-600' : 'text-red-600'}`} /><span className="text-xs font-medium text-gray-600">Budget</span></div>
+                      <p className={`text-2xl font-bold ${achievement >= 100 ? 'text-green-600' : achievement >= 75 ? 'text-amber-600' : 'text-red-600'}`}>{achievement.toFixed(0)}%</p>
+                      <p className="text-[10px] text-gray-400 mt-0.5">{dailyBudget.toFixed(0)} target</p>
+                    </>
+                  ) : (
+                    <>
+                      <div className="flex items-center gap-2 text-gray-500 mb-2"><DollarSign className="w-4 h-4" /><span className="text-xs font-medium">Cash Sales</span></div>
+                      <p className="text-2xl font-bold text-gray-900">{branchCash > 0 ? branchCash.toFixed(0) : '—'}</p>
+                      <p className="text-[10px] text-gray-400 mt-0.5">Cash GC: {branchCashGC}</p>
+                    </>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* ===== SALES CHANNELS BREAKDOWN ===== */}
+            <div className="grid grid-cols-3 gap-2">
+              <Card className="bg-gradient-to-br from-orange-50 to-white border-orange-200">
+                <CardContent className="p-3">
+                  <p className="text-[9px] font-bold text-orange-600 uppercase">POS</p>
+                  <p className="text-base font-bold text-gray-900 mt-1">{posNet.toFixed(0)}</p>
+                  <p className="text-[9px] text-gray-400">{branchGC} GC</p>
+                  <p className="text-[9px] text-gray-400">Gross: {posGross.toFixed(0)}</p>
+                </CardContent>
+              </Card>
+              <Card className={`bg-gradient-to-br ${hdNet > 0 ? 'from-cyan-50 border-cyan-200' : 'from-gray-50 border-gray-200'} to-white`}>
+                <CardContent className="p-3">
+                  <p className={`text-[9px] font-bold uppercase ${hdNet > 0 ? 'text-cyan-600' : 'text-gray-400'}`}>Home Delivery</p>
+                  <p className={`text-base font-bold mt-1 ${hdNet > 0 ? 'text-gray-900' : 'text-gray-400'}`}>{hdNet > 0 ? hdNet.toFixed(0) : '—'}</p>
+                  {hdOrders > 0 && <p className="text-[9px] text-gray-400">{hdOrders} orders</p>}
+                  {hdGross > 0 && <p className="text-[9px] text-gray-400">Gross: {hdGross.toFixed(0)}</p>}
+                </CardContent>
+              </Card>
+              <Card className={`bg-gradient-to-br ${delNet > 0 ? 'from-teal-50 border-teal-200' : 'from-gray-50 border-gray-200'} to-white`}>
+                <CardContent className="p-3">
+                  <p className={`text-[9px] font-bold uppercase ${delNet > 0 ? 'text-teal-600' : 'text-gray-400'}`}>Deliveroo</p>
+                  <p className={`text-base font-bold mt-1 ${delNet > 0 ? 'text-gray-900' : 'text-gray-400'}`}>{delNet > 0 ? delNet.toFixed(0) : '—'}</p>
+                  {delOrders > 0 && <p className="text-[9px] text-gray-400">{delOrders} orders</p>}
+                  {delGross > 0 && <p className="text-[9px] text-gray-400">Gross: {delGross.toFixed(0)}</p>}
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* ===== PROMOTION TRACKING ===== */}
+            {promotionData.length > 0 && (
               <div>
-                <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-3 flex items-center gap-2"><PieChart className="w-4 h-4" />Category Breakdown</h2>
-                <Card>
-                  <CardContent className="p-4">
-                    <div className="flex items-center gap-4">
-                      <DonutChart categories={allCategories} totalSales={catTotal} />
-                      <div className="flex-1 space-y-1.5">
-                        {allCategories.map((cat, i) => (
-                          <div key={i} className="flex items-center justify-between">
-                            <div className="flex items-center gap-2">
-                              <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: getCatColor(cat.name, i) }} />
-                              <span className="text-xs text-gray-700">{cat.name}</span>
+                <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-3">Promotion Tracking</h2>
+                <Card className="bg-gradient-to-r from-pink-50 to-purple-50 border-pink-200">
+                  <CardContent className="p-3">
+                    <div className="flex gap-2 overflow-x-auto pb-1">
+                      {promotionData.flatMap(p => p.columns).map((col, ci) => (
+                        <div
+                          key={`promo-${col.code}-${ci}`}
+                          className={`flex-shrink-0 min-w-[140px] rounded-lg p-2.5 border ${
+                            col.isCategory
+                              ? 'bg-orange-50 border-orange-300'
+                              : col.isMain
+                                ? 'bg-pink-50 border-pink-300'
+                                : 'bg-purple-50 border-purple-200'
+                          }`}
+                        >
+                          <div className="flex items-center gap-1 mb-1.5">
+                            <span className="text-[8px] font-mono text-gray-500">{col.code}</span>
+                            {col.isCategory ? (
+                              <span className="text-[7px] px-1 py-0.5 bg-orange-200 text-orange-700 rounded font-bold flex items-center gap-0.5">
+                                <Layers className="w-2 h-2" />CAT{col.itemCount > 0 ? ` · ${col.itemCount}` : ''}
+                              </span>
+                            ) : col.isMain ? (
+                              <span className="text-[7px] px-1 py-0.5 bg-pink-200 text-pink-700 rounded font-bold">PROMO</span>
+                            ) : null}
+                          </div>
+                          <p className="text-[11px] font-semibold text-gray-800 truncate mb-2" title={col.name}>{col.name}</p>
+                          <div className="grid grid-cols-2 gap-x-2 gap-y-1.5">
+                            <div>
+                              <p className="text-[8px] text-gray-500 uppercase">QTY</p>
+                              <p className="text-xs font-bold text-gray-900">{col.qty}</p>
                             </div>
-                            <div className="text-right">
-                              <span className="text-xs font-medium text-gray-900">{cat.pct.toFixed(1)}%</span>
-                              <span className="text-[10px] text-gray-400 ml-1">{cat.sales.toFixed(0)}</span>
+                            <div>
+                              <p className="text-[8px] text-gray-500 uppercase">%Count</p>
+                              <p className="text-xs font-bold text-amber-600">{col.countPct.toFixed(1)}%</p>
+                            </div>
+                            <div>
+                              <p className="text-[8px] text-gray-500 uppercase">AUV</p>
+                              <p className="text-xs font-bold text-blue-600">{col.auv.toFixed(2)}</p>
+                            </div>
+                            <div>
+                              <p className="text-[8px] text-gray-500 uppercase">IR</p>
+                              <p className="text-xs font-bold text-purple-600">{col.ir.toFixed(1)}%</p>
                             </div>
                           </div>
-                        ))}
-                      </div>
+                          <div className="mt-1.5 pt-1.5 border-t border-gray-200">
+                            <p className="text-[8px] text-gray-500">Sales</p>
+                            <p className="text-[11px] font-semibold text-green-600">{col.sales.toFixed(2)}</p>
+                          </div>
+                        </div>
+                      ))}
                     </div>
                   </CardContent>
                 </Card>
               </div>
             )}
 
-            {/* Item / Promo Tracker */}
-            {allItems.length > 0 && (
+            {/* ===== CATEGORY BREAKDOWN ===== */}
+            {branchCategories.length > 0 && (
               <div>
-                <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-3">Item Tracker (IR & AUV)</h2>
+                <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-3 flex items-center gap-2"><PieChart className="w-4 h-4" />Category Breakdown</h2>
                 <Card>
-                  <CardContent className="p-3">
+                  <CardContent className="p-4">
+                    <div className="flex justify-center mb-4">
+                      <DonutChart categories={branchCategories} totalSales={catTotal} />
+                    </div>
                     <table className="w-full text-[11px]">
-                      <thead><tr className="text-gray-500 border-b"><th className="text-left py-1.5">Item</th><th className="text-right py-1.5">Qty</th><th className="text-right py-1.5">Sales</th><th className="text-right py-1.5">IR%</th><th className="text-right py-1.5">AUV</th></tr></thead>
+                      <thead>
+                        <tr className="border-b border-gray-200">
+                          <th className="text-left py-1.5 text-gray-500 font-medium">Category</th>
+                          <th className="text-right py-1.5 text-gray-500 font-medium">Qty</th>
+                          <th className="text-right py-1.5 text-gray-500 font-medium">Sales</th>
+                          <th className="text-right py-1.5 text-gray-500 font-medium">%</th>
+                          <th className="text-right py-1.5 text-gray-500 font-medium">AUV</th>
+                          <th className="text-right py-1.5 text-gray-500 font-medium">IR</th>
+                        </tr>
+                      </thead>
                       <tbody>
-                        {allItems.sort((a, b) => (b.sales || 0) - (a.sales || 0)).slice(0, 15).map((item, i) => {
-                          const ir = combinedGC > 0 ? item.qty / combinedGC * 100 : 0
-                          const auv = item.qty > 0 ? item.sales / item.qty : 0
+                        {branchCategories.map((cat, i) => {
+                          const qty = cat.qty || 0
+                          const auv = qty > 0 ? (cat.sales / qty).toFixed(2) : '0.00'
+                          const ir = branchGC > 0 ? ((qty / branchGC) * 100).toFixed(1) : '0.0'
                           return (
-                            <tr key={i} className="border-b border-gray-50">
-                              <td className="py-1.5 font-medium text-gray-800 truncate max-w-[120px]">{item.name}</td>
-                              <td className="text-right text-gray-600">{item.qty}</td>
-                              <td className="text-right text-gray-600">{(item.sales || 0).toFixed(0)}</td>
-                              <td className="text-right text-blue-600 font-medium">{ir.toFixed(1)}%</td>
-                              <td className="text-right text-gray-600">{auv.toFixed(2)}</td>
+                            <tr key={i} className="border-b border-gray-100">
+                              <td className="py-1.5 text-gray-800 font-medium">
+                                <div className="flex items-center gap-1.5">
+                                  <div className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: getCatColor(cat.name, i) }} />
+                                  {cat.name}
+                                </div>
+                              </td>
+                              <td className="text-right py-1.5 text-gray-600">{qty}</td>
+                              <td className="text-right py-1.5 text-gray-800 font-medium">{cat.sales.toFixed(0)}</td>
+                              <td className="text-right py-1.5 text-gray-600">{cat.pct.toFixed(1)}%</td>
+                              <td className="text-right py-1.5 text-blue-600 font-medium">{auv}</td>
+                              <td className="text-right py-1.5 text-purple-600 font-medium">{ir}%</td>
                             </tr>
                           )
                         })}
@@ -275,85 +545,36 @@ export default function SalesDashboardPage() {
               </div>
             )}
 
-            {/* Delivery Channels */}
-            {(hasHd || hasDel) && (
+            {/* ===== ITEM TRACKER ===== */}
+            {branchItems.length > 0 && (
               <div>
-                <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-3">Delivery Channels</h2>
-                <div className="space-y-2">
-                  {hasHd && (
-                    <Card className="bg-gradient-to-br from-cyan-50 to-white border-cyan-100">
-                      <CardContent className="p-4">
-                        <p className="text-xs font-bold text-cyan-700 mb-2">Home Delivery</p>
-                        <div className="grid grid-cols-3 gap-3 text-center">
-                          <div><p className="text-[10px] text-gray-500">Net</p><p className="text-base font-bold">{totalHdNet.toFixed(0)}</p></div>
-                          <div><p className="text-[10px] text-gray-500">Gross</p><p className="text-base font-bold">{totalHdGross.toFixed(0)}</p></div>
-                          <div><p className="text-[10px] text-gray-500">Orders</p><p className="text-base font-bold">{totalHdOrders}</p></div>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  )}
-                  {hasDel && (
-                    <Card className="bg-gradient-to-br from-teal-50 to-white border-teal-100">
-                      <CardContent className="p-4">
-                        <p className="text-xs font-bold text-teal-700 mb-2">Deliveroo</p>
-                        <div className="grid grid-cols-3 gap-3 text-center">
-                          <div><p className="text-[10px] text-gray-500">Net</p><p className="text-base font-bold">{totalDelNet.toFixed(0)}</p></div>
-                          <div><p className="text-[10px] text-gray-500">Gross</p><p className="text-base font-bold">{totalDelGross.toFixed(0)}</p></div>
-                          <div><p className="text-[10px] text-gray-500">Orders</p><p className="text-base font-bold">{totalDelOrders}</p></div>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  )}
-                </div>
+                <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-3">Item Tracker ({branchItems.length} items)</h2>
+                <Card>
+                  <CardContent className="p-3">
+                    <div className="max-h-60 overflow-y-auto">
+                      <table className="w-full text-[11px]">
+                        <thead className="sticky top-0 bg-white"><tr className="text-gray-500 border-b"><th className="text-left py-1.5">Item</th><th className="text-right py-1.5">Qty</th><th className="text-right py-1.5">Sales</th><th className="text-right py-1.5">IR%</th><th className="text-right py-1.5">AUV</th></tr></thead>
+                        <tbody>
+                          {branchItems.sort((a, b) => (b.sales || 0) - (a.sales || 0)).map((item, i) => {
+                            const qty = item.quantity || 0
+                            const ir = branchGC > 0 ? qty / branchGC * 100 : 0
+                            const auv = qty > 0 ? item.sales / qty : 0
+                            return (
+                              <tr key={i} className="border-b border-gray-50">
+                                <td className="py-1.5 font-medium text-gray-800 truncate max-w-[120px]">{item.name}</td>
+                                <td className="text-right text-gray-600">{qty}</td>
+                                <td className="text-right text-gray-600">{(item.sales || 0).toFixed(0)}</td>
+                                <td className="text-right text-blue-600 font-medium">{ir.toFixed(1)}%</td>
+                                <td className="text-right text-gray-600">{auv.toFixed(2)}</td>
+                              </tr>
+                            )
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  </CardContent>
+                </Card>
               </div>
-            )}
-
-            {/* Window Status */}
-            <div>
-              <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-3">Window Status</h2>
-              <Card>
-                <CardContent className="p-0">
-                  {SALES_WINDOWS.map((w, idx) => {
-                    const done = submittedWindows.includes(w.id)
-                    const rec = todaySales.find(s => s.sales_window === w.id)
-                    const wNet = (rec?.total_sales || 0) + (rec?.hd_net_sales || 0) + (rec?.deliveroo_net_sales || 0)
-                    return (
-                      <div key={w.id} className={`flex items-center justify-between p-4 ${idx < SALES_WINDOWS.length - 1 ? 'border-b border-gray-100' : ''}`}>
-                        <div className="flex items-center gap-3">
-                          <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${done ? 'bg-green-100' : 'bg-gray-100'}`}>
-                            {done ? <CheckCircle2 className="w-5 h-5 text-green-600" /> : <Clock className="w-5 h-5 text-gray-400" />}
-                          </div>
-                          <div>
-                            <p className="font-medium text-gray-900">{w.label}</p>
-                            <p className="text-xs text-gray-500">{w.time}</p>
-                          </div>
-                        </div>
-                        <div className="text-right">
-                          {done ? (
-                            <>
-                              <p className="text-sm font-semibold text-green-600">AED {wNet.toFixed(0)}</p>
-                              <p className="text-[11px] text-gray-400">{rec?.transaction_count || 0} GC{(rec?.hd_orders || 0) > 0 ? ` +${rec.hd_orders} HD` : ''}{(rec?.deliveroo_orders || 0) > 0 ? ` +${rec.deliveroo_orders} Del` : ''}</p>
-                            </>
-                          ) : (
-                            <span className="px-2 py-1 rounded-full bg-gray-100 text-gray-500 text-xs">Pending</span>
-                          )}
-                        </div>
-                      </div>
-                    )
-                  })}
-                </CardContent>
-              </Card>
-            </div>
-
-            {todaySales.length === 0 && (
-              <Card className="bg-gradient-to-br from-gray-50 to-white">
-                <CardContent className="p-8 text-center">
-                  <TrendingUp className="w-14 h-14 mx-auto text-gray-300 mb-4" />
-                  <h3 className="text-base font-semibold text-gray-900 mb-1">No Sales Yet</h3>
-                  <p className="text-sm text-gray-500 mb-4">Submit your first sales report to see data here.</p>
-                  <button onClick={() => router.push('/dashboard')} className="px-4 py-2 rounded-lg bg-green-500 text-white text-sm font-medium hover:bg-green-600">Go to Home</button>
-                </CardContent>
-              </Card>
             )}
           </>
         )}

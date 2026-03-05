@@ -12,6 +12,7 @@ import {
   Plus,
   Eye,
   RotateCcw,
+  Layers,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
@@ -126,6 +127,7 @@ export default function SalesPage() {
   const posFileRef = useRef(null)
 
   // Tracked promotion items
+  const [trackedItems, setTrackedItems] = useState([])
   const [trackedCodes, setTrackedCodes] = useState(new Set())
 
   // Extracted data for review
@@ -149,11 +151,9 @@ export default function SalesPage() {
       setBranch(b)
       // Load tracked promotion items for this branch
       api.getTrackedItems(b.id).then(items => {
-        console.log('Tracked items loaded:', items)
         if (Array.isArray(items)) {
-          const codes = new Set(items.map(i => i.item_code))
-          console.log('Tracked codes:', [...codes])
-          setTrackedCodes(codes)
+          setTrackedItems(items)
+          setTrackedCodes(new Set(items.map(i => i.item_code)))
         }
       }).catch(err => console.error('Failed to load tracked items:', err))
     }
@@ -300,6 +300,85 @@ export default function SalesPage() {
       }
     })
   }, [extractedCategories, extractedSales])
+
+  // Promotion tracking: match tracked items against extracted POS items
+  const promotionData = useMemo(() => {
+    if (!trackedItems.length || !extractedCategories?.items?.length) return []
+    const items = extractedCategories.items
+    const categories = extractedCategories.categories || []
+    const totalQty = items.reduce((s, it) => s + (it.quantity || 0), 0)
+    const gc = extractedSales?.guest_count || 0
+
+    return trackedItems.map(tracked => {
+      const isCategory = tracked.item_code?.startsWith('CAT:')
+
+      if (isCategory) {
+        const catName = tracked.item_code.replace('CAT:', '')
+        const catRow = categories.find(c => c.name && c.name.toLowerCase() === catName.toLowerCase())
+        const catQty = catRow?.quantity || catRow?.qty || 0
+        const catSales = catRow?.sales || 0
+        const catItems = items.filter(it => it.category && it.category.toLowerCase() === catName.toLowerCase())
+
+        const columns = [{
+          code: 'CAT', name: catName, qty: catQty,
+          countPct: totalQty > 0 ? ((catQty / totalQty) * 100) : 0,
+          auv: catQty > 0 ? (catSales / catQty) : 0,
+          ir: gc > 0 ? ((catQty / gc) * 100) : 0,
+          sales: catSales, isMain: true, isCategory: true, itemCount: catItems.length,
+        }]
+        catItems.forEach(it => {
+          const qty = it.quantity || 0
+          const sales = it.sales || 0
+          columns.push({
+            code: it.code, name: it.name, qty,
+            countPct: totalQty > 0 ? ((qty / totalQty) * 100) : 0,
+            auv: qty > 0 ? (sales / qty) : 0,
+            ir: gc > 0 ? ((qty / gc) * 100) : 0,
+            sales, isMain: false,
+          })
+        })
+        return { trackedName: catName, trackedCode: tracked.item_code, columns, isCategory: true }
+      }
+
+      // Item tracking: exact match + variants
+      const baseName = tracked.item_name.replace(/\s+(Sgl|Val|Dbl|Kids|S|M|L|XL|Single|Value|Double|Regular|Large|Small)$/i, '').trim()
+      const matchedItems = items.filter(it => {
+        if (it.code === tracked.item_code) return true
+        const itBase = it.name?.replace(/\s+(Sgl|Val|Dbl|Kids|S|M|L|XL|Single|Value|Double|Regular|Large|Small)$/i, '').trim()
+        return itBase && itBase.toLowerCase() === baseName.toLowerCase() && it.code !== tracked.item_code
+      })
+
+      const exactMatch = matchedItems.find(it => it.code === tracked.item_code)
+      const variants = matchedItems.filter(it => it.code !== tracked.item_code)
+      const columns = []
+
+      if (exactMatch) {
+        const qty = exactMatch.quantity || 0
+        const sales = exactMatch.sales || 0
+        columns.push({
+          code: exactMatch.code, name: exactMatch.name, qty,
+          countPct: totalQty > 0 ? ((qty / totalQty) * 100) : 0,
+          auv: qty > 0 ? (sales / qty) : 0,
+          ir: gc > 0 ? ((qty / gc) * 100) : 0,
+          sales, isMain: true,
+        })
+      } else {
+        columns.push({ code: tracked.item_code, name: tracked.item_name, qty: 0, countPct: 0, auv: 0, ir: 0, sales: 0, isMain: true })
+      }
+      variants.forEach(v => {
+        const qty = v.quantity || 0
+        const sales = v.sales || 0
+        columns.push({
+          code: v.code, name: v.name, qty,
+          countPct: totalQty > 0 ? ((qty / totalQty) * 100) : 0,
+          auv: qty > 0 ? (sales / qty) : 0,
+          ir: gc > 0 ? ((qty / gc) * 100) : 0,
+          sales, isMain: false,
+        })
+      })
+      return { trackedName: tracked.item_name, trackedCode: tracked.item_code, columns }
+    })
+  }, [trackedItems, extractedCategories, extractedSales])
 
   // Save all data (step 2)
   const handleSubmit = async () => {
@@ -544,20 +623,55 @@ export default function SalesPage() {
                       </button>
                     </div>
 
-                    {/* Sales Summary Cards */}
-                    <div>
-                      <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider mb-1.5">Sales Summary</p>
-                      <div className="grid grid-cols-3 gap-1.5">
-                        <SummaryCard label="Gross Sales" value={extractedSales.gross_sales || 0} />
-                        <SummaryCard label="Net Sales" value={extractedSales.net_sales || extractedSales.total_sales || 0} color="text-green-700" />
-                        <SummaryCard label="ATV" value={extractedSales.atv || 0} />
-                      </div>
-                      <div className="grid grid-cols-3 gap-1.5 mt-1.5">
-                        <SummaryCard label="Guest Count" value={extractedSales.guest_count || 0} prefix="" color="text-blue-700" />
-                        <SummaryCard label="Cash Sales" value={extractedSales.cash_sales || 0} />
-                        <SummaryCard label="Cash GC" value={extractedSales.cash_gc || 0} prefix="" color="text-blue-700" />
-                      </div>
-                    </div>
+                    {/* Combined Sales Summary Cards (POS + HD + Deliveroo) */}
+                    {(() => {
+                      const posNet = extractedSales.net_sales || extractedSales.total_sales || 0
+                      const posGross = extractedSales.gross_sales || 0
+                      const posGC = extractedSales.guest_count || 0
+                      const hdNetVal = parseFloat(hdData.net_sales) || 0
+                      const hdGrossVal = parseFloat(hdData.gross_sales) || 0
+                      const hdOrd = parseInt(hdData.orders) || 0
+                      const delNetVal = parseFloat(delData.net_sales) || 0
+                      const delGrossVal = parseFloat(delData.gross_sales) || 0
+                      const delOrd = parseInt(delData.orders) || 0
+                      const totalNet = posNet + hdNetVal + delNetVal
+                      const totalGross = posGross + hdGrossVal + delGrossVal
+                      const totalGC = posGC + hdOrd + delOrd
+                      return (
+                        <div className="space-y-2">
+                          <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider">Sales Summary</p>
+                          <div className="grid grid-cols-3 gap-1.5">
+                            <SummaryCard label="Total Net" value={totalNet} color="text-green-700" />
+                            <SummaryCard label="Total Gross" value={totalGross} />
+                            <SummaryCard label="ATV" value={extractedSales.atv || 0} />
+                          </div>
+                          <div className="grid grid-cols-3 gap-1.5">
+                            <SummaryCard label="Total GC" value={totalGC} prefix="" color="text-blue-700" />
+                            <SummaryCard label="Cash Sales" value={extractedSales.cash_sales || 0} />
+                            <SummaryCard label="Cash GC" value={extractedSales.cash_gc || 0} prefix="" color="text-blue-700" />
+                          </div>
+
+                          {/* Sales Channels Breakdown */}
+                          <div className="grid grid-cols-3 gap-1.5">
+                            <div className="bg-orange-50 rounded-lg p-2 border border-orange-200">
+                              <p className="text-[9px] font-semibold text-orange-600 uppercase">POS</p>
+                              <p className="text-sm font-bold text-gray-900 mt-0.5">{posNet.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
+                              <p className="text-[9px] text-gray-400">{posGC} GC</p>
+                            </div>
+                            <div className={`rounded-lg p-2 border ${hdNetVal > 0 ? 'bg-cyan-50 border-cyan-200' : 'bg-gray-50 border-gray-200'}`}>
+                              <p className={`text-[9px] font-semibold uppercase ${hdNetVal > 0 ? 'text-cyan-600' : 'text-gray-400'}`}>Home Delivery</p>
+                              <p className={`text-sm font-bold mt-0.5 ${hdNetVal > 0 ? 'text-gray-900' : 'text-gray-400'}`}>{hdNetVal > 0 ? hdNetVal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '—'}</p>
+                              {hdOrd > 0 && <p className="text-[9px] text-gray-400">{hdOrd} orders</p>}
+                            </div>
+                            <div className={`rounded-lg p-2 border ${delNetVal > 0 ? 'bg-teal-50 border-teal-200' : 'bg-gray-50 border-gray-200'}`}>
+                              <p className={`text-[9px] font-semibold uppercase ${delNetVal > 0 ? 'text-teal-600' : 'text-gray-400'}`}>Deliveroo</p>
+                              <p className={`text-sm font-bold mt-0.5 ${delNetVal > 0 ? 'text-gray-900' : 'text-gray-400'}`}>{delNetVal > 0 ? delNetVal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '—'}</p>
+                              {delOrd > 0 && <p className="text-[9px] text-gray-400">{delOrd} orders</p>}
+                            </div>
+                          </div>
+                        </div>
+                      )
+                    })()}
 
                     {/* Category Pie Chart */}
                     {categoriesWithCalc.length > 0 && (
@@ -595,6 +709,68 @@ export default function SalesPage() {
                         </div>
                       </div>
                     )}
+
+                    {/* Promotion Tracking */}
+                    {promotionData.length > 0 && (() => {
+                      const allCols = promotionData.flatMap(p => p.columns)
+                      return (
+                        <div className="bg-gradient-to-r from-pink-50 to-purple-50 rounded-lg border border-pink-200 overflow-hidden">
+                          <div className="px-3 py-2 border-b border-pink-200">
+                            <p className="text-[10px] font-semibold text-pink-600 uppercase tracking-wider">Promotion Tracking</p>
+                          </div>
+                          <div className="p-3">
+                            <div className="flex gap-2 overflow-x-auto pb-1">
+                              {allCols.map((col, ci) => (
+                                <div
+                                  key={`promo-${col.code}-${ci}`}
+                                  className={`flex-shrink-0 min-w-[140px] rounded-lg p-2.5 border ${
+                                    col.isCategory
+                                      ? 'bg-orange-50 border-orange-300'
+                                      : col.isMain
+                                        ? 'bg-pink-50 border-pink-300'
+                                        : 'bg-purple-50 border-purple-200'
+                                  }`}
+                                >
+                                  <div className="flex items-center gap-1 mb-1.5">
+                                    <span className="text-[8px] font-mono text-gray-500">{col.code}</span>
+                                    {col.isCategory ? (
+                                      <span className="text-[7px] px-1 py-0.5 bg-orange-200 text-orange-700 rounded font-bold flex items-center gap-0.5">
+                                        <Layers className="w-2 h-2" />CAT{col.itemCount > 0 ? ` · ${col.itemCount}` : ''}
+                                      </span>
+                                    ) : col.isMain ? (
+                                      <span className="text-[7px] px-1 py-0.5 bg-pink-200 text-pink-700 rounded font-bold">PROMO</span>
+                                    ) : null}
+                                  </div>
+                                  <p className="text-[11px] font-semibold text-gray-800 truncate mb-2" title={col.name}>{col.name}</p>
+                                  <div className="grid grid-cols-2 gap-x-2 gap-y-1.5">
+                                    <div>
+                                      <p className="text-[8px] text-gray-500 uppercase">QTY</p>
+                                      <p className="text-xs font-bold text-gray-900">{col.qty}</p>
+                                    </div>
+                                    <div>
+                                      <p className="text-[8px] text-gray-500 uppercase">%Count</p>
+                                      <p className="text-xs font-bold text-amber-600">{col.countPct.toFixed(1)}%</p>
+                                    </div>
+                                    <div>
+                                      <p className="text-[8px] text-gray-500 uppercase">AUV</p>
+                                      <p className="text-xs font-bold text-blue-600">{col.auv.toFixed(2)}</p>
+                                    </div>
+                                    <div>
+                                      <p className="text-[8px] text-gray-500 uppercase">IR</p>
+                                      <p className="text-xs font-bold text-purple-600">{col.ir.toFixed(1)}%</p>
+                                    </div>
+                                  </div>
+                                  <div className="mt-1.5 pt-1.5 border-t border-gray-200">
+                                    <p className="text-[8px] text-gray-500">Sales</p>
+                                    <p className="text-[11px] font-semibold text-green-600">{col.sales.toFixed(2)}</p>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        </div>
+                      )
+                    })()}
 
                     {/* Items Table */}
                     {itemsWithCalc.length > 0 && (
