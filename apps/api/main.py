@@ -128,6 +128,15 @@ def run_migrations():
                 conn.commit()
                 logger.info("Migration: cash_gc and atv added successfully")
 
+            # Cool Mood columns
+            if 'cm_gross_sales' not in ds_columns:
+                logger.info("Migration: Adding Cool Mood columns to daily_sales table")
+                conn.execute(text("ALTER TABLE daily_sales ADD COLUMN cm_gross_sales FLOAT DEFAULT 0"))
+                conn.execute(text("ALTER TABLE daily_sales ADD COLUMN cm_net_sales FLOAT DEFAULT 0"))
+                conn.execute(text("ALTER TABLE daily_sales ADD COLUMN cm_orders INTEGER DEFAULT 0"))
+                conn.commit()
+                logger.info("Migration: Cool Mood columns added successfully")
+
         # Migrate daily_budgets table
         if 'daily_budgets' in inspector.get_table_names():
             db_columns = [c['name'] for c in inspector.get_columns('daily_budgets')]

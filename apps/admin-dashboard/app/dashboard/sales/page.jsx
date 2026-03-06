@@ -189,10 +189,13 @@ export default function SalesReportsPage() {
   const delGross = activeRecord?.deliveroo_gross_sales || 0
   const delNet = activeRecord?.deliveroo_net_sales || 0
   const delOrders = activeRecord?.deliveroo_orders || 0
+  const cmGross = activeRecord?.cm_gross_sales || 0
+  const cmNet = activeRecord?.cm_net_sales || 0
+  const cmOrders = activeRecord?.cm_orders || 0
 
-  const totalNet = posNet + hdNet + delNet
-  const totalGross = posGross + hdGross + delGross
-  const totalGC = branchGC + hdOrders + delOrders
+  const totalNet = posNet + hdNet + delNet + cmNet
+  const totalGross = posGross + hdGross + delGross + cmGross
+  const totalGC = branchGC + hdOrders + delOrders + cmOrders
 
   const branchCategories = useMemo(() => {
     if (!activeRecord?.category_data) return []
@@ -499,7 +502,7 @@ export default function SalesReportsPage() {
                   </div>
 
                   {/* Sales Channels — stack on mobile */}
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                     {/* POS */}
                     <div className="bg-gray-800/50 border border-gray-700 rounded-xl p-3">
                       <div className="flex items-center justify-between mb-1">
@@ -526,6 +529,15 @@ export default function SalesReportsPage() {
                       </div>
                       <p className={`text-sm font-bold ${delNet > 0 ? 'text-white' : 'text-gray-600'}`}>{delNet > 0 ? delNet.toLocaleString(undefined, { maximumFractionDigits: 0 }) : '—'}</p>
                       {delGross > 0 && <p className="text-[9px] text-gray-500 mt-0.5">Gross: {delGross.toLocaleString(undefined, { maximumFractionDigits: 0 })}</p>}
+                    </div>
+                    {/* Cool Mood */}
+                    <div className={`rounded-xl p-3 border ${cmNet > 0 ? 'bg-violet-900/20 border-violet-800/40' : 'bg-gray-800/50 border-gray-700'}`}>
+                      <div className="flex items-center justify-between mb-1">
+                        <p className={`text-[10px] font-semibold uppercase ${cmNet > 0 ? 'text-violet-400' : 'text-gray-600'}`}>Cool Mood</p>
+                        {cmOrders > 0 && <span className="text-[9px] text-gray-500">{cmOrders} orders</span>}
+                      </div>
+                      <p className={`text-sm font-bold ${cmNet > 0 ? 'text-white' : 'text-gray-600'}`}>{cmNet > 0 ? cmNet.toLocaleString(undefined, { maximumFractionDigits: 0 }) : '—'}</p>
+                      {cmGross > 0 && <p className="text-[9px] text-gray-500 mt-0.5">Gross: {cmGross.toLocaleString(undefined, { maximumFractionDigits: 0 })}</p>}
                     </div>
                   </div>
 

@@ -479,10 +479,12 @@ async def smart_advisor(
     del_gross = (getattr(latest_sale, 'deliveroo_gross_sales', 0) or 0) if latest_sale else 0
     del_net = (getattr(latest_sale, 'deliveroo_net_sales', 0) or 0) if latest_sale else 0
     del_orders = (getattr(latest_sale, 'deliveroo_orders', 0) or 0) if latest_sale else 0
+    cm_gross = (getattr(latest_sale, 'cm_gross_sales', 0) or 0) if latest_sale else 0
+    cm_net = (getattr(latest_sale, 'cm_net_sales', 0) or 0) if latest_sale else 0
+    cm_orders_val = (getattr(latest_sale, 'cm_orders', 0) or 0) if latest_sale else 0
 
-    combined_net = actual_gross + hd_gross + del_gross
-    combined_net = actual_net + hd_net + del_net
-    combined_gc = actual_gc + hd_orders + del_orders
+    combined_net = actual_net + hd_net + del_net + cm_net
+    combined_gc = actual_gc + hd_orders + del_orders + cm_orders_val
 
     # Budget fields
     budget_amt = budget.budget_amount if budget else 0
@@ -533,13 +535,15 @@ async def smart_advisor(
     mtd_actual_net = sum(
         (s.total_sales or 0) +
         (getattr(s, 'hd_net_sales', 0) or 0) +
-        (getattr(s, 'deliveroo_net_sales', 0) or 0)
+        (getattr(s, 'deliveroo_net_sales', 0) or 0) +
+        (getattr(s, 'cm_net_sales', 0) or 0)
         for s in mtd_latest_rows
     )
     mtd_actual_gc = sum(
         (s.transaction_count or 0) +
         (getattr(s, 'hd_orders', 0) or 0) +
-        (getattr(s, 'deliveroo_orders', 0) or 0)
+        (getattr(s, 'deliveroo_orders', 0) or 0) +
+        (getattr(s, 'cm_orders', 0) or 0)
         for s in mtd_latest_rows
     )
     mtd_ach_pct = (mtd_actual_net / mtd_budget_val * 100) if mtd_budget_val > 0 else 0

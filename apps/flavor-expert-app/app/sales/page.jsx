@@ -170,6 +170,9 @@ export default function SalesPage() {
   // Deliveroo manual fields
   const [delData, setDelData] = useState({ gross_sales: '', net_sales: '', orders: '' })
 
+  // Cool Mood manual fields
+  const [cmData, setCmData] = useState({ gross_sales: '', net_sales: '', orders: '' })
+
   useEffect(() => {
     const userData = localStorage.getItem('br_user')
     if (!userData) { router.push('/login'); return }
@@ -231,6 +234,7 @@ export default function SalesPage() {
     setExtractedCategories(null)
     setHdData({ gross_sales: '', net_sales: '', orders: '' })
     setDelData({ gross_sales: '', net_sales: '', orders: '' })
+    setCmData({ gross_sales: '', net_sales: '', orders: '' })
   }
 
   const handleCapture = (e) => {
@@ -446,6 +450,9 @@ export default function SalesPage() {
         deliveroo_gross_sales: parseFloat(delData.gross_sales) || 0,
         deliveroo_net_sales: parseFloat(delData.net_sales) || 0,
         deliveroo_orders: parseInt(delData.orders) || 0,
+        cm_gross_sales: parseFloat(cmData.gross_sales) || 0,
+        cm_net_sales: parseFloat(cmData.net_sales) || 0,
+        cm_orders: parseInt(cmData.orders) || 0,
       })
 
       const updated = [...submittedWindows, selectedWindow]
@@ -634,9 +641,12 @@ export default function SalesPage() {
                       const delNetVal = parseFloat(delData.net_sales) || 0
                       const delGrossVal = parseFloat(delData.gross_sales) || 0
                       const delOrd = parseInt(delData.orders) || 0
-                      const totalNet = posNet + hdNetVal + delNetVal
-                      const totalGross = posGross + hdGrossVal + delGrossVal
-                      const totalGC = posGC + hdOrd + delOrd
+                      const cmNetVal = parseFloat(cmData.net_sales) || 0
+                      const cmGrossVal = parseFloat(cmData.gross_sales) || 0
+                      const cmOrd = parseInt(cmData.orders) || 0
+                      const totalNet = posNet + hdNetVal + delNetVal + cmNetVal
+                      const totalGross = posGross + hdGrossVal + delGrossVal + cmGrossVal
+                      const totalGC = posGC + hdOrd + delOrd + cmOrd
                       return (
                         <div className="space-y-2">
                           <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider">Sales Summary</p>
@@ -652,7 +662,7 @@ export default function SalesPage() {
                           </div>
 
                           {/* Sales Channels Breakdown */}
-                          <div className="grid grid-cols-3 gap-1.5">
+                          <div className="grid grid-cols-2 gap-1.5">
                             <div className="bg-orange-50 rounded-lg p-2 border border-orange-200">
                               <p className="text-[9px] font-semibold text-orange-600 uppercase">POS</p>
                               <p className="text-sm font-bold text-gray-900 mt-0.5">{posNet.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
@@ -667,6 +677,11 @@ export default function SalesPage() {
                               <p className={`text-[9px] font-semibold uppercase ${delNetVal > 0 ? 'text-teal-600' : 'text-gray-400'}`}>Deliveroo</p>
                               <p className={`text-sm font-bold mt-0.5 ${delNetVal > 0 ? 'text-gray-900' : 'text-gray-400'}`}>{delNetVal > 0 ? delNetVal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '—'}</p>
                               {delOrd > 0 && <p className="text-[9px] text-gray-400">{delOrd} orders</p>}
+                            </div>
+                            <div className={`rounded-lg p-2 border ${cmNetVal > 0 ? 'bg-violet-50 border-violet-200' : 'bg-gray-50 border-gray-200'}`}>
+                              <p className={`text-[9px] font-semibold uppercase ${cmNetVal > 0 ? 'text-violet-600' : 'text-gray-400'}`}>Cool Mood</p>
+                              <p className={`text-sm font-bold mt-0.5 ${cmNetVal > 0 ? 'text-gray-900' : 'text-gray-400'}`}>{cmNetVal > 0 ? cmNetVal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '—'}</p>
+                              {cmOrd > 0 && <p className="text-[9px] text-gray-400">{cmOrd} orders</p>}
                             </div>
                           </div>
                         </div>
@@ -867,6 +882,32 @@ export default function SalesPage() {
                     label="Orders"
                     value={delData.orders}
                     onChange={(e) => setDelData(p => ({ ...p, orders: e.target.value }))}
+                    prefix=""
+                  />
+                </div>
+              </div>
+
+              {/* ============== COOL MOOD SECTION (Manual Input) ============== */}
+              <div className="bg-white rounded-xl p-3 border border-violet-200">
+                <div className="flex items-center gap-2 mb-3">
+                  <span className="text-[11px] font-bold text-white px-2.5 py-0.5 rounded-full bg-violet-600">Cool Mood</span>
+                  <span className="text-[10px] text-gray-400">Optional</span>
+                </div>
+                <div className="grid grid-cols-3 gap-2">
+                  <NumField
+                    label="Gross Sales"
+                    value={cmData.gross_sales}
+                    onChange={(e) => setCmData(p => ({ ...p, gross_sales: e.target.value }))}
+                  />
+                  <NumField
+                    label="Net Sales"
+                    value={cmData.net_sales}
+                    onChange={(e) => setCmData(p => ({ ...p, net_sales: e.target.value }))}
+                  />
+                  <NumField
+                    label="Orders"
+                    value={cmData.orders}
+                    onChange={(e) => setCmData(p => ({ ...p, orders: e.target.value }))}
                     prefix=""
                   />
                 </div>

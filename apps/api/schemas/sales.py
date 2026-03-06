@@ -38,6 +38,10 @@ class DailySalesCreate(BaseModel):
     deliveroo_net_sales: Optional[float] = 0
     deliveroo_orders: Optional[int] = 0
     deliveroo_photo_url: Optional[str] = None
+    # Cool Mood (optional)
+    cm_gross_sales: Optional[float] = 0
+    cm_net_sales: Optional[float] = 0
+    cm_orders: Optional[int] = 0
 
 
 class DailySalesResponse(BaseModel):
@@ -69,6 +73,9 @@ class DailySalesResponse(BaseModel):
     deliveroo_net_sales: Optional[float] = None
     deliveroo_orders: Optional[int] = None
     deliveroo_photo_url: Optional[str] = None
+    cm_gross_sales: Optional[float] = None
+    cm_net_sales: Optional[float] = None
+    cm_orders: Optional[int] = None
     submitted_by_id: int
     created_at: datetime
 

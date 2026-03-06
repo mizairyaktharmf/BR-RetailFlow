@@ -58,6 +58,11 @@ class DailySales(Base):
     deliveroo_orders = Column(Integer, nullable=True, default=0)
     deliveroo_photo_url = Column(Text, nullable=True)
 
+    # Cool Mood data
+    cm_gross_sales = Column(Float, nullable=True, default=0)
+    cm_net_sales = Column(Float, nullable=True, default=0)
+    cm_orders = Column(Integer, nullable=True, default=0)
+
     # Items breakdown (JSON: [{code, name, category, qty, sales, pct}, ...])
     items_data = Column(Text, nullable=True)
 
