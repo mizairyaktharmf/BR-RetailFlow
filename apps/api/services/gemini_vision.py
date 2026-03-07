@@ -112,10 +112,11 @@ Rules:
 - sales_summary: Extract from the Sales Summary section at top
 - guest_count = GC from Sales Summary (NOT from Cash Sales section)
 - atv = ATV from Sales Summary
-- cash_sales = "Cash Sales" or "Grs CashSls" amount
+- cash_sales = "Net CashSls" amount (NOT "Grs CashSls" — use the NET cash sales value)
 - cash_gc = GC from the Cash Sales section
 - categories: Strip "T>" prefix. List ALL category total rows (T>Cups & Cones etc.)
 - items: List ALL individual items with 4-digit code, name, quantity, sales, contribution %
+- IMPORTANT: Each item's "category" MUST match the T>CategoryName header it appears under in the receipt. Items listed between T>Sundaes and T>Beverages belong to "Sundaes". Items between T>Desserts and T>Toppings belong to "Desserts". Items between T>Toppings and T>Others belong to "Toppings". Pay close attention to the T> grouping headers.
 - If a section is not visible on this image, use empty array [] for categories/items or 0 for numbers
 - Extract numbers exactly as shown, do not calculate
 - Return ONLY the JSON object, no other text"""

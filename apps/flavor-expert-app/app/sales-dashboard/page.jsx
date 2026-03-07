@@ -188,11 +188,14 @@ export default function SalesDashboardPage() {
   const delGross = activeRecord?.deliveroo_gross_sales || 0
   const delNet = activeRecord?.deliveroo_net_sales || 0
   const delOrders = activeRecord?.deliveroo_orders || 0
+  const cmGross = activeRecord?.cm_gross_sales || 0
+  const cmNet = activeRecord?.cm_net_sales || 0
+  const cmOrders = activeRecord?.cm_orders || 0
 
   // Combined totals
-  const totalNet = posNet + hdNet + delNet
-  const totalGross = posGross + hdGross + delGross
-  const totalGC = branchGC + hdOrders + delOrders
+  const totalNet = posNet + hdNet + delNet + cmNet
+  const totalGross = posGross + hdGross + delGross + cmGross
+  const totalGC = branchGC + hdOrders + delOrders + cmOrders
 
   // Categories from active window
   const branchCategories = useMemo(() => {
@@ -249,42 +252,74 @@ export default function SalesDashboardPage() {
         return { trackedName: catName, trackedCode: tracked.item_code, columns, isCategory: true }
       }
 
-      const baseName = tracked.item_name.replace(/\s+(Sgl|Val|Dbl|Kids|S|M|L|XL|Single|Value|Double|Regular|Large|Small)$/i, '').trim()
+      // Name-based tracking: match ALL items whose name contains the base name
+      const isNameTrack = tracked.item_code?.startsWith('NAME:')
+      const baseName = isNameTrack
+        ? tracked.item_code.replace('NAME:', '').trim()
+        : tracked.item_name.replace(/\s+(Sgl|Val|Dbl|Kids|S|M|L|XL|Single|Value|Double|Regular|Large|Small)$/i, '').trim()
+
       const matchedItems = branchItems.filter(it => {
-        if (it.code === tracked.item_code) return true
+        if (!isNameTrack && it.code === tracked.item_code) return true
+        if (isNameTrack) {
+          return it.name && it.name.toLowerCase().includes(baseName.toLowerCase())
+        }
         const itBase = it.name?.replace(/\s+(Sgl|Val|Dbl|Kids|S|M|L|XL|Single|Value|Double|Regular|Large|Small)$/i, '').trim()
-        return itBase && itBase.toLowerCase() === baseName.toLowerCase() && it.code !== tracked.item_code
+        return itBase && itBase.toLowerCase() === baseName.toLowerCase()
       })
 
-      const exactMatch = matchedItems.find(it => it.code === tracked.item_code)
-      const variants = matchedItems.filter(it => it.code !== tracked.item_code)
       const columns = []
 
-      if (exactMatch) {
-        const qty = exactMatch.quantity || 0
-        const sales = exactMatch.sales || 0
+      if (isNameTrack) {
+        const totalMatchQty = matchedItems.reduce((s, it) => s + (it.quantity || 0), 0)
+        const totalMatchSales = matchedItems.reduce((s, it) => s + (it.sales || 0), 0)
         columns.push({
-          code: exactMatch.code, name: exactMatch.name, qty,
-          countPct: totalQty > 0 ? ((qty / totalQty) * 100) : 0,
-          auv: qty > 0 ? (sales / qty) : 0,
-          ir: branchGC > 0 ? ((qty / branchGC) * 100) : 0,
-          sales, isMain: true,
+          code: 'ALL', name: baseName, qty: totalMatchQty,
+          countPct: totalQty > 0 ? ((totalMatchQty / totalQty) * 100) : 0,
+          auv: totalMatchQty > 0 ? (totalMatchSales / totalMatchQty) : 0,
+          ir: branchGC > 0 ? ((totalMatchQty / branchGC) * 100) : 0,
+          sales: totalMatchSales, isMain: true, isNameGroup: true, itemCount: matchedItems.length,
+        })
+        matchedItems.forEach(it => {
+          const qty = it.quantity || 0
+          const sales = it.sales || 0
+          columns.push({
+            code: it.code, name: it.name, qty,
+            countPct: totalQty > 0 ? ((qty / totalQty) * 100) : 0,
+            auv: qty > 0 ? (sales / qty) : 0,
+            ir: branchGC > 0 ? ((qty / branchGC) * 100) : 0,
+            sales, isMain: false,
+          })
         })
       } else {
-        columns.push({ code: tracked.item_code, name: tracked.item_name, qty: 0, countPct: 0, auv: 0, ir: 0, sales: 0, isMain: true })
-      }
-      variants.forEach(v => {
-        const qty = v.quantity || 0
-        const sales = v.sales || 0
-        columns.push({
-          code: v.code, name: v.name, qty,
-          countPct: totalQty > 0 ? ((qty / totalQty) * 100) : 0,
-          auv: qty > 0 ? (sales / qty) : 0,
-          ir: branchGC > 0 ? ((qty / branchGC) * 100) : 0,
-          sales, isMain: false,
+        const exactMatch = matchedItems.find(it => it.code === tracked.item_code)
+        const variants = matchedItems.filter(it => it.code !== tracked.item_code)
+
+        if (exactMatch) {
+          const qty = exactMatch.quantity || 0
+          const sales = exactMatch.sales || 0
+          columns.push({
+            code: exactMatch.code, name: exactMatch.name, qty,
+            countPct: totalQty > 0 ? ((qty / totalQty) * 100) : 0,
+            auv: qty > 0 ? (sales / qty) : 0,
+            ir: branchGC > 0 ? ((qty / branchGC) * 100) : 0,
+            sales, isMain: true,
+          })
+        } else {
+          columns.push({ code: tracked.item_code, name: tracked.item_name, qty: 0, countPct: 0, auv: 0, ir: 0, sales: 0, isMain: true })
+        }
+        variants.forEach(v => {
+          const qty = v.quantity || 0
+          const sales = v.sales || 0
+          columns.push({
+            code: v.code, name: v.name, qty,
+            countPct: totalQty > 0 ? ((qty / totalQty) * 100) : 0,
+            auv: qty > 0 ? (sales / qty) : 0,
+            ir: branchGC > 0 ? ((qty / branchGC) * 100) : 0,
+            sales, isMain: false,
+          })
         })
-      })
-      return { trackedName: tracked.item_name, trackedCode: tracked.item_code, columns }
+      }
+      return { trackedName: isNameTrack ? baseName : tracked.item_name, trackedCode: tracked.item_code, columns }
     })
   }, [trackedItems, branchItems, branchCategories, branchGC])
 
@@ -473,7 +508,7 @@ export default function SalesDashboardPage() {
             </div>
 
             {/* ===== SALES CHANNELS BREAKDOWN ===== */}
-            <div className="grid grid-cols-3 gap-2">
+            <div className="grid grid-cols-2 gap-2">
               <Card className="bg-gradient-to-br from-orange-50 to-white border-orange-200">
                 <CardContent className="p-3">
                   <p className="text-[9px] font-bold text-orange-600 uppercase">POS</p>
@@ -496,6 +531,14 @@ export default function SalesDashboardPage() {
                   <p className={`text-base font-bold mt-1 ${delNet > 0 ? 'text-gray-900' : 'text-gray-400'}`}>{delNet > 0 ? delNet.toFixed(0) : '—'}</p>
                   {delOrders > 0 && <p className="text-[9px] text-gray-400">{delOrders} orders</p>}
                   {delGross > 0 && <p className="text-[9px] text-gray-400">Gross: {delGross.toFixed(0)}</p>}
+                </CardContent>
+              </Card>
+              <Card className={`bg-gradient-to-br ${cmNet > 0 ? 'from-violet-50 border-violet-200' : 'from-gray-50 border-gray-200'} to-white`}>
+                <CardContent className="p-3">
+                  <p className={`text-[9px] font-bold uppercase ${cmNet > 0 ? 'text-violet-600' : 'text-gray-400'}`}>Cool Mood</p>
+                  <p className={`text-base font-bold mt-1 ${cmNet > 0 ? 'text-gray-900' : 'text-gray-400'}`}>{cmNet > 0 ? cmNet.toFixed(0) : '—'}</p>
+                  {cmOrders > 0 && <p className="text-[9px] text-gray-400">{cmOrders} orders</p>}
+                  {cmGross > 0 && <p className="text-[9px] text-gray-400">Gross: {cmGross.toFixed(0)}</p>}
                 </CardContent>
               </Card>
             </div>
