@@ -466,6 +466,49 @@ export default function SalesReportsPage() {
                 </div>
               ) : (
                 <>
+                  {/* Window Selector — compact 4-col grid like flavor expert */}
+                  <div>
+                    <p className="text-[10px] text-gray-500 uppercase tracking-wider mb-2">Window Status</p>
+                    <div className="grid grid-cols-4 gap-2">
+                      {SALES_WINDOWS.map((w) => {
+                        const done = submittedWindows.includes(w.id)
+                        const isActive = activeWindowId === w.id
+                        const rec = currentSales.find(s => s.sales_window === w.id)
+                        return (
+                          <button
+                            key={w.id}
+                            onClick={() => { if (done) setActiveWindowId(w.id) }}
+                            disabled={!done}
+                            className={`p-2 sm:p-2.5 rounded-xl text-center transition-all ${
+                              isActive && done
+                                ? 'bg-purple-600 text-white shadow-lg shadow-purple-600/30 scale-[1.02]'
+                                : done
+                                  ? 'bg-green-900/30 border border-green-700/50 hover:border-green-600'
+                                  : 'bg-gray-800/50 border border-gray-700 opacity-60'
+                            }`}
+                          >
+                            <p className={`text-[10px] sm:text-xs font-bold ${isActive && done ? 'text-white' : done ? 'text-green-400' : 'text-gray-500'}`}>
+                              {w.label.split(' ')[0]}
+                            </p>
+                            {done ? (
+                              <>
+                                <CheckCircle2 className={`w-3.5 h-3.5 mx-auto mt-0.5 ${isActive ? 'text-white' : 'text-green-400'}`} />
+                                <p className={`text-[9px] mt-0.5 font-medium ${isActive ? 'text-purple-200' : 'text-green-300'}`}>
+                                  {((rec?.total_sales || 0) + (rec?.hd_net_sales || 0) + (rec?.deliveroo_net_sales || 0) + (rec?.cm_net_sales || 0)).toFixed(0)}
+                                </p>
+                              </>
+                            ) : (
+                              <>
+                                <Clock className="w-3.5 h-3.5 mx-auto mt-0.5 text-gray-600" />
+                                <p className="text-[9px] mt-0.5 text-gray-600">Pending</p>
+                              </>
+                            )}
+                          </button>
+                        )
+                      })}
+                    </div>
+                  </div>
+
                   {/* Window label */}
                   {activeRecord && (
                     <p className="text-[10px] text-gray-500 uppercase tracking-wider">
@@ -473,71 +516,58 @@ export default function SalesReportsPage() {
                     </p>
                   )}
 
-                  {/* Summary Cards — responsive grid */}
-                  <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
-                    <div className="bg-green-900/20 border border-green-800/40 rounded-xl p-3 text-center">
-                      <p className="text-[10px] text-green-400 font-medium">Total Net</p>
-                      <p className="text-sm md:text-base font-bold text-white mt-0.5">{totalNet.toLocaleString(undefined, { maximumFractionDigits: 0 })}</p>
+                  {/* Summary Cards — 2-col mobile, 4-col tablet, 6-col desktop */}
+                  <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 sm:gap-2">
+                    <div className="bg-green-900/20 border border-green-800/40 rounded-xl p-3 sm:p-3">
+                      <p className="text-[9px] sm:text-[10px] text-green-400 font-medium">Total Net</p>
+                      <p className="text-lg sm:text-sm md:text-base font-bold text-white mt-0.5">{totalNet.toLocaleString(undefined, { maximumFractionDigits: 0 })}</p>
+                      {(hdNet > 0 || delNet > 0 || cmNet > 0) && <p className="text-[9px] text-gray-500 mt-0.5">POS {posNet.toFixed(0)}{hdNet > 0 ? ` +HD ${hdNet.toFixed(0)}` : ''}{delNet > 0 ? ` +Del ${delNet.toFixed(0)}` : ''}</p>}
                     </div>
-                    <div className="bg-amber-900/20 border border-amber-800/40 rounded-xl p-3 text-center">
-                      <p className="text-[10px] text-amber-400 font-medium">Total Gross</p>
-                      <p className="text-sm md:text-base font-bold text-white mt-0.5">{totalGross.toLocaleString(undefined, { maximumFractionDigits: 0 })}</p>
+                    <div className="bg-blue-900/20 border border-blue-800/40 rounded-xl p-3 sm:p-3">
+                      <p className="text-[9px] sm:text-[10px] text-blue-400 font-medium">Total GC</p>
+                      <p className="text-lg sm:text-sm md:text-base font-bold text-white mt-0.5">{totalGC}</p>
+                      <p className="text-[9px] text-gray-500 mt-0.5">ATV: {branchATV.toFixed(2)}</p>
                     </div>
-                    <div className="bg-blue-900/20 border border-blue-800/40 rounded-xl p-3 text-center">
-                      <p className="text-[10px] text-blue-400 font-medium">ATV</p>
-                      <p className="text-sm md:text-base font-bold text-white mt-0.5">{branchATV.toFixed(2)}</p>
+                    <div className="bg-amber-900/20 border border-amber-800/40 rounded-xl p-3 sm:p-3">
+                      <p className="text-[9px] sm:text-[10px] text-amber-400 font-medium">Total Gross</p>
+                      <p className="text-lg sm:text-sm md:text-base font-bold text-white mt-0.5">{totalGross.toLocaleString(undefined, { maximumFractionDigits: 0 })}</p>
                     </div>
-                    <div className="bg-purple-900/20 border border-purple-800/40 rounded-xl p-3 text-center">
-                      <p className="text-[10px] text-purple-400 font-medium">Total GC</p>
-                      <p className="text-sm md:text-base font-bold text-white mt-0.5">{totalGC}</p>
-                    </div>
-                    <div className="bg-cyan-900/20 border border-cyan-800/40 rounded-xl p-3 text-center">
-                      <p className="text-[10px] text-cyan-400 font-medium">Cash Sales</p>
-                      <p className="text-sm md:text-base font-bold text-white mt-0.5">{branchCash.toLocaleString(undefined, { maximumFractionDigits: 0 })}</p>
-                    </div>
-                    <div className="bg-gray-800/50 border border-gray-700 rounded-xl p-3 text-center">
-                      <p className="text-[10px] text-gray-400 font-medium">Cash GC</p>
-                      <p className="text-sm md:text-base font-bold text-white mt-0.5">{branchCashGC}</p>
+                    <div className="bg-gray-800/50 border border-gray-700 rounded-xl p-3 sm:p-3">
+                      <p className="text-[9px] sm:text-[10px] text-gray-400 font-medium">Cash Sales</p>
+                      <p className="text-lg sm:text-sm md:text-base font-bold text-white mt-0.5">{branchCash.toLocaleString(undefined, { maximumFractionDigits: 0 })}</p>
+                      <p className="text-[9px] text-gray-500 mt-0.5">Cash GC: {branchCashGC}</p>
                     </div>
                   </div>
 
-                  {/* Sales Channels — stack on mobile */}
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                  {/* Sales Channels — 2-col grid like flavor expert */}
+                  <div className="grid grid-cols-2 gap-2">
                     {/* POS */}
                     <div className="bg-gray-800/50 border border-gray-700 rounded-xl p-3">
-                      <div className="flex items-center justify-between mb-1">
-                        <p className="text-[10px] text-green-400 font-semibold uppercase">POS</p>
-                        <span className="text-[9px] text-gray-500">{branchGC} GC</span>
-                      </div>
-                      <p className="text-sm font-bold text-white">{posNet.toLocaleString(undefined, { maximumFractionDigits: 0 })}</p>
-                      <p className="text-[9px] text-gray-500 mt-0.5">Gross: {posGross.toLocaleString(undefined, { maximumFractionDigits: 0 })}</p>
+                      <p className="text-[9px] font-bold text-orange-400 uppercase">POS</p>
+                      <p className="text-base font-bold text-white mt-1">{posNet.toLocaleString(undefined, { maximumFractionDigits: 0 })}</p>
+                      <p className="text-[9px] text-gray-500">{branchGC} GC</p>
+                      <p className="text-[9px] text-gray-500">Gross: {posGross.toLocaleString(undefined, { maximumFractionDigits: 0 })}</p>
                     </div>
-                    {/* HD */}
+                    {/* Home Delivery */}
                     <div className={`rounded-xl p-3 border ${hdNet > 0 ? 'bg-cyan-900/20 border-cyan-800/40' : 'bg-gray-800/50 border-gray-700'}`}>
-                      <div className="flex items-center justify-between mb-1">
-                        <p className={`text-[10px] font-semibold uppercase ${hdNet > 0 ? 'text-cyan-400' : 'text-gray-600'}`}>Home Delivery</p>
-                        {hdOrders > 0 && <span className="text-[9px] text-gray-500">{hdOrders} orders</span>}
-                      </div>
-                      <p className={`text-sm font-bold ${hdNet > 0 ? 'text-white' : 'text-gray-600'}`}>{hdNet > 0 ? hdNet.toLocaleString(undefined, { maximumFractionDigits: 0 }) : '—'}</p>
-                      {hdGross > 0 && <p className="text-[9px] text-gray-500 mt-0.5">Gross: {hdGross.toLocaleString(undefined, { maximumFractionDigits: 0 })}</p>}
+                      <p className={`text-[9px] font-bold uppercase ${hdNet > 0 ? 'text-cyan-400' : 'text-gray-600'}`}>Home Delivery</p>
+                      <p className={`text-base font-bold mt-1 ${hdNet > 0 ? 'text-white' : 'text-gray-600'}`}>{hdNet > 0 ? hdNet.toLocaleString(undefined, { maximumFractionDigits: 0 }) : '—'}</p>
+                      {hdOrders > 0 && <p className="text-[9px] text-gray-500">{hdOrders} orders</p>}
+                      {hdGross > 0 && <p className="text-[9px] text-gray-500">Gross: {hdGross.toLocaleString(undefined, { maximumFractionDigits: 0 })}</p>}
                     </div>
                     {/* Deliveroo */}
                     <div className={`rounded-xl p-3 border ${delNet > 0 ? 'bg-teal-900/20 border-teal-800/40' : 'bg-gray-800/50 border-gray-700'}`}>
-                      <div className="flex items-center justify-between mb-1">
-                        <p className={`text-[10px] font-semibold uppercase ${delNet > 0 ? 'text-teal-400' : 'text-gray-600'}`}>Deliveroo</p>
-                        {delOrders > 0 && <span className="text-[9px] text-gray-500">{delOrders} orders</span>}
-                      </div>
-                      <p className={`text-sm font-bold ${delNet > 0 ? 'text-white' : 'text-gray-600'}`}>{delNet > 0 ? delNet.toLocaleString(undefined, { maximumFractionDigits: 0 }) : '—'}</p>
-                      {delGross > 0 && <p className="text-[9px] text-gray-500 mt-0.5">Gross: {delGross.toLocaleString(undefined, { maximumFractionDigits: 0 })}</p>}
+                      <p className={`text-[9px] font-bold uppercase ${delNet > 0 ? 'text-teal-400' : 'text-gray-600'}`}>Deliveroo</p>
+                      <p className={`text-base font-bold mt-1 ${delNet > 0 ? 'text-white' : 'text-gray-600'}`}>{delNet > 0 ? delNet.toLocaleString(undefined, { maximumFractionDigits: 0 }) : '—'}</p>
+                      {delOrders > 0 && <p className="text-[9px] text-gray-500">{delOrders} orders</p>}
+                      {delGross > 0 && <p className="text-[9px] text-gray-500">Gross: {delGross.toLocaleString(undefined, { maximumFractionDigits: 0 })}</p>}
                     </div>
                     {/* Cool Mood */}
                     <div className={`rounded-xl p-3 border ${cmNet > 0 ? 'bg-violet-900/20 border-violet-800/40' : 'bg-gray-800/50 border-gray-700'}`}>
-                      <div className="flex items-center justify-between mb-1">
-                        <p className={`text-[10px] font-semibold uppercase ${cmNet > 0 ? 'text-violet-400' : 'text-gray-600'}`}>Cool Mood</p>
-                        {cmOrders > 0 && <span className="text-[9px] text-gray-500">{cmOrders} orders</span>}
-                      </div>
-                      <p className={`text-sm font-bold ${cmNet > 0 ? 'text-white' : 'text-gray-600'}`}>{cmNet > 0 ? cmNet.toLocaleString(undefined, { maximumFractionDigits: 0 }) : '—'}</p>
-                      {cmGross > 0 && <p className="text-[9px] text-gray-500 mt-0.5">Gross: {cmGross.toLocaleString(undefined, { maximumFractionDigits: 0 })}</p>}
+                      <p className={`text-[9px] font-bold uppercase ${cmNet > 0 ? 'text-violet-400' : 'text-gray-600'}`}>Cool Mood</p>
+                      <p className={`text-base font-bold mt-1 ${cmNet > 0 ? 'text-white' : 'text-gray-600'}`}>{cmNet > 0 ? cmNet.toLocaleString(undefined, { maximumFractionDigits: 0 }) : '—'}</p>
+                      {cmOrders > 0 && <p className="text-[9px] text-gray-500">{cmOrders} orders</p>}
+                      {cmGross > 0 && <p className="text-[9px] text-gray-500">Gross: {cmGross.toLocaleString(undefined, { maximumFractionDigits: 0 })}</p>}
                     </div>
                   </div>
 
@@ -552,19 +582,19 @@ export default function SalesReportsPage() {
                             Promotion Tracking
                           </p>
                         </div>
-                        <div className="p-4 space-y-4">
-                          {/* Donut — only on larger screens or when few items */}
+                        <div className="p-3 sm:p-4 space-y-4">
+                          {/* Donut — hidden on mobile */}
                           {promoWithSales.length > 1 && (
-                            <div className="mb-4">
+                            <div className="mb-4 hidden sm:block">
                               <CategoryDonut categories={promoWithSales.map(c => ({ name: c.name, sales: c.sales }))} size={110} />
                             </div>
                           )}
-                          {/* Promo Cards — responsive grid */}
-                          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-2">
+                          {/* Promo Cards — horizontal scroll on mobile, grid on desktop */}
+                          <div className="flex gap-2 overflow-x-auto pb-1 sm:grid sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 sm:overflow-x-visible">
                             {allCols.map((col, ci) => (
                               <div
                                 key={`promo-${col.code}-${ci}`}
-                                className={`rounded-xl p-3 border ${
+                                className={`flex-shrink-0 min-w-[140px] sm:min-w-0 rounded-xl p-2.5 sm:p-3 border ${
                                   col.isCategory
                                     ? 'bg-orange-900/30 border-orange-700/50'
                                     : col.isNameGroup
@@ -621,62 +651,8 @@ export default function SalesReportsPage() {
                     )
                   })()}
 
-                  {/* Window Status + Category side by side */}
-                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                    {/* Window Status */}
-                    <div className="bg-gray-800/50 border border-gray-700 rounded-xl overflow-hidden">
-                      <div className="px-4 py-3 border-b border-gray-700">
-                        <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Window Status</p>
-                      </div>
-                      <div>
-                        {SALES_WINDOWS.map((w, idx) => {
-                          const isSubmitted = submittedWindows.includes(w.id)
-                          const record = currentSales.find(s => s.sales_window === w.id)
-                          return (
-                            <button
-                              key={w.id}
-                              onClick={() => { if (isSubmitted) setActiveWindowId(w.id) }}
-                              disabled={!isSubmitted}
-                              className={`w-full flex items-center justify-between px-3 md:px-4 py-3 transition-colors ${
-                                idx < SALES_WINDOWS.length - 1 ? 'border-b border-gray-700/50' : ''
-                              } ${isSubmitted && activeWindowId === w.id ? 'bg-purple-900/30 border-l-2 border-l-purple-500' : isSubmitted ? 'hover:bg-gray-700/50 cursor-pointer' : 'cursor-default'}`}
-                            >
-                              <div className="flex items-center gap-2.5">
-                                <div className={`w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 ${
-                                  activeWindowId === w.id ? 'bg-purple-900/50' : isSubmitted ? 'bg-green-900/40' : 'bg-gray-700'
-                                }`}>
-                                  {isSubmitted ? (
-                                    <CheckCircle2 className={`w-3.5 h-3.5 ${activeWindowId === w.id ? 'text-purple-400' : 'text-green-400'}`} />
-                                  ) : (
-                                    <Clock className="w-3.5 h-3.5 text-gray-500" />
-                                  )}
-                                </div>
-                                <div className="text-left">
-                                  <p className="text-sm font-medium text-white">{w.label}</p>
-                                  <p className="text-[10px] text-gray-500">{w.time}</p>
-                                </div>
-                              </div>
-                              <div className="text-right">
-                                {isSubmitted ? (
-                                  <div>
-                                    <p className="text-sm font-semibold text-green-400">
-                                      AED {(record?.total_sales || 0).toFixed(0)}
-                                    </p>
-                                    <p className="text-[10px] text-gray-500">
-                                      {record?.transaction_count || 0} GC
-                                    </p>
-                                  </div>
-                                ) : (
-                                  <span className="px-2 py-0.5 rounded-full bg-gray-700 text-gray-500 text-[10px]">Pending</span>
-                                )}
-                              </div>
-                            </button>
-                          )
-                        })}
-                      </div>
-                    </div>
-
-                    {/* Category Breakdown */}
+                  {/* Category Breakdown */}
+                  <div className="grid grid-cols-1 gap-4">
                     <div className="bg-gray-800/50 border border-gray-700 rounded-xl overflow-hidden">
                       <div className="px-4 py-3 border-b border-gray-700">
                         <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Category Breakdown</p>
@@ -684,7 +660,9 @@ export default function SalesReportsPage() {
                       <div className="p-4">
                         {branchCategories.length > 0 ? (
                           <>
-                            <CategoryDonut categories={branchCategories} size={110} />
+                            <div className="hidden sm:block">
+                              <CategoryDonut categories={branchCategories} size={110} />
+                            </div>
                             <div className="overflow-x-auto mt-3">
                               <table className="w-full text-[10px]">
                                 <thead>
@@ -728,22 +706,20 @@ export default function SalesReportsPage() {
                   {/* Items Table — scrollable */}
                   {branchItems.length > 0 && (
                     <div className="bg-gray-800/50 border border-gray-700 rounded-xl overflow-hidden">
-                      <div className="px-4 py-3 border-b border-gray-700">
+                      <div className="px-3 sm:px-4 py-3 border-b border-gray-700">
                         <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">
-                          Item Sales ({branchItems.length} items)
+                          Item Tracker ({branchItems.length} items)
                         </p>
                       </div>
-                      <div className="max-h-64 overflow-auto">
-                        <table className="w-full text-xs min-w-[500px]">
+                      <div className="max-h-60 overflow-y-auto p-3">
+                        <table className="w-full text-[11px]">
                           <thead className="sticky top-0 bg-gray-800">
-                            <tr className="border-b border-gray-700">
-                              <th className="text-left py-2 px-3 text-gray-500 font-medium">Code</th>
-                              <th className="text-left py-2 px-2 text-gray-500 font-medium">Item</th>
-                              <th className="text-left py-2 px-2 text-gray-500 font-medium hidden sm:table-cell">Category</th>
-                              <th className="text-right py-2 px-2 text-gray-500 font-medium">Qty</th>
-                              <th className="text-right py-2 px-2 text-gray-500 font-medium">Sales</th>
-                              <th className="text-right py-2 px-2 text-gray-500 font-medium hidden md:table-cell">AUV</th>
-                              <th className="text-right py-2 px-3 text-gray-500 font-medium hidden md:table-cell">IR</th>
+                            <tr className="text-gray-500 border-b border-gray-700">
+                              <th className="text-left py-1.5">Item</th>
+                              <th className="text-right py-1.5">Qty</th>
+                              <th className="text-right py-1.5">Sales</th>
+                              <th className="text-right py-1.5">IR%</th>
+                              <th className="text-right py-1.5">AUV</th>
                             </tr>
                           </thead>
                           <tbody>
@@ -755,14 +731,12 @@ export default function SalesReportsPage() {
                               const auv = qty > 0 ? (sales / qty).toFixed(2) : '0.00'
                               const ir = branchGC > 0 ? ((qty / branchGC) * 100).toFixed(1) : '0.0'
                               return (
-                                <tr key={i} className="border-t border-gray-800 hover:bg-gray-700/30">
-                                  <td className="py-1.5 px-3 font-mono text-gray-500 text-[10px]">{item.code}</td>
-                                  <td className="py-1.5 px-2 text-white truncate max-w-[120px] md:max-w-none">{item.name}</td>
-                                  <td className="py-1.5 px-2 text-gray-500 hidden sm:table-cell">{item.category || '—'}</td>
-                                  <td className="text-right py-1.5 px-2 text-gray-300">{qty}</td>
-                                  <td className="text-right py-1.5 px-2 text-white font-medium">{sales.toFixed(2)}</td>
-                                  <td className="text-right py-1.5 px-2 text-blue-400 hidden md:table-cell">{auv}</td>
-                                  <td className="text-right py-1.5 px-3 text-purple-400 hidden md:table-cell">{ir}</td>
+                                <tr key={i} className="border-b border-gray-800/50">
+                                  <td className="py-1.5 font-medium text-white truncate max-w-[120px]">{item.name}</td>
+                                  <td className="text-right py-1.5 text-gray-400">{qty}</td>
+                                  <td className="text-right py-1.5 text-white font-medium">{sales.toFixed(0)}</td>
+                                  <td className="text-right py-1.5 text-blue-400 font-medium">{ir}%</td>
+                                  <td className="text-right py-1.5 text-gray-400">{auv}</td>
                                 </tr>
                               )
                             })}

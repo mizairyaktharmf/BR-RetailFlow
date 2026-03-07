@@ -63,6 +63,27 @@ function mergeCategoryResults(dataArray) {
     }
     merged.items.push(...(d.items || []))
   }
+
+  // Post-merge: validate item categories against known category names
+  // If an item's name clearly matches a category name, fix misassignment
+  const catNames = merged.categories.map(c => c.name?.toLowerCase()).filter(Boolean)
+  if (catNames.length > 0) {
+    for (const item of merged.items) {
+      if (!item.category || !item.name) continue
+      const itemNameLower = item.name.toLowerCase()
+      // Check if item name starts with or contains a different category name
+      for (const cn of catNames) {
+        if (cn === item.category?.toLowerCase()) break // already correct
+        // If item name starts with the category keyword (e.g. "Topping 1 Serve" -> "Toppings")
+        const cnBase = cn.replace(/s$/, '') // "Toppings" -> "Topping"
+        if (itemNameLower.startsWith(cnBase) && item.category?.toLowerCase() !== cn) {
+          item.category = merged.categories.find(c => c.name?.toLowerCase() === cn)?.name || item.category
+          break
+        }
+      }
+    }
+  }
+
   return merged
 }
 
