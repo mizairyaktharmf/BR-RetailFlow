@@ -259,23 +259,22 @@ export default function SalesPage() {
     setPosStatus('extracting')
 
     try {
-      // Process photos ONE AT A TIME to avoid CloudFront/Gemini timeouts
-      const combinedResults = []
-      for (const file of posPhotos) {
-        let result = null
-        try {
-          result = await api.extractReceipt(file, 'pos_combined')
-        } catch (e1) {
-          // Retry once on failure
-          console.warn('First attempt failed, retrying...', e1.message)
+      // Process ALL photos in parallel for speed
+      const combinedResults = await Promise.all(
+        posPhotos.map(async (file) => {
           try {
-            result = await api.extractReceipt(file, 'pos_combined')
-          } catch (e2) {
-            console.error('Retry also failed:', e2.message)
+            return await api.extractReceipt(file, 'pos_combined')
+          } catch (e1) {
+            console.warn('First attempt failed, retrying...', e1.message)
+            try {
+              return await api.extractReceipt(file, 'pos_combined')
+            } catch (e2) {
+              console.error('Retry also failed:', e2.message)
+              return null
+            }
           }
-        }
-        if (result) combinedResults.push(result)
-      }
+        })
+      )
 
       const successData = combinedResults.filter(r => r?.success).map(r => r.data)
       console.log('All combined results:', JSON.stringify(combinedResults, null, 2))
