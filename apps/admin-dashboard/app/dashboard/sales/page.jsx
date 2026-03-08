@@ -311,7 +311,17 @@ export default function SalesReportsPage() {
 
   const branchItems = useMemo(() => {
     if (!activeRecord?.items_data) return []
-    try { return JSON.parse(activeRecord.items_data) } catch { return [] }
+    try {
+      const raw = JSON.parse(activeRecord.items_data)
+      // Remove true duplicates — same name + same qty + same sales
+      const seen = new Set()
+      return raw.filter(it => {
+        const key = `${(it.name || '').toLowerCase()}|${it.quantity || 0}|${it.sales || 0}`
+        if (seen.has(key)) return false
+        seen.add(key)
+        return true
+      })
+    } catch { return [] }
   }, [activeRecord])
 
   const promotionData = useMemo(() => {
@@ -323,13 +333,15 @@ export default function SalesReportsPage() {
 
       if (isCategory) {
         const catName = tracked.item_code.replace('CAT:', '')
+        const catLower = catName.toLowerCase()
         const catRow = branchCategories.find(c =>
-          c.name && c.name.toLowerCase() === catName.toLowerCase()
+          c.name && (c.name.toLowerCase() === catLower || c.name.toLowerCase().includes(catLower) || catLower.includes(c.name.toLowerCase()))
         )
         const catQty = catRow?.qty || 0
         const catSales = catRow?.sales || 0
+        // Match items by category field — flexible match
         const catItems = branchItems.filter(it =>
-          it.category && it.category.toLowerCase() === catName.toLowerCase()
+          it.category && (it.category.toLowerCase() === catLower || it.category.toLowerCase().includes(catLower) || catLower.includes(it.category.toLowerCase()))
         )
 
         const columns = [{
@@ -382,7 +394,6 @@ export default function SalesReportsPage() {
         // Name tracking: show combined total as main card, then individual variants
         const totalMatchQty = matchedItems.reduce((s, it) => s + (it.quantity || 0), 0)
         const totalMatchSales = matchedItems.reduce((s, it) => s + (it.sales || 0), 0)
-
         columns.push({
           code: 'ALL',
           name: baseName,
