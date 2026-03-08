@@ -224,12 +224,13 @@ async def get_branch_budget(
 
 @router.post("/extract-receipt", response_model=ReceiptExtractionResponse)
 async def extract_receipt(
-    file: UploadFile = File(...),
-    receipt_type: str = Query(..., description="pos, pos_categories, hd, or deliveroo"),
+    files: List[UploadFile] = File(...),
+    receipt_type: str = Query(..., description="pos, pos_categories, pos_combined, hd, or deliveroo"),
     current_user: User = Depends(get_current_user),
 ):
-    """Extract sales data from a receipt photo using Gemini Vision.
-    Photo is NOT saved — only used for extraction."""
+    """Extract sales data from receipt photos using Gemini Vision.
+    Accepts 1-5 images. For pos_combined, all images are sent to Gemini together.
+    Photos are NOT saved — only used for extraction."""
     from services.gemini_vision import (
         extract_pos_sales,
         extract_pos_categories,
@@ -238,41 +239,54 @@ async def extract_receipt(
         extract_deliveroo_sales,
     )
 
+    if len(files) > 5:
+        raise HTTPException(status_code=400, detail="Maximum 5 images allowed.")
+
     allowed_types = ["image/jpeg", "image/png", "image/webp", "image/heic"]
-    if file.content_type not in allowed_types:
-        raise HTTPException(status_code=400, detail="Invalid file type. Use JPEG, PNG, or WebP.")
 
     try:
-        image_bytes = await file.read()
-
-        # Resize large images to reduce Gemini processing time
         from PIL import Image
         import io
-        try:
-            img = Image.open(io.BytesIO(image_bytes))
-            max_dim = 2048
-            if max(img.size) > max_dim:
-                ratio = max_dim / max(img.size)
-                new_size = (int(img.size[0] * ratio), int(img.size[1] * ratio))
-                img = img.resize(new_size, Image.LANCZOS)
-                buf = io.BytesIO()
-                img.save(buf, format='JPEG', quality=85)
-                image_bytes = buf.getvalue()
-                logger.info(f"Resized image to {new_size}, {len(image_bytes)} bytes")
-        except Exception as resize_err:
-            logger.warning(f"Image resize skipped: {resize_err}")
+
+        def _resize_image(raw_bytes: bytes) -> bytes:
+            """Resize large images to reduce Gemini processing time."""
+            try:
+                img = Image.open(io.BytesIO(raw_bytes))
+                max_dim = 2048
+                if max(img.size) > max_dim:
+                    ratio = max_dim / max(img.size)
+                    new_size = (int(img.size[0] * ratio), int(img.size[1] * ratio))
+                    img = img.resize(new_size, Image.LANCZOS)
+                    buf = io.BytesIO()
+                    img.save(buf, format='JPEG', quality=85)
+                    logger.info(f"Resized image to {new_size}, {len(buf.getvalue())} bytes")
+                    return buf.getvalue()
+            except Exception as resize_err:
+                logger.warning(f"Image resize skipped: {resize_err}")
+            return raw_bytes
+
+        # Read and resize all images
+        image_bytes_list = []
+        for f in files:
+            if f.content_type not in allowed_types:
+                raise HTTPException(status_code=400, detail=f"Invalid file type: {f.content_type}. Use JPEG, PNG, or WebP.")
+            raw = await f.read()
+            image_bytes_list.append(_resize_image(raw))
+
+        logger.info(f"Extraction request: type={receipt_type}, images={len(image_bytes_list)}")
 
         if receipt_type == "pos":
-            data = await extract_pos_sales(image_bytes)
+            data = await extract_pos_sales(image_bytes_list[0])
         elif receipt_type == "pos_categories":
-            data = await extract_pos_categories(image_bytes)
+            data = await extract_pos_categories(image_bytes_list[0])
         elif receipt_type == "pos_combined":
-            data = await extract_pos_combined(image_bytes)
+            # Send ALL images to Gemini in one request
+            data = await extract_pos_combined(image_bytes_list)
             logger.info(f"POS Combined result: cats={len(data.get('categories', []))}, items={len(data.get('items', []))}, summary_keys={list(data.get('sales_summary', {}).keys())}")
         elif receipt_type == "hd":
-            data = await extract_hd_sales(image_bytes)
+            data = await extract_hd_sales(image_bytes_list[0])
         elif receipt_type == "deliveroo":
-            data = await extract_deliveroo_sales(image_bytes)
+            data = await extract_deliveroo_sales(image_bytes_list[0])
         else:
             raise HTTPException(status_code=400, detail=f"Invalid receipt_type: {receipt_type}.")
 

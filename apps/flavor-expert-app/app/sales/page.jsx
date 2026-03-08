@@ -280,40 +280,26 @@ export default function SalesPage() {
     setPosStatus('extracting')
 
     try {
-      // Process ALL photos in parallel for speed
-      const combinedResults = await Promise.all(
-        posPhotos.map(async (file) => {
-          try {
-            return await api.extractReceipt(file, 'pos_combined')
-          } catch (e1) {
-            console.warn('First attempt failed, retrying...', e1.message)
-            try {
-              return await api.extractReceipt(file, 'pos_combined')
-            } catch (e2) {
-              console.error('Retry also failed:', e2.message)
-              return null
-            }
-          }
-        })
-      )
-
-      const successData = combinedResults.filter(r => r?.success).map(r => r.data)
-      console.log('All combined results:', JSON.stringify(combinedResults, null, 2))
-
-      if (successData.length === 0) {
-        throw new Error('Could not extract data from any photo. Please try again.')
+      // Send ALL photos to Gemini in ONE request — Gemini sees all images together
+      let result = null
+      try {
+        result = await api.extractReceipt(posPhotos, 'pos_combined')
+      } catch (e1) {
+        console.warn('First attempt failed, retrying...', e1.message)
+        result = await api.extractReceipt(posPhotos, 'pos_combined')
       }
 
-      // Split combined results into sales summaries and category data
-      const posDataArray = successData.map(d => d.sales_summary || {})
-      const catDataArray = successData.map(d => ({ categories: d.categories || [], items: d.items || [] }))
+      if (!result?.success) {
+        throw new Error(result?.error || 'Could not extract data from photos. Please try again.')
+      }
 
-      console.log('Categories from each photo:', catDataArray.map(c => `cats=${c.categories.length}, items=${c.items.length}`))
+      const data = result.data
+      console.log('POS Combined result:', JSON.stringify(data, null, 2))
 
-      const posData = mergeNumericResults(posDataArray)
-      const catData = mergeCategoryResults(catDataArray)
+      const posData = data.sales_summary || {}
+      const catData = { categories: data.categories || [], items: data.items || [] }
 
-      console.log('Merged catData:', JSON.stringify(catData, null, 2))
+      console.log(`Extracted: cats=${catData.categories.length}, items=${catData.items.length}`)
 
       setExtractedSales(posData)
       setExtractedCategories(catData)

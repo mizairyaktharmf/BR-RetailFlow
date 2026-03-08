@@ -187,13 +187,15 @@ class ApiService {
     return this.request(`/sales/daily?branch_id=${branchId}&date=${date}`)
   }
 
-  async extractReceipt(file, receiptType) {
+  async extractReceipt(filesOrFile, receiptType) {
     const formData = new FormData()
-    formData.append('file', file)
+    // Support both single file and array of files
+    const fileList = Array.isArray(filesOrFile) ? filesOrFile : [filesOrFile]
+    fileList.forEach(f => formData.append('files', f))
 
     const token = this.getToken()
     const controller = new AbortController()
-    const timeoutId = setTimeout(() => controller.abort(), 120000) // 2 min timeout
+    const timeoutId = setTimeout(() => controller.abort(), 180000) // 3 min timeout for multi-image
 
     try {
       const response = await fetch(

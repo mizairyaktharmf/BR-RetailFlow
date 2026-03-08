@@ -81,9 +81,54 @@ Rules:
 - contribution_pct is the percentage shown in the last column
 - Return ONLY the JSON object, no other text"""
 
-POS_COMBINED_PROMPT = """Analyze this POS sales receipt image. Extract ALL data visible.
+POS_COMBINED_PROMPT = """Analyze these POS sales receipt images. You may receive 1-5 images showing different parts of the SAME receipt. Extract ALL data from ALL images combined.
 
-Return ONLY a valid JSON object with these sections:
+The POS receipt has these sections IN ORDER:
+
+1. **Sales Summary** — at the very top: Gross Sales, Returns, Net Sales, Discount, Tax, GC (Guest Count), ATV
+2. **Cash Sales** — below sales summary: Grs CashSls, Net CashSls, GC
+3. **Category Sales Summary** — a summary table showing category totals:
+   Cups & Cones  250  4,222.76  17.0
+   Sundaes       687  13,095.85 52.6
+   Beverages      53  1,388.52   5.6
+   Take Home      39  2,154.28   8.7
+   Desserts       31  3,052.41  12.3
+   Toppings      344    420.84   1.7
+   Others         65    537.99   2.2
+   Soft Drink      1     14.29   0.1
+   TOTAL SALES  1470 24,886.94 100.0
+
+4. **Item Sales Summary** — ALL individual items listed sequentially with T> category headers:
+   Items listed ABOVE a T> line belong to that category:
+   - First items up to "T>Cups & Cones" = Cups & Cones items
+   - Items after T>Cups & Cones up to "T>Sundaes" = Sundaes items
+   - Items after T>Sundaes up to "T>Beverages" = Beverages items (Thick Shakes, etc.)
+   - Items after T>Beverages up to "T>Take Home" = Take Home items (Fun Pack, Value Pack, etc.)
+   - Items after T>Take Home up to "T>Desserts" = Desserts items (CPU cakes, ATC cakes, INV cakes, etc.)
+   - Items after T>Desserts up to "T>Toppings" = Toppings items
+   - Items after T>Toppings up to "T>Others" = Others items
+   - Items after T>Others up to "T>Soft Drink" = Soft Drink items
+
+5. **TOTAL SALES** — final total row
+6. **Non Sales Item Summary** — non-sales items (ignore these)
+7. **Discount / Promo Summary** — discount info (ignore these)
+
+CRITICAL RULES:
+- Extract EVERY SINGLE item visible across ALL images. Do NOT skip any item. Do NOT truncate.
+- The sum of item quantities for each category MUST equal the T> category total quantity.
+- Each item has: 4-digit code, name, quantity, sales amount, contribution %
+- Items belong to the category whose T> header appears BELOW them in the list.
+- If multiple images show the same section, do NOT duplicate items.
+- If images show different sections, COMBINE all data into one result.
+- Extract numbers exactly as shown — do not round or calculate.
+- sales_summary: if visible, extract from the Sales Summary section
+- guest_count = GC from Sales Summary (NOT from Cash Sales section)
+- cash_sales = "Net CashSls" amount
+- cash_gc = GC from the Cash Sales section
+- categories: from Category Sales Summary OR from T> total lines
+- If a section is not visible in any image, use empty array [] or 0
+
+Return ONLY a valid JSON object:
 
 {
   "sales_summary": {
@@ -108,18 +153,7 @@ Return ONLY a valid JSON object with these sections:
   ]
 }
 
-Rules:
-- sales_summary: Extract from the Sales Summary section at top
-- guest_count = GC from Sales Summary (NOT from Cash Sales section)
-- atv = ATV from Sales Summary
-- cash_sales = "Net CashSls" amount (NOT "Grs CashSls" — use the NET cash sales value)
-- cash_gc = GC from the Cash Sales section
-- categories: Strip "T>" prefix. List ALL category total rows (T>Cups & Cones etc.)
-- items: List ALL individual items with 4-digit code, name, quantity, sales, contribution %
-- IMPORTANT: Each item's "category" MUST match the T>CategoryName header it appears under in the receipt. Items listed between T>Sundaes and T>Beverages belong to "Sundaes". Items between T>Desserts and T>Toppings belong to "Desserts". Items between T>Toppings and T>Others belong to "Toppings". Pay close attention to the T> grouping headers.
-- If a section is not visible on this image, use empty array [] for categories/items or 0 for numbers
-- Extract numbers exactly as shown, do not calculate
-- Return ONLY the JSON object, no other text"""
+Return ONLY the JSON object, no other text."""
 
 HOME_DELIVERY_PROMPT = """Analyze this Home Delivery sales report image. Extract the following information and return ONLY a valid JSON object:
 
@@ -340,15 +374,26 @@ async def extract_pos_categories(image_bytes: bytes) -> dict:
     return _parse_json_response(response.text)
 
 
-async def extract_pos_combined(image_bytes: bytes) -> dict:
-    """Extract ALL POS data (sales summary + categories + items) in one call."""
+async def extract_pos_combined(image_bytes_list) -> dict:
+    """Extract ALL POS data (sales summary + categories + items) in one call.
+    Accepts a single bytes object or a list of bytes (multi-image).
+    """
     from google.genai import types
     client = _get_client()
-    img = _image_from_bytes(image_bytes)
+
+    # Support both single image and multiple images
+    if isinstance(image_bytes_list, bytes):
+        image_bytes_list = [image_bytes_list]
+
+    contents = []
+    for img_bytes in image_bytes_list:
+        contents.append(_image_from_bytes(img_bytes))
+    contents.append(POS_COMBINED_PROMPT)
+
     response = client.models.generate_content(
         model="gemini-2.5-flash",
-        contents=[img, POS_COMBINED_PROMPT],
-        config=types.GenerateContentConfig(temperature=0.1, max_output_tokens=8192),
+        contents=contents,
+        config=types.GenerateContentConfig(temperature=0.1, max_output_tokens=65536),
     )
     return _parse_json_response(response.text)
 
