@@ -226,10 +226,29 @@ export default function SalesDashboardPage() {
 
       if (isCategory) {
         const catName = tracked.item_code.replace('CAT:', '')
-        const catRow = branchCategories.find(c => c.name && c.name.toLowerCase() === catName.toLowerCase())
+        const catLower = catName.toLowerCase()
+        // Word-root matching for spelling variations (Desserts vs Deserts)
+        const tWords = catLower.replace(/[^a-z]/g, ' ').split(/\s+/).filter(w => w.length > 3).map(w => w.replace(/s$/, ''))
+        const catRow = branchCategories.find(c => {
+          if (!c.name) return false
+          const cLow = c.name.toLowerCase()
+          if (cLow === catLower || cLow.includes(catLower) || catLower.includes(cLow)) return true
+          const cWords = cLow.replace(/[^a-z]/g, ' ').split(/\s+/).filter(w => w.length > 3).map(w => w.replace(/s$/, ''))
+          return tWords.some(tw => cWords.some(cw => cw === tw || cw.includes(tw) || tw.includes(cw)))
+        })
         const catQty = catRow?.qty || 0
         const catSales = catRow?.sales || 0
-        const catItems = branchItems.filter(it => it.category && it.category.toLowerCase() === catName.toLowerCase())
+        // Match items using tracked name + matched category_data name + word-root
+        const matchNames = [catLower]
+        if (catRow?.name && catRow.name.toLowerCase() !== catLower) matchNames.push(catRow.name.toLowerCase())
+        const catWords = catLower.replace(/[^a-z]/g, ' ').split(/\s+/).filter(w => w.length > 3).map(w => w.replace(/s$/, ''))
+        const catItems = branchItems.filter(it => {
+          if (!it.category) return false
+          const itCat = it.category.toLowerCase()
+          if (matchNames.some(mn => itCat === mn || itCat.includes(mn) || mn.includes(itCat))) return true
+          const itWords = itCat.replace(/[^a-z]/g, ' ').split(/\s+/).filter(w => w.length > 3).map(w => w.replace(/s$/, ''))
+          return catWords.some(cw => itWords.some(iw => iw === cw || iw.includes(cw) || cw.includes(iw)))
+        })
 
         const columns = [{
           code: 'CAT', name: catName, qty: catQty,
@@ -544,63 +563,116 @@ export default function SalesDashboardPage() {
             </div>
 
             {/* ===== PROMOTION TRACKING ===== */}
-            {promotionData.length > 0 && (
-              <div>
-                <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-3">Promotion Tracking</h2>
-                <Card className="bg-gradient-to-r from-pink-50 to-purple-50 border-pink-200">
-                  <CardContent className="p-3">
-                    <div className="flex gap-2 overflow-x-auto pb-1">
-                      {promotionData.flatMap(p => p.columns).map((col, ci) => (
-                        <div
-                          key={`promo-${col.code}-${ci}`}
-                          className={`flex-shrink-0 min-w-[140px] rounded-lg p-2.5 border ${
-                            col.isCategory
-                              ? 'bg-orange-50 border-orange-300'
-                              : col.isMain
-                                ? 'bg-pink-50 border-pink-300'
-                                : 'bg-purple-50 border-purple-200'
-                          }`}
-                        >
-                          <div className="flex items-center gap-1 mb-1.5">
-                            <span className="text-[8px] font-mono text-gray-500">{col.code}</span>
-                            {col.isCategory ? (
-                              <span className="text-[7px] px-1 py-0.5 bg-orange-200 text-orange-700 rounded font-bold flex items-center gap-0.5">
-                                <Layers className="w-2 h-2" />CAT{col.itemCount > 0 ? ` · ${col.itemCount}` : ''}
-                              </span>
-                            ) : col.isMain ? (
-                              <span className="text-[7px] px-1 py-0.5 bg-pink-200 text-pink-700 rounded font-bold">PROMO</span>
-                            ) : null}
-                          </div>
-                          <p className="text-[11px] font-semibold text-gray-800 truncate mb-2" title={col.name}>{col.name}</p>
-                          <div className="grid grid-cols-2 gap-x-2 gap-y-1.5">
-                            <div>
-                              <p className="text-[8px] text-gray-500 uppercase">QTY</p>
-                              <p className="text-xs font-bold text-gray-900">{col.qty}</p>
-                            </div>
-                            <div>
-                              <p className="text-[8px] text-gray-500 uppercase">%Count</p>
-                              <p className="text-xs font-bold text-amber-600">{col.countPct.toFixed(1)}%</p>
-                            </div>
-                            <div>
-                              <p className="text-[8px] text-gray-500 uppercase">AUV</p>
-                              <p className="text-xs font-bold text-blue-600">{col.auv.toFixed(2)}</p>
-                            </div>
-                            <div>
-                              <p className="text-[8px] text-gray-500 uppercase">IR</p>
-                              <p className="text-xs font-bold text-purple-600">{col.ir.toFixed(1)}%</p>
-                            </div>
-                          </div>
-                          <div className="mt-1.5 pt-1.5 border-t border-gray-200">
-                            <p className="text-[8px] text-gray-500">Sales</p>
-                            <p className="text-[11px] font-semibold text-green-600">{col.sales.toFixed(2)}</p>
+            {promotionData.length > 0 && (() => {
+              const mainItems = promotionData.map(p => p.columns[0]).filter(c => c.sales > 0)
+              return (
+                <div>
+                  <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-3">Promotion Tracking</h2>
+                  {/* Donut for main totals */}
+                  {mainItems.length > 1 && (
+                    <Card className="bg-white border-gray-200 mb-3">
+                      <CardContent className="p-3 flex justify-center">
+                        <div className="flex flex-col items-center gap-2">
+                          <DonutChart categories={mainItems.map(c => ({ name: c.name, sales: c.sales }))} totalSales={mainItems.reduce((s, c) => s + c.sales, 0)} />
+                          <div className="flex flex-wrap justify-center gap-3">
+                            {mainItems.map((c, i) => (
+                              <div key={i} className="flex items-center gap-1.5">
+                                <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: getCatColor(c.name, i) }} />
+                                <span className="text-[10px] text-gray-600">{c.name}</span>
+                                <span className="text-[10px] font-bold text-gray-800">{Math.round(c.sales / mainItems.reduce((s, x) => s + x.sales, 0) * 100)}%</span>
+                              </div>
+                            ))}
                           </div>
                         </div>
-                      ))}
-                    </div>
-                  </CardContent>
-                </Card>
-              </div>
-            )}
+                      </CardContent>
+                    </Card>
+                  )}
+                  {/* Grouped containers — one per tracked item */}
+                  <div className="space-y-3">
+                    {promotionData.map((group, gi) => {
+                      const main = group.columns[0]
+                      const variants = group.columns.slice(1)
+                      const borderColor = main.isCategory
+                        ? 'border-orange-300' : main.isNameGroup
+                        ? 'border-green-300' : 'border-pink-300'
+                      const bgColor = main.isCategory
+                        ? 'bg-orange-50' : main.isNameGroup
+                        ? 'bg-green-50' : 'bg-pink-50'
+                      return (
+                        <Card key={`group-${gi}`} className={`${bgColor} ${borderColor} overflow-hidden`}>
+                          {/* Main total header */}
+                          <div className="p-3 flex items-center justify-between gap-3">
+                            <div className="min-w-0">
+                              <div className="flex items-center gap-1.5 mb-1">
+                                <p className="text-xs font-bold text-gray-900 truncate">{main.name}</p>
+                                {main.isCategory ? (
+                                  <span className="text-[7px] px-1 py-0.5 bg-orange-200 text-orange-700 rounded flex-shrink-0 font-bold">CAT</span>
+                                ) : main.isNameGroup ? (
+                                  <span className="text-[7px] px-1 py-0.5 bg-green-200 text-green-700 rounded flex-shrink-0 font-bold">ALL</span>
+                                ) : (
+                                  <span className="text-[7px] px-1 py-0.5 bg-pink-200 text-pink-700 rounded flex-shrink-0 font-bold">PROMO</span>
+                                )}
+                              </div>
+                              {variants.length > 0 && (
+                                <p className="text-[9px] text-gray-500">{variants.length} variant{variants.length > 1 ? 's' : ''} sold</p>
+                              )}
+                            </div>
+                            <div className="grid grid-cols-4 gap-3 flex-shrink-0 text-center">
+                              <div>
+                                <p className="text-[8px] text-gray-500">QTY</p>
+                                <p className="text-sm font-bold text-gray-900">{main.qty}</p>
+                              </div>
+                              <div>
+                                <p className="text-[8px] text-gray-500">IR</p>
+                                <p className="text-sm font-bold text-purple-600">{main.ir.toFixed(1)}%</p>
+                              </div>
+                              <div>
+                                <p className="text-[8px] text-gray-500">AUV</p>
+                                <p className="text-sm font-bold text-blue-600">{main.auv.toFixed(2)}</p>
+                              </div>
+                              <div>
+                                <p className="text-[8px] text-gray-500">Sales</p>
+                                <p className="text-sm font-bold text-green-600">{main.sales.toFixed(0)}</p>
+                              </div>
+                            </div>
+                          </div>
+                          {/* Variant cards — horizontal scroll */}
+                          {variants.length > 0 && (
+                            <div className="border-t border-gray-200 px-3 py-2">
+                              <div className="flex gap-2 overflow-x-auto pb-1">
+                                {variants.map((v, vi) => (
+                                  <div key={`v-${gi}-${vi}`} className="flex-shrink-0 min-w-[120px] bg-white rounded-lg p-2 border border-gray-200 shadow-sm">
+                                    <p className="text-[10px] font-medium text-gray-800 truncate mb-1.5" title={v.name}>{v.name}</p>
+                                    <div className="grid grid-cols-2 gap-x-2 gap-y-1">
+                                      <div>
+                                        <p className="text-[7px] text-gray-500">QTY</p>
+                                        <p className="text-[11px] font-bold text-gray-900">{v.qty}</p>
+                                      </div>
+                                      <div>
+                                        <p className="text-[7px] text-gray-500">Sales</p>
+                                        <p className="text-[11px] font-bold text-green-600">{v.sales.toFixed(0)}</p>
+                                      </div>
+                                      <div>
+                                        <p className="text-[7px] text-gray-500">AUV</p>
+                                        <p className="text-[11px] font-bold text-blue-600">{v.auv.toFixed(2)}</p>
+                                      </div>
+                                      <div>
+                                        <p className="text-[7px] text-gray-500">IR</p>
+                                        <p className="text-[11px] font-bold text-purple-600">{v.ir.toFixed(1)}%</p>
+                                      </div>
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                        </Card>
+                      )
+                    })}
+                  </div>
+                </div>
+              )
+            })()}
 
             {/* ===== CATEGORY BREAKDOWN ===== */}
             {branchCategories.length > 0 && (
