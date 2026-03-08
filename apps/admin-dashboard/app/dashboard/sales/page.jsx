@@ -334,15 +334,33 @@ export default function SalesReportsPage() {
       if (isCategory) {
         const catName = tracked.item_code.replace('CAT:', '')
         const catLower = catName.toLowerCase()
-        const catRow = branchCategories.find(c =>
-          c.name && (c.name.toLowerCase() === catLower || c.name.toLowerCase().includes(catLower) || catLower.includes(c.name.toLowerCase()))
-        )
+        const catRow = branchCategories.find(c => {
+          if (!c.name) return false
+          const cLow = c.name.toLowerCase()
+          if (cLow === catLower || cLow.includes(catLower) || catLower.includes(cLow)) return true
+          // Word-root match for spelling variations (Desserts vs Deserts)
+          const cWords = cLow.replace(/[^a-z]/g, ' ').split(/\s+/).filter(w => w.length > 3).map(w => w.replace(/s$/, ''))
+          const tWords = catLower.replace(/[^a-z]/g, ' ').split(/\s+/).filter(w => w.length > 3).map(w => w.replace(/s$/, ''))
+          return tWords.some(tw => cWords.some(cw => cw === tw || cw.includes(tw) || tw.includes(cw)))
+        })
         const catQty = catRow?.qty || 0
         const catSales = catRow?.sales || 0
-        // Match items by category field — flexible match
-        const catItems = branchItems.filter(it =>
-          it.category && (it.category.toLowerCase() === catLower || it.category.toLowerCase().includes(catLower) || catLower.includes(it.category.toLowerCase()))
-        )
+        // Match items by category field — use tracked name, matched category_data name, and word-root matching
+        const matchNames = [catLower]
+        if (catRow?.name && catRow.name.toLowerCase() !== catLower) {
+          matchNames.push(catRow.name.toLowerCase())
+        }
+        // Also extract word roots for fuzzy matching (e.g., "desserts" → "dessert", "deserts" → "desert")
+        const catWords = catLower.replace(/[^a-z]/g, ' ').split(/\s+/).filter(w => w.length > 3).map(w => w.replace(/s$/, ''))
+        const catItems = branchItems.filter(it => {
+          if (!it.category) return false
+          const itCat = it.category.toLowerCase()
+          // Direct match or includes match
+          if (matchNames.some(mn => itCat === mn || itCat.includes(mn) || mn.includes(itCat))) return true
+          // Word-root match: any significant word root from tracked name found in item category
+          const itWords = itCat.replace(/[^a-z]/g, ' ').split(/\s+/).filter(w => w.length > 3).map(w => w.replace(/s$/, ''))
+          return catWords.some(cw => itWords.some(iw => iw === cw || iw.includes(cw) || cw.includes(iw)))
+        })
 
         const columns = [{
           code: `CAT`,
