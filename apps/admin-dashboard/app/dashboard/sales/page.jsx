@@ -43,7 +43,8 @@ function CategoryDonut({ categories, size = 120 }) {
   })
 
   return (
-    <div className="flex flex-col sm:flex-row items-center gap-4">
+    <div className="flex flex-col items-center gap-3">
+      {/* Donut — smaller on mobile */}
       <div className="relative flex-shrink-0" style={{ width: size, height: size }}>
         <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
           <circle cx={half} cy={half} r={radius} fill="none" stroke="#374151" strokeWidth="14" />
@@ -66,16 +67,17 @@ function CategoryDonut({ categories, size = 120 }) {
           <p className="text-sm font-bold text-white">{total.toFixed(0)}</p>
         </div>
       </div>
-      <div className="flex-1 w-full space-y-1.5">
+      {/* Legend — 2-col grid on mobile to save space */}
+      <div className="w-full grid grid-cols-2 gap-x-3 gap-y-1">
         {segments.map((cat, idx) => (
-          <div key={idx} className="flex items-center justify-between text-sm">
-            <div className="flex items-center gap-2 min-w-0">
-              <div className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: cat.color }} />
-              <span className="text-xs text-gray-300 truncate">{cat.name}</span>
+          <div key={idx} className="flex items-center justify-between">
+            <div className="flex items-center gap-1.5 min-w-0">
+              <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: cat.color }} />
+              <span className="text-[10px] text-gray-300 truncate">{cat.name}</span>
             </div>
-            <div className="flex items-center gap-2 flex-shrink-0">
-              <span className="text-xs font-semibold text-white">{Math.round(cat.pct * 100)}%</span>
-              <span className="text-[10px] text-gray-500 w-14 text-right">{cat.sales.toFixed(0)}</span>
+            <div className="flex items-center gap-1 flex-shrink-0">
+              <span className="text-[10px] font-semibold text-white">{Math.round(cat.pct * 100)}%</span>
+              <span className="text-[9px] text-gray-500 w-10 text-right">{cat.sales.toFixed(0)}</span>
             </div>
           </div>
         ))}
@@ -84,6 +86,98 @@ function CategoryDonut({ categories, size = 120 }) {
   )
 }
 
+
+// Budget vs Actual line chart
+function BudgetLineChart({ data, selectedDate }) {
+  if (!data?.days?.length) return null
+  const days = data.days
+  const today = new Date().toISOString().split('T')[0]
+  const selectedDay = parseInt(selectedDate.split('-')[2])
+
+  // Only show days up to today (or all if viewing past month)
+  const visibleDays = days.filter(d => d.date <= today || d.budget > 0)
+  if (visibleDays.length === 0) return null
+
+  const maxVal = Math.max(
+    ...visibleDays.map(d => Math.max(d.budget || 0, d.actual || 0, d.ly_sales || 0)),
+    1
+  )
+
+  const w = 600, h = 160, padL = 40, padR = 10, padT = 10, padB = 25
+  const chartW = w - padL - padR
+  const chartH = h - padT - padB
+
+  const x = (i) => padL + (i / (visibleDays.length - 1 || 1)) * chartW
+  const y = (val) => padT + chartH - (val / maxVal) * chartH
+
+  const line = (key) => visibleDays
+    .filter(d => d[key] > 0)
+    .map((d, i, arr) => {
+      const idx = visibleDays.indexOf(d)
+      return `${i === 0 ? 'M' : 'L'}${x(idx).toFixed(1)},${y(d[key]).toFixed(1)}`
+    }).join(' ')
+
+  const budgetLine = line('budget')
+  const actualLine = line('actual')
+  const lyLine = line('ly_sales')
+
+  // Y-axis labels
+  const yLabels = [0, Math.round(maxVal / 2), Math.round(maxVal)]
+
+  return (
+    <div className="bg-gray-800/50 border border-gray-700 rounded-xl overflow-hidden">
+      <div className="px-3 sm:px-4 py-2.5 border-b border-gray-700 flex items-center justify-between">
+        <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Budget vs Actual</p>
+        <div className="flex items-center gap-3 text-[9px]">
+          <span className="flex items-center gap-1"><span className="w-3 h-0.5 bg-amber-400 inline-block rounded" />Budget</span>
+          <span className="flex items-center gap-1"><span className="w-3 h-0.5 bg-green-400 inline-block rounded" />Actual</span>
+          <span className="flex items-center gap-1"><span className="w-3 h-0.5 bg-gray-500 inline-block rounded" />LY</span>
+        </div>
+      </div>
+      <div className="p-3 overflow-x-auto">
+        <svg viewBox={`0 0 ${w} ${h}`} className="w-full min-w-[400px]" style={{ height: 160 }}>
+          {/* Grid lines */}
+          {yLabels.map((val, i) => (
+            <g key={i}>
+              <line x1={padL} y1={y(val)} x2={w - padR} y2={y(val)} stroke="#374151" strokeWidth="0.5" strokeDasharray="4,4" />
+              <text x={padL - 4} y={y(val) + 3} textAnchor="end" className="fill-gray-500" fontSize="8">{val >= 1000 ? `${(val/1000).toFixed(0)}k` : val}</text>
+            </g>
+          ))}
+          {/* X-axis day labels */}
+          {visibleDays.map((d, i) => (
+            (d.day % 5 === 1 || d.day === visibleDays.length) && (
+              <text key={d.day} x={x(i)} y={h - 4} textAnchor="middle" className="fill-gray-500" fontSize="8">{d.day}</text>
+            )
+          ))}
+          {/* LY line */}
+          {lyLine && <path d={lyLine} fill="none" stroke="#6b7280" strokeWidth="1" strokeDasharray="3,3" />}
+          {/* Budget line */}
+          {budgetLine && <path d={budgetLine} fill="none" stroke="#f59e0b" strokeWidth="1.5" />}
+          {/* Actual line */}
+          {actualLine && <path d={actualLine} fill="none" stroke="#4ade80" strokeWidth="2" />}
+          {/* Dots for actual */}
+          {visibleDays.filter(d => d.actual > 0).map((d) => {
+            const idx = visibleDays.indexOf(d)
+            const isSelected = d.day === selectedDay
+            return (
+              <circle key={d.day} cx={x(idx)} cy={y(d.actual)} r={isSelected ? 4 : 2}
+                fill={d.actual >= d.budget ? '#4ade80' : '#f87171'}
+                stroke={isSelected ? '#fff' : 'none'} strokeWidth="1.5" />
+            )
+          })}
+          {/* Selected day vertical line */}
+          {(() => {
+            const selIdx = visibleDays.findIndex(d => d.day === selectedDay)
+            if (selIdx >= 0) return (
+              <line x1={x(selIdx)} y1={padT} x2={x(selIdx)} y2={padT + chartH} stroke="#a78bfa" strokeWidth="1" strokeDasharray="3,3" opacity="0.6" />
+            )
+            return null
+          })()}
+        </svg>
+      </div>
+    </div>
+  )
+}
 
 export default function SalesReportsPage() {
   const router = useRouter()
@@ -96,6 +190,7 @@ export default function SalesReportsPage() {
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0])
   const [activeWindowId, setActiveWindowId] = useState(null)
   const [trackedItems, setTrackedItems] = useState([])
+  const [budgetChart, setBudgetChart] = useState(null)
 
   useEffect(() => {
     const userData = localStorage.getItem('br_admin_user')
@@ -114,6 +209,14 @@ export default function SalesReportsPage() {
       .then(items => setTrackedItems(Array.isArray(items) ? items : []))
       .catch(() => setTrackedItems([]))
   }, [selectedBranch])
+
+  useEffect(() => {
+    if (!selectedBranch) return
+    const month = selectedDate.slice(0, 7)
+    api.getBudgetChart(selectedBranch.id, month)
+      .then(data => setBudgetChart(data))
+      .catch(() => setBudgetChart(null))
+  }, [selectedBranch, selectedDate])
 
   const loadBranches = async () => {
     setLoading(true)
@@ -360,7 +463,7 @@ export default function SalesReportsPage() {
   }
 
   return (
-    <div className="space-y-4 md:space-y-5">
+    <div className="p-4 md:p-6 space-y-4 md:space-y-5 max-w-full overflow-x-hidden">
       {/* Header + Date */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
@@ -398,7 +501,7 @@ export default function SalesReportsPage() {
           {/* Branch Selector — horizontal scroll on mobile */}
           <div>
             <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Select Branch</p>
-            <div className="flex gap-2 overflow-x-auto pb-2 -mx-1 px-1 scrollbar-hide">
+            <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
               {branches.map((b) => {
                 const hasSales = (branchSales[b.id] || []).length > 0
                 const isSelected = selectedBranch?.id === b.id
@@ -459,10 +562,10 @@ export default function SalesReportsPage() {
                   <Loader2 className="w-6 h-6 animate-spin text-purple-400" />
                 </div>
               ) : currentSales.length === 0 ? (
-                <div className="bg-gray-800/50 border border-gray-700 rounded-xl p-6 md:p-8 text-center">
-                  <AlertCircle className="w-10 h-10 mx-auto text-gray-600 mb-2" />
-                  <p className="text-gray-400">No sales submitted for this date</p>
-                  <p className="text-xs text-gray-600 mt-1">Sales will appear here once the branch submits reports</p>
+                <div className="bg-gray-800/50 border border-gray-700 rounded-xl p-4 md:p-8 text-center">
+                  <AlertCircle className="w-8 h-8 mx-auto text-gray-600 mb-2" />
+                  <p className="text-sm text-gray-400">No sales submitted for this date</p>
+                  <p className="text-[11px] text-gray-600 mt-1">Sales will appear once the branch submits reports</p>
                 </div>
               ) : (
                 <>
@@ -571,97 +674,119 @@ export default function SalesReportsPage() {
                     </div>
                   </div>
 
+                  {/* Budget vs Actual Chart */}
+                  <BudgetLineChart data={budgetChart} selectedDate={selectedDate} />
+
                   {/* Promotion Tracking */}
                   {promotionData.length > 0 && (() => {
-                    const allCols = promotionData.flatMap(p => p.columns)
-                    const promoWithSales = allCols.filter(c => c.sales > 0)
+                    const mainItems = promotionData.map(p => p.columns[0]).filter(c => c.sales > 0)
                     return (
-                      <div className="bg-gradient-to-r from-pink-900/20 to-purple-900/20 border border-pink-800/40 rounded-xl overflow-hidden">
-                        <div className="px-4 py-3 border-b border-pink-800/30">
-                          <p className="text-xs font-semibold text-pink-400 uppercase tracking-wider">
-                            Promotion Tracking
-                          </p>
-                        </div>
-                        <div className="p-3 sm:p-4 space-y-4">
-                          {/* Donut — hidden on mobile */}
-                          {promoWithSales.length > 1 && (
-                            <div className="mb-4 hidden sm:block">
-                              <CategoryDonut categories={promoWithSales.map(c => ({ name: c.name, sales: c.sales }))} size={110} />
-                            </div>
-                          )}
-                          {/* Promo Cards — horizontal scroll on mobile, grid on desktop */}
-                          <div className="flex gap-2 overflow-x-auto pb-1 sm:grid sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 sm:overflow-x-visible">
-                            {allCols.map((col, ci) => (
-                              <div
-                                key={`promo-${col.code}-${ci}`}
-                                className={`flex-shrink-0 min-w-[140px] sm:min-w-0 rounded-xl p-2.5 sm:p-3 border ${
-                                  col.isCategory
-                                    ? 'bg-orange-900/30 border-orange-700/50'
-                                    : col.isNameGroup
-                                      ? 'bg-green-900/30 border-green-700/50'
-                                      : col.isMain
-                                        ? 'bg-pink-900/30 border-pink-700/50'
-                                        : 'bg-purple-900/20 border-purple-700/40'
-                                }`}
-                              >
-                                <div className="flex items-center gap-1 mb-1.5 flex-wrap">
-                                  <span className="text-[8px] font-mono text-gray-500">{col.code}</span>
-                                  {col.isCategory ? (
-                                    <span className="text-[7px] px-1 py-0.5 bg-orange-800/50 text-orange-300 rounded">
-                                      CAT{col.itemCount > 0 ? ` · ${col.itemCount}` : ''}
-                                    </span>
-                                  ) : col.isNameGroup ? (
-                                    <span className="text-[7px] px-1 py-0.5 bg-green-800/50 text-green-300 rounded">
-                                      ALL{col.itemCount > 0 ? ` · ${col.itemCount}` : ''}
-                                    </span>
-                                  ) : col.isMain ? (
-                                    <span className="text-[7px] px-1 py-0.5 bg-pink-800/50 text-pink-300 rounded">PROMO</span>
-                                  ) : null}
-                                </div>
-                                <p className="text-[11px] font-semibold text-white truncate mb-2" title={col.name}>
-                                  {col.name}
-                                </p>
-                                <div className="grid grid-cols-2 gap-x-2 gap-y-1.5">
-                                  <div>
-                                    <p className="text-[8px] text-gray-500 uppercase">QTY</p>
-                                    <p className="text-xs font-bold text-white">{col.qty}</p>
-                                  </div>
-                                  <div>
-                                    <p className="text-[8px] text-gray-500 uppercase">%Count</p>
-                                    <p className="text-xs font-bold text-amber-400">{col.countPct.toFixed(1)}%</p>
-                                  </div>
-                                  <div>
-                                    <p className="text-[8px] text-gray-500 uppercase">AUV</p>
-                                    <p className="text-xs font-bold text-blue-400">{col.auv.toFixed(2)}</p>
-                                  </div>
-                                  <div>
-                                    <p className="text-[8px] text-gray-500 uppercase">IR</p>
-                                    <p className="text-xs font-bold text-purple-400">{col.ir.toFixed(1)}%</p>
-                                  </div>
-                                </div>
-                                <div className="mt-1.5 pt-1.5 border-t border-gray-700/50">
-                                  <p className="text-[8px] text-gray-500">Sales</p>
-                                  <p className="text-[11px] font-semibold text-green-400">{col.sales.toFixed(2)}</p>
-                                </div>
-                              </div>
-                            ))}
+                      <div>
+                        <p className="text-[10px] text-gray-500 uppercase tracking-wider mb-2">Promotion Tracking</p>
+                        {/* Donut for main totals */}
+                        {mainItems.length > 1 && (
+                          <div className="mb-3">
+                            <CategoryDonut categories={mainItems.map(c => ({ name: c.name, sales: c.sales }))} size={100} />
                           </div>
+                        )}
+                        {/* Grouped containers — one per tracked item */}
+                        <div className="space-y-3">
+                          {promotionData.map((group, gi) => {
+                            const main = group.columns[0]
+                            const variants = group.columns.slice(1)
+                            const borderColor = main.isCategory
+                              ? 'border-orange-700/50' : main.isNameGroup
+                              ? 'border-green-700/50' : 'border-pink-700/50'
+                            const bgColor = main.isCategory
+                              ? 'bg-orange-900/20' : main.isNameGroup
+                              ? 'bg-green-900/20' : 'bg-pink-900/20'
+                            return (
+                              <div key={`group-${gi}`} className={`rounded-xl border ${borderColor} ${bgColor} overflow-hidden`}>
+                                {/* Main total header */}
+                                <div className="p-3 flex items-center justify-between gap-3">
+                                  <div className="min-w-0">
+                                    <div className="flex items-center gap-1.5 mb-1">
+                                      <p className="text-xs font-bold text-white truncate">{main.name}</p>
+                                      {main.isCategory ? (
+                                        <span className="text-[7px] px-1 py-0.5 bg-orange-800/50 text-orange-300 rounded flex-shrink-0">CAT</span>
+                                      ) : main.isNameGroup ? (
+                                        <span className="text-[7px] px-1 py-0.5 bg-green-800/50 text-green-300 rounded flex-shrink-0">ALL</span>
+                                      ) : (
+                                        <span className="text-[7px] px-1 py-0.5 bg-pink-800/50 text-pink-300 rounded flex-shrink-0">PROMO</span>
+                                      )}
+                                    </div>
+                                    {variants.length > 0 && (
+                                      <p className="text-[9px] text-gray-500">{variants.length} variant{variants.length > 1 ? 's' : ''} sold</p>
+                                    )}
+                                  </div>
+                                  <div className="grid grid-cols-4 gap-3 flex-shrink-0 text-center">
+                                    <div>
+                                      <p className="text-[8px] text-gray-500">QTY</p>
+                                      <p className="text-sm font-bold text-white">{main.qty}</p>
+                                    </div>
+                                    <div>
+                                      <p className="text-[8px] text-gray-500">IR</p>
+                                      <p className="text-sm font-bold text-purple-400">{main.ir.toFixed(1)}%</p>
+                                    </div>
+                                    <div>
+                                      <p className="text-[8px] text-gray-500">AUV</p>
+                                      <p className="text-sm font-bold text-blue-400">{main.auv.toFixed(2)}</p>
+                                    </div>
+                                    <div>
+                                      <p className="text-[8px] text-gray-500">Sales</p>
+                                      <p className="text-sm font-bold text-green-400">{main.sales.toFixed(0)}</p>
+                                    </div>
+                                  </div>
+                                </div>
+                                {/* Variant cards — horizontal scroll */}
+                                {variants.length > 0 && (
+                                  <div className="border-t border-gray-700/50 px-3 py-2">
+                                    <div className="flex gap-2 overflow-x-auto pb-1">
+                                      {variants.map((v, vi) => (
+                                        <div key={`v-${gi}-${vi}`} className="flex-shrink-0 min-w-[120px] bg-gray-800/60 rounded-lg p-2 border border-gray-700/50">
+                                          <p className="text-[10px] font-medium text-white truncate mb-1.5" title={v.name}>{v.name}</p>
+                                          <div className="grid grid-cols-2 gap-x-2 gap-y-1">
+                                            <div>
+                                              <p className="text-[7px] text-gray-500">QTY</p>
+                                              <p className="text-[11px] font-bold text-white">{v.qty}</p>
+                                            </div>
+                                            <div>
+                                              <p className="text-[7px] text-gray-500">Sales</p>
+                                              <p className="text-[11px] font-bold text-green-400">{v.sales.toFixed(0)}</p>
+                                            </div>
+                                            <div>
+                                              <p className="text-[7px] text-gray-500">AUV</p>
+                                              <p className="text-[11px] font-bold text-blue-400">{v.auv.toFixed(2)}</p>
+                                            </div>
+                                            <div>
+                                              <p className="text-[7px] text-gray-500">IR</p>
+                                              <p className="text-[11px] font-bold text-purple-400">{v.ir.toFixed(1)}%</p>
+                                            </div>
+                                          </div>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
+                            )
+                          })}
                         </div>
                       </div>
                     )
                   })()}
 
                   {/* Category Breakdown */}
-                  <div className="grid grid-cols-1 gap-4">
+                  <div>
                     <div className="bg-gray-800/50 border border-gray-700 rounded-xl overflow-hidden">
-                      <div className="px-4 py-3 border-b border-gray-700">
+                      <div className="px-3 sm:px-4 py-2.5 border-b border-gray-700">
                         <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Category Breakdown</p>
                       </div>
-                      <div className="p-4">
+                      <div className="p-3 sm:p-4">
                         {branchCategories.length > 0 ? (
                           <>
-                            <div className="hidden sm:block">
-                              <CategoryDonut categories={branchCategories} size={110} />
+                            <div>
+                              <CategoryDonut categories={branchCategories} size={100} />
                             </div>
                             <div className="overflow-x-auto mt-3">
                               <table className="w-full text-[10px]">
@@ -732,7 +857,7 @@ export default function SalesReportsPage() {
                               const ir = branchGC > 0 ? ((qty / branchGC) * 100).toFixed(1) : '0.0'
                               return (
                                 <tr key={i} className="border-b border-gray-800/50">
-                                  <td className="py-1.5 font-medium text-white truncate max-w-[120px]">{item.name}</td>
+                                  <td className="py-1.5 font-medium text-white"><span className="block truncate max-w-[100px] sm:max-w-[200px]">{item.name}</span></td>
                                   <td className="text-right py-1.5 text-gray-400">{qty}</td>
                                   <td className="text-right py-1.5 text-white font-medium">{sales.toFixed(0)}</td>
                                   <td className="text-right py-1.5 text-blue-400 font-medium">{ir}%</td>

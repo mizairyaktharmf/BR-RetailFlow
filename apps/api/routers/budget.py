@@ -714,7 +714,86 @@ async def smart_advisor(
     }
 
 
-# ============== 7. TRACKER OVERVIEW (All branches for a date) ==============
+# ============== 7. BUDGET vs ACTUAL CHART (Daily for a month) ==============
+
+@router.get("/chart/{branch_id}")
+async def budget_chart(
+    branch_id: int,
+    month: str = Query(..., description="YYYY-MM format"),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Returns daily budget + actual sales for chart rendering."""
+    try:
+        year, mon = month.split("-")
+        start = date(int(year), int(mon), 1)
+        if int(mon) == 12:
+            end = date(int(year) + 1, 1, 1)
+        else:
+            end = date(int(year), int(mon) + 1, 1)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid month format. Use YYYY-MM")
+
+    # Get all budgets for the month
+    budgets = db.query(DailyBudget).filter(
+        and_(
+            DailyBudget.branch_id == branch_id,
+            DailyBudget.budget_date >= start,
+            DailyBudget.budget_date < end,
+        )
+    ).order_by(DailyBudget.budget_date).all()
+
+    # Get all sales for the month
+    sales = db.query(DailySales).filter(
+        and_(
+            DailySales.branch_id == branch_id,
+            DailySales.date >= start,
+            DailySales.date < end,
+        )
+    ).all()
+
+    # Group sales by date, keep only the latest window per day
+    window_priority = {"closing": 4, "9pm": 3, "7pm": 2, "3pm": 1}
+    sales_by_date = {}
+    for s in sales:
+        d = str(s.date)
+        w = s.sales_window.value if hasattr(s.sales_window, 'value') else s.sales_window
+        prio = window_priority.get(w, 0)
+        if d not in sales_by_date or prio > sales_by_date[d][0]:
+            sales_by_date[d] = (prio, s)
+
+    b_map = {str(b.budget_date): b for b in budgets}
+
+    days = []
+    num_days = calendar.monthrange(int(year), int(mon))[1]
+    for day_num in range(1, num_days + 1):
+        d = date(int(year), int(mon), day_num)
+        ds = str(d)
+        bud = b_map.get(ds)
+        sal_entry = sales_by_date.get(ds)
+        sal = sal_entry[1] if sal_entry else None
+
+        actual_net = 0
+        if sal:
+            actual_net = (
+                (sal.total_sales or 0) +
+                (getattr(sal, 'hd_net_sales', 0) or 0) +
+                (getattr(sal, 'deliveroo_net_sales', 0) or 0) +
+                (getattr(sal, 'cm_net_sales', 0) or 0)
+            )
+
+        days.append({
+            "date": ds,
+            "day": day_num,
+            "budget": bud.budget_amount if bud else 0,
+            "actual": round(actual_net, 2),
+            "ly_sales": bud.ly_sales if bud else 0,
+        })
+
+    return {"branch_id": branch_id, "month": month, "days": days}
+
+
+# ============== 8. TRACKER OVERVIEW (All branches for a date) ==============
 
 @router.get("/tracker-overview")
 async def tracker_overview(

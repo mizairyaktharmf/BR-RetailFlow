@@ -457,6 +457,10 @@ class ApiService {
     return this.request(`/budget/tracker-overview?date=${date}`)
   }
 
+  async getBudgetChart(branchId, month) {
+    return this.request(`/budget/chart/${branchId}?month=${month}`)
+  }
+
   // ============ TRACKED PROMOTION ITEMS ============
   async getTrackedItems(branchId) {
     return this.request(`/sales/tracked-items?branch_id=${branchId}`)
