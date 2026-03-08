@@ -56,6 +56,9 @@ def _build_sales_response(s) -> DailySalesResponse:
         deliveroo_net_sales=getattr(s, 'deliveroo_net_sales', None),
         deliveroo_orders=getattr(s, 'deliveroo_orders', None),
         deliveroo_photo_url=getattr(s, 'deliveroo_photo_url', None),
+        cm_gross_sales=getattr(s, 'cm_gross_sales', None),
+        cm_net_sales=getattr(s, 'cm_net_sales', None),
+        cm_orders=getattr(s, 'cm_orders', None),
         submitted_by_id=s.submitted_by_id,
         created_at=s.created_at,
     )
@@ -125,6 +128,10 @@ async def submit_daily_sales(
         _set(existing, 'deliveroo_orders', data.deliveroo_orders or 0)
         if data.deliveroo_photo_url:
             _set(existing, 'deliveroo_photo_url', data.deliveroo_photo_url)
+        # Cool Mood
+        _set(existing, 'cm_gross_sales', data.cm_gross_sales or 0)
+        _set(existing, 'cm_net_sales', data.cm_net_sales or 0)
+        _set(existing, 'cm_orders', data.cm_orders or 0)
         db.commit()
         db.refresh(existing)
 
@@ -160,6 +167,9 @@ async def submit_daily_sales(
     _set(sales_entry, 'deliveroo_net_sales', data.deliveroo_net_sales or 0)
     _set(sales_entry, 'deliveroo_orders', data.deliveroo_orders or 0)
     _set(sales_entry, 'deliveroo_photo_url', data.deliveroo_photo_url)
+    _set(sales_entry, 'cm_gross_sales', data.cm_gross_sales or 0)
+    _set(sales_entry, 'cm_net_sales', data.cm_net_sales or 0)
+    _set(sales_entry, 'cm_orders', data.cm_orders or 0)
 
     db.add(sales_entry)
     db.commit()
