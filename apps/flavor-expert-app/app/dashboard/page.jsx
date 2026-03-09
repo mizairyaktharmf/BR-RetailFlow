@@ -15,7 +15,7 @@ import {
   ClipboardList,
   AlertCircle,
   Cake,
-  PackagePlus
+  Bell
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -122,20 +122,20 @@ export default function DashboardPage() {
       badge: cakeAlerts.length > 0 ? { count: cakeAlerts.length, type: 'danger' } : null,
       items: [
         {
-          title: 'Cake Stock',
-          description: 'View current stock & record sales',
+          title: 'Cake',
+          description: 'Stock, sell & receive cakes',
           icon: Cake,
           href: '/cake/stock',
           iconBg: 'bg-orange-100',
           iconColor: 'text-orange-600',
         },
         {
-          title: 'Receive Cakes',
-          description: 'Log cake deliveries from warehouse',
-          icon: PackagePlus,
-          href: '/cake/receive',
-          iconBg: 'bg-emerald-100',
-          iconColor: 'text-emerald-600',
+          title: 'Alerts',
+          description: 'Set low stock alert thresholds',
+          icon: Bell,
+          href: '/cake/alerts',
+          iconBg: 'bg-red-100',
+          iconColor: 'text-red-600',
         },
       ],
     },
@@ -190,14 +190,29 @@ export default function DashboardPage() {
                 <p className="text-pink-100 text-sm">{user.full_name}</p>
               </div>
             </div>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="text-white hover:bg-white/20"
-              onClick={handleLogout}
-            >
-              <LogOut className="w-5 h-5" />
-            </Button>
+            <div className="flex items-center gap-1">
+              <Button
+                variant="ghost"
+                size="icon"
+                className="text-white hover:bg-white/20 relative"
+                onClick={() => router.push('/cake/stock')}
+              >
+                <Bell className="w-5 h-5" />
+                {cakeAlerts.length > 0 && (
+                  <span className="absolute -top-0.5 -right-0.5 w-5 h-5 rounded-full bg-red-500 text-white text-[10px] font-bold flex items-center justify-center">
+                    {cakeAlerts.length}
+                  </span>
+                )}
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="text-white hover:bg-white/20"
+                onClick={handleLogout}
+              >
+                <LogOut className="w-5 h-5" />
+              </Button>
+            </div>
           </div>
 
           {/* Branch Info */}
@@ -394,10 +409,10 @@ export default function DashboardPage() {
             <span className="text-xs mt-1">Sales</span>
           </button>
           <button
-            onClick={() => router.push('/cake/stock')}
+            onClick={() => router.push('/cake/alerts')}
             className="flex flex-col items-center p-2 text-gray-400 hover:text-pink-500 relative"
           >
-            <Cake className="w-5 h-5" />
+            <Bell className="w-5 h-5" />
             <span className="text-xs mt-1">Cake Alerts</span>
             {cakeAlerts.length > 0 && (
               <span className="absolute top-1 right-1/4 w-4 h-4 rounded-full bg-red-500 text-white text-[9px] font-bold flex items-center justify-center">

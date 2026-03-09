@@ -6,17 +6,14 @@ import {
   ArrowLeft,
   Cake,
   Minus,
+  Plus,
   Search,
   Loader2,
   CheckCircle2,
-  Info,
   AlertTriangle,
   Package,
   ShoppingCart,
-  Bell,
-  ChevronDown,
-  ChevronUp,
-  Save
+  PackagePlus
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -32,21 +29,21 @@ export default function CakeStockPage() {
   const [stock, setStock] = useState([])
   const [loading, setLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState('')
-  const [sellingItemId, setSellingItemId] = useState(null)
-  const [sellQuantity, setSellQuantity] = useState(1)
   const [submitting, setSubmitting] = useState(false)
   const [successMessage, setSuccessMessage] = useState('')
   const [needsInit, setNeedsInit] = useState(false)
 
+  // Sell state
+  const [sellingItemId, setSellingItemId] = useState(null)
+  const [sellQuantity, setSellQuantity] = useState(1)
+
+  // Receive state
+  const [receivingItemId, setReceivingItemId] = useState(null)
+  const [receiveQuantity, setReceiveQuantity] = useState(1)
+
   // Init stock state
   const [initQuantities, setInitQuantities] = useState({})
   const [initSubmitting, setInitSubmitting] = useState(false)
-
-  // Alert settings state
-  const [showAlertSettings, setShowAlertSettings] = useState(false)
-  const [alertConfigs, setAlertConfigs] = useState({})
-  const [alertSaving, setAlertSaving] = useState(false)
-  const [alertSaved, setAlertSaved] = useState(false)
 
   useEffect(() => {
     const userData = localStorage.getItem('br_user')
@@ -64,20 +61,14 @@ export default function CakeStockPage() {
     try {
       const data = await api.getCakeStock(branchId)
       if (data && data.length > 0) {
-        // Check if any product has stock initialized (quantity > 0 or has been updated)
         const hasAnyStock = data.some(s => s.current_quantity > 0 || s.last_updated_at)
         setStock(data)
         setNeedsInit(!hasAnyStock)
-
         if (!hasAnyStock) {
-          // Pre-fill init quantities with 0
           const initQty = {}
           data.forEach(item => { initQty[item.cake_product_id] = '' })
           setInitQuantities(initQty)
         }
-
-        // Load alert configs
-        loadAlertConfigs(branchId, data)
       } else {
         setStock([])
         setNeedsInit(true)
@@ -88,34 +79,6 @@ export default function CakeStockPage() {
       setNeedsInit(true)
     } finally {
       setLoading(false)
-    }
-  }
-
-  const loadAlertConfigs = async (branchId, stockData) => {
-    try {
-      const configs = await api.getCakeAlertConfigs(branchId).catch(() => [])
-      const configMap = {}
-      // Default from stock data thresholds
-      stockData.forEach(item => {
-        configMap[item.cake_product_id] = {
-          cake_product_id: item.cake_product_id,
-          threshold: item.alert_threshold || 3,
-          enabled: true,
-        }
-      })
-      // Override with saved configs
-      if (configs && configs.length > 0) {
-        configs.forEach(c => {
-          configMap[c.cake_product_id] = {
-            cake_product_id: c.cake_product_id,
-            threshold: c.threshold !== undefined ? c.threshold : 3,
-            enabled: c.is_enabled !== undefined ? c.is_enabled : true,
-          }
-        })
-      }
-      setAlertConfigs(configMap)
-    } catch (error) {
-      console.error('Error loading alert configs:', error)
     }
   }
 
@@ -137,11 +100,7 @@ export default function CakeStockPage() {
         return
       }
 
-      await api.initCakeStock({
-        branch_id: user.branch_id,
-        items,
-      })
-
+      await api.initCakeStock({ branch_id: user.branch_id, items })
       setSuccessMessage('Initial stock saved successfully!')
       setTimeout(() => setSuccessMessage(''), 3000)
       setNeedsInit(false)
@@ -154,7 +113,7 @@ export default function CakeStockPage() {
     }
   }
 
-  // ---- Sell ----
+  // ---- Quantity colors ----
   const getQuantityColor = (quantity, threshold) => {
     if (quantity <= 0) return 'bg-red-500 text-white'
     if (quantity <= threshold) return 'bg-red-500 text-white'
@@ -167,7 +126,9 @@ export default function CakeStockPage() {
     return 'bg-gray-50'
   }
 
+  // ---- Sell ----
   const handleSellClick = (itemId) => {
+    setReceivingItemId(null)
     if (sellingItemId === itemId) {
       setSellingItemId(null)
       setSellQuantity(1)
@@ -194,7 +155,7 @@ export default function CakeStockPage() {
       }))
       setSellingItemId(null)
       setSellQuantity(1)
-      setSuccessMessage(`Sold ${sellQuantity}x ${item.cake_name} successfully!`)
+      setSuccessMessage(`Sold ${sellQuantity}x ${item.cake_name}`)
       setTimeout(() => setSuccessMessage(''), 3000)
     } catch (error) {
       console.error('Error recording sale:', error)
@@ -204,44 +165,42 @@ export default function CakeStockPage() {
     }
   }
 
-  // ---- Alert Settings ----
-  const handleThresholdChange = (productId, value) => {
-    const numValue = value.replace(/[^0-9]/g, '')
-    setAlertConfigs(prev => ({
-      ...prev,
-      [productId]: { ...prev[productId], threshold: numValue === '' ? '' : parseInt(numValue) }
-    }))
-    setAlertSaved(false)
+  // ---- Receive ----
+  const handleReceiveClick = (itemId) => {
+    setSellingItemId(null)
+    if (receivingItemId === itemId) {
+      setReceivingItemId(null)
+      setReceiveQuantity(1)
+    } else {
+      setReceivingItemId(itemId)
+      setReceiveQuantity(1)
+    }
   }
 
-  const handleToggleAlert = (productId) => {
-    setAlertConfigs(prev => ({
-      ...prev,
-      [productId]: { ...prev[productId], enabled: !prev[productId]?.enabled }
-    }))
-    setAlertSaved(false)
-  }
-
-  const handleSaveAlerts = async () => {
-    setAlertSaving(true)
+  const handleConfirmReceive = async (item) => {
+    if (receiveQuantity <= 0) return
+    setSubmitting(true)
+    setSuccessMessage('')
     try {
-      const configsList = Object.values(alertConfigs).map(c => ({
-        cake_product_id: c.cake_product_id,
-        threshold: parseInt(c.threshold) || 3,
-        is_enabled: c.enabled,
-      }))
-      await api.updateCakeAlertConfigBulk({
+      await api.receiveCakes({
         branch_id: user.branch_id,
-        configs: configsList,
+        items: [{ cake_product_id: item.cake_product_id, quantity: receiveQuantity }]
       })
-      setAlertSaved(true)
-      setSuccessMessage('Alert settings saved!')
-      setTimeout(() => { setSuccessMessage(''); setAlertSaved(false) }, 3000)
+      setStock(prev => prev.map(s => {
+        if (s.cake_product_id === item.cake_product_id) {
+          return { ...s, current_quantity: s.current_quantity + receiveQuantity }
+        }
+        return s
+      }))
+      setReceivingItemId(null)
+      setReceiveQuantity(1)
+      setSuccessMessage(`Received ${receiveQuantity}x ${item.cake_name}`)
+      setTimeout(() => setSuccessMessage(''), 3000)
     } catch (error) {
-      console.error('Error saving alerts:', error)
-      alert('Failed to save alert settings.')
+      console.error('Error receiving cake:', error)
+      alert('Failed to record receipt. Please try again.')
     } finally {
-      setAlertSaving(false)
+      setSubmitting(false)
     }
   }
 
@@ -272,9 +231,9 @@ export default function CakeStockPage() {
             <div>
               <h1 className="font-bold text-lg flex items-center gap-2">
                 <Cake className="w-5 h-5" />
-                Cake Stock
+                Cake
               </h1>
-              <p className="text-orange-100 text-sm">{formatDate(new Date())}</p>
+              <p className="text-orange-100 text-sm">Stock, sell & receive — {formatDate(new Date())}</p>
             </div>
           </div>
         </div>
@@ -285,8 +244,7 @@ export default function CakeStockPage() {
         <div className="px-4 py-3">
           <Alert variant="success" className="bg-green-50 border-green-200">
             <CheckCircle2 className="h-4 w-4 text-green-600" />
-            <AlertTitle className="text-green-800">Success</AlertTitle>
-            <AlertDescription className="text-green-700">{successMessage}</AlertDescription>
+            <AlertDescription className="text-green-700 font-medium">{successMessage}</AlertDescription>
           </Alert>
         </div>
       )}
@@ -418,7 +376,8 @@ export default function CakeStockPage() {
                   <div className="space-y-3">
                     {filteredStock.map(item => {
                       const threshold = item.alert_threshold || 3
-                      const isExpanded = sellingItemId === item.cake_product_id
+                      const isSelling = sellingItemId === item.cake_product_id
+                      const isReceiving = receivingItemId === item.cake_product_id
 
                       return (
                         <div
@@ -426,39 +385,48 @@ export default function CakeStockPage() {
                           className={`rounded-lg overflow-hidden ${getRowBackground(item.current_quantity, threshold)}`}
                         >
                           <div className="flex items-center justify-between p-3">
-                            <div className="flex items-center gap-3">
-                              <div className="w-10 h-10 rounded-full bg-orange-100 flex items-center justify-center">
+                            <div className="flex items-center gap-3 flex-1 min-w-0">
+                              <div className="w-10 h-10 rounded-full bg-orange-100 flex items-center justify-center flex-shrink-0">
                                 <Cake className="w-5 h-5 text-orange-500" />
                               </div>
-                              <div>
-                                <p className="font-medium text-gray-900">{item.cake_name}</p>
-                                <p className="text-xs text-gray-500">{item.cake_code}</p>
+                              <div className="min-w-0">
+                                <p className="font-medium text-gray-900 text-sm truncate">{item.cake_name}</p>
+                                <p className="text-[10px] text-gray-500">{item.cake_code}</p>
                               </div>
                             </div>
                             <div className="flex items-center gap-2">
-                              <span className={`px-3 py-1 rounded-full text-sm font-medium ${getQuantityColor(item.current_quantity, threshold)}`}>
+                              <span className={`px-3 py-1 rounded-full text-sm font-bold ${getQuantityColor(item.current_quantity, threshold)}`}>
                                 {item.current_quantity}
                               </span>
                               <Button
                                 variant="outline"
-                                size="sm"
-                                className="text-orange-600 border-orange-300 hover:bg-orange-50"
+                                size="icon"
+                                className="w-9 h-9 text-red-600 border-red-300 hover:bg-red-50"
                                 onClick={() => handleSellClick(item.cake_product_id)}
                                 disabled={item.current_quantity <= 0}
                               >
-                                <Minus className="w-4 h-4 mr-1" />
-                                Sell
+                                <Minus className="w-4 h-4" />
+                              </Button>
+                              <Button
+                                variant="outline"
+                                size="icon"
+                                className="w-9 h-9 text-green-600 border-green-300 hover:bg-green-50"
+                                onClick={() => handleReceiveClick(item.cake_product_id)}
+                              >
+                                <Plus className="w-4 h-4" />
                               </Button>
                             </div>
                           </div>
 
                           {/* Expanded Sell Controls */}
-                          {isExpanded && (
+                          {isSelling && (
                             <div className="px-3 pb-3">
                               <Separator className="mb-3" />
+                              <p className="text-xs text-red-600 font-medium mb-2 flex items-center gap-1">
+                                <ShoppingCart className="w-3 h-3" /> Record Sale
+                              </p>
                               <div className="flex items-center gap-3">
-                                <span className="text-sm text-gray-600">Qty:</span>
-                                <div className="flex items-center gap-2">
+                                <div className="flex items-center gap-1.5">
                                   {[1, 2, 3, 4, 5].map(qty => (
                                     <button
                                       key={qty}
@@ -466,10 +434,10 @@ export default function CakeStockPage() {
                                       disabled={qty > item.current_quantity}
                                       className={`w-9 h-9 rounded-lg text-sm font-medium transition-colors ${
                                         sellQuantity === qty
-                                          ? 'bg-orange-500 text-white'
+                                          ? 'bg-red-500 text-white'
                                           : qty > item.current_quantity
                                             ? 'bg-gray-100 text-gray-300 cursor-not-allowed'
-                                            : 'bg-gray-100 text-gray-700 hover:bg-orange-100'
+                                            : 'bg-gray-100 text-gray-700 hover:bg-red-100'
                                       }`}
                                     >
                                       {qty}
@@ -478,14 +446,53 @@ export default function CakeStockPage() {
                                 </div>
                                 <Button
                                   size="sm"
-                                  className="ml-auto bg-orange-500 hover:bg-orange-600"
+                                  className="ml-auto bg-red-500 hover:bg-red-600"
                                   onClick={() => handleConfirmSale(item)}
                                   disabled={submitting || sellQuantity > item.current_quantity}
                                 >
                                   {submitting ? (
                                     <Loader2 className="w-4 h-4 animate-spin" />
                                   ) : (
-                                    <><ShoppingCart className="w-4 h-4 mr-1" /> Confirm</>
+                                    <><Minus className="w-3 h-3 mr-1" /> Sell</>
+                                  )}
+                                </Button>
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Expanded Receive Controls */}
+                          {isReceiving && (
+                            <div className="px-3 pb-3">
+                              <Separator className="mb-3" />
+                              <p className="text-xs text-green-600 font-medium mb-2 flex items-center gap-1">
+                                <PackagePlus className="w-3 h-3" /> Receive Stock
+                              </p>
+                              <div className="flex items-center gap-3">
+                                <div className="flex items-center gap-1.5">
+                                  {[1, 2, 3, 5, 10].map(qty => (
+                                    <button
+                                      key={qty}
+                                      onClick={() => setReceiveQuantity(qty)}
+                                      className={`w-9 h-9 rounded-lg text-sm font-medium transition-colors ${
+                                        receiveQuantity === qty
+                                          ? 'bg-green-500 text-white'
+                                          : 'bg-gray-100 text-gray-700 hover:bg-green-100'
+                                      }`}
+                                    >
+                                      {qty}
+                                    </button>
+                                  ))}
+                                </div>
+                                <Button
+                                  size="sm"
+                                  className="ml-auto bg-green-500 hover:bg-green-600"
+                                  onClick={() => handleConfirmReceive(item)}
+                                  disabled={submitting}
+                                >
+                                  {submitting ? (
+                                    <Loader2 className="w-4 h-4 animate-spin" />
+                                  ) : (
+                                    <><Plus className="w-3 h-3 mr-1" /> Receive</>
                                   )}
                                 </Button>
                               </div>
@@ -497,81 +504,6 @@ export default function CakeStockPage() {
                   </div>
                 )}
               </CardContent>
-            </Card>
-
-            {/* ====== ALERT SETTINGS (collapsible) ====== */}
-            <Card className="mt-4">
-              <button
-                onClick={() => setShowAlertSettings(!showAlertSettings)}
-                className="w-full px-4 py-3 flex items-center justify-between"
-              >
-                <span className="flex items-center gap-2 font-medium text-sm text-gray-900">
-                  <Bell className="w-4 h-4 text-red-500" />
-                  Alert Settings
-                </span>
-                {showAlertSettings
-                  ? <ChevronUp className="w-4 h-4 text-gray-400" />
-                  : <ChevronDown className="w-4 h-4 text-gray-400" />
-                }
-              </button>
-
-              {showAlertSettings && (
-                <CardContent className="pt-0">
-                  <Separator className="mb-3" />
-                  <p className="text-xs text-gray-500 mb-3">
-                    Set the minimum stock threshold for each cake. You'll be alerted when stock falls below.
-                  </p>
-
-                  <div className="space-y-2">
-                    {stock.map(item => {
-                      const config = alertConfigs[item.cake_product_id] || { threshold: 3, enabled: true }
-                      return (
-                        <div key={item.cake_product_id} className="flex items-center justify-between p-2 bg-gray-50 rounded-lg">
-                          <div className="flex items-center gap-2 flex-1 min-w-0">
-                            <Cake className="w-4 h-4 text-orange-400 flex-shrink-0" />
-                            <p className="text-sm text-gray-800 truncate">{item.cake_name}</p>
-                          </div>
-                          <div className="flex items-center gap-2 flex-shrink-0">
-                            <Input
-                              type="number"
-                              inputMode="numeric"
-                              min="0"
-                              max="999"
-                              placeholder="3"
-                              value={config.threshold}
-                              onChange={(e) => handleThresholdChange(item.cake_product_id, e.target.value)}
-                              className="w-14 text-center h-8 text-sm"
-                            />
-                            <button
-                              onClick={() => handleToggleAlert(item.cake_product_id)}
-                              className={`relative inline-flex h-6 w-10 items-center rounded-full transition-colors ${
-                                config.enabled ? 'bg-red-500' : 'bg-gray-300'
-                              }`}
-                            >
-                              <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                                config.enabled ? 'translate-x-5' : 'translate-x-1'
-                              }`} />
-                            </button>
-                          </div>
-                        </div>
-                      )
-                    })}
-                  </div>
-
-                  <Button
-                    onClick={handleSaveAlerts}
-                    disabled={alertSaving}
-                    className="w-full mt-3 bg-red-500 hover:bg-red-600"
-                    size="sm"
-                  >
-                    {alertSaving ? (
-                      <><Loader2 className="w-4 h-4 mr-1 animate-spin" /> Saving...</>
-                    ) : (
-                      <><Save className="w-4 h-4 mr-1" /> Save Alert Settings</>
-                    )}
-                  </Button>
-                </CardContent>
-              )}
             </Card>
 
             {/* Stock Level Guide */}

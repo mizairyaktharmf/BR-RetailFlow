@@ -19,7 +19,8 @@ import {
   IceCream,
   BarChart3,
   Target,
-  Tag
+  Tag,
+  Bell
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 
@@ -34,6 +35,7 @@ const navigation = [
   { name: 'Promotions', href: '/dashboard/promotions', icon: Tag, roles: ['supreme_admin', 'super_admin', 'admin'] },
   { name: 'Ice Cream Flavors', href: '/dashboard/flavors', icon: IceCream, roles: ['supreme_admin'] },
   { name: 'Cake Products', href: '/dashboard/cake-products', icon: Cake, roles: ['supreme_admin'] },
+  { name: 'Cake Alerts', href: '/dashboard/cake-alerts', icon: Bell, roles: ['supreme_admin', 'super_admin', 'admin'] },
 ]
 
 const roleLabels = {

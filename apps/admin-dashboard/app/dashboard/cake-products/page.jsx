@@ -29,7 +29,7 @@ export default function CakeProductsPage() {
   const [selectedProduct, setSelectedProduct] = useState(null)
   const [loading, setLoading] = useState(false)
   const [pageLoading, setPageLoading] = useState(true)
-  const [formData, setFormData] = useState({ name: '', code: '', category: '', default_alert_threshold: 2 })
+  const [formData, setFormData] = useState({ name: '', code: '', category: '' })
   const [error, setError] = useState('')
 
   useEffect(() => {
@@ -68,8 +68,8 @@ export default function CakeProductsPage() {
   const handleOpenModal = (product = null) => {
     setSelectedProduct(product)
     setFormData(product
-      ? { name: product.name, code: product.code, category: product.category || '', default_alert_threshold: product.default_alert_threshold || 2 }
-      : { name: '', code: '', category: '', default_alert_threshold: 2 }
+      ? { name: product.name, code: product.code, category: product.category || '' }
+      : { name: '', code: '', category: '' }
     )
     setError('')
     setIsModalOpen(true)
@@ -78,7 +78,7 @@ export default function CakeProductsPage() {
   const handleCloseModal = () => {
     setIsModalOpen(false)
     setSelectedProduct(null)
-    setFormData({ name: '', code: '', category: '', default_alert_threshold: 2 })
+    setFormData({ name: '', code: '', category: '' })
     setError('')
   }
 
@@ -98,7 +98,6 @@ export default function CakeProductsPage() {
         name: formData.name,
         code: formData.code.toUpperCase(),
         category: formData.category || null,
-        default_alert_threshold: parseInt(formData.default_alert_threshold) || 2,
       }
 
       if (selectedProduct) {
@@ -198,14 +197,13 @@ export default function CakeProductsPage() {
                     <th className="text-left p-4 text-xs font-medium text-slate-400 uppercase">Product</th>
                     <th className="text-left p-4 text-xs font-medium text-slate-400 uppercase">Code</th>
                     <th className="text-left p-4 text-xs font-medium text-slate-400 uppercase hidden sm:table-cell">Category</th>
-                    <th className="text-center p-4 text-xs font-medium text-slate-400 uppercase hidden sm:table-cell">Alert Threshold</th>
                     <th className="text-right p-4 text-xs font-medium text-slate-400 uppercase">Actions</th>
                   </tr>
                 </thead>
                 <tbody>
                   {filteredProducts.length === 0 ? (
                     <tr>
-                      <td colSpan="5" className="text-center py-12">
+                      <td colSpan="4" className="text-center py-12">
                         <Cake className="w-12 h-12 mx-auto text-slate-600 mb-4" />
                         <p className="text-slate-400">
                           {searchTerm ? 'No cake products match your search' : 'No cake products added yet'}
@@ -228,11 +226,6 @@ export default function CakeProductsPage() {
                         </td>
                         <td className="p-4 hidden sm:table-cell">
                           <span className="text-slate-400 text-sm">{product.category || '—'}</span>
-                        </td>
-                        <td className="p-4 text-center hidden sm:table-cell">
-                          <span className="px-2 py-1 rounded bg-amber-500/20 text-amber-300 text-xs font-medium">
-                            {product.default_alert_threshold || 2}
-                          </span>
                         </td>
                         <td className="p-4">
                           <div className="flex justify-end gap-1">
@@ -314,21 +307,6 @@ export default function CakeProductsPage() {
                   onChange={(e) => setFormData({ ...formData, category: e.target.value })}
                   className="bg-slate-700/50 border-slate-600 text-white placeholder:text-slate-500"
                 />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="threshold" className="text-slate-300">Low Stock Alert Threshold</Label>
-                <Input
-                  id="threshold"
-                  type="number"
-                  min="0"
-                  max="100"
-                  placeholder="2"
-                  value={formData.default_alert_threshold}
-                  onChange={(e) => setFormData({ ...formData, default_alert_threshold: e.target.value })}
-                  className="bg-slate-700/50 border-slate-600 text-white placeholder:text-slate-500"
-                />
-                <p className="text-[11px] text-slate-500">Alert when stock falls at or below this number</p>
               </div>
 
               <div className="flex gap-3 pt-2">
