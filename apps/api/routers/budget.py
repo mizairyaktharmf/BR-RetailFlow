@@ -786,8 +786,10 @@ async def budget_chart(
             "date": ds,
             "day": day_num,
             "budget": bud.budget_amount if bud else 0,
+            "budget_gc": bud.budget_gc if bud else 0,
             "actual": round(actual_net, 2),
             "ly_sales": bud.ly_sales if bud else 0,
+            "ly_gc": bud.ly_gc if bud else 0,
         })
 
     return {"branch_id": branch_id, "month": month, "days": days}

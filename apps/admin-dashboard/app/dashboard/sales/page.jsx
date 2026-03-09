@@ -300,6 +300,17 @@ export default function SalesReportsPage() {
   const totalGross = posGross + hdGross + delGross + cmGross
   const totalGC = branchGC + hdOrders + delOrders + cmOrders
 
+  // Day budget & LY data from budget chart
+  const dayBudgetData = useMemo(() => {
+    if (!budgetChart?.days) return null
+    return budgetChart.days.find(d => d.date === selectedDate) || null
+  }, [budgetChart, selectedDate])
+  const dayBudget = dayBudgetData?.budget || 0
+  const dayLySales = dayBudgetData?.ly_sales || 0
+  const dayLyGC = dayBudgetData?.ly_gc || 0
+  const dayBudgetGC = dayBudgetData?.budget_gc || 0
+  const achievement = dayBudget > 0 ? (totalNet / dayBudget * 100) : 0
+
   const branchCategories = useMemo(() => {
     if (!activeRecord?.category_data) return []
     try {
@@ -649,7 +660,7 @@ export default function SalesReportsPage() {
                   )}
 
                   {/* Summary Cards — 2-col mobile, 4-col tablet, 6-col desktop */}
-                  <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 sm:gap-2">
+                  <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2 sm:gap-2">
                     <div className="bg-green-900/20 border border-green-800/40 rounded-xl p-3 sm:p-3">
                       <p className="text-[9px] sm:text-[10px] text-green-400 font-medium">Total Net</p>
                       <p className="text-lg sm:text-sm md:text-base font-bold text-white mt-0.5">{totalNet.toLocaleString(undefined, { maximumFractionDigits: 0 })}</p>
@@ -670,6 +681,32 @@ export default function SalesReportsPage() {
                       <p className="text-[9px] text-gray-500 mt-0.5">Cash GC: {branchCashGC}</p>
                     </div>
                   </div>
+
+                  {/* Budget & LY Cards */}
+                  {dayBudget > 0 && (
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-2">
+                      <div className="bg-purple-900/20 border border-purple-800/40 rounded-xl p-3">
+                        <p className="text-[9px] sm:text-[10px] text-purple-400 font-medium">Day Budget</p>
+                        <p className="text-lg sm:text-sm md:text-base font-bold text-white mt-0.5">{dayBudget.toLocaleString(undefined, { maximumFractionDigits: 0 })}</p>
+                        <p className="text-[9px] text-gray-500 mt-0.5">GC: {dayBudgetGC}</p>
+                      </div>
+                      <div className={`rounded-xl p-3 border ${achievement >= 100 ? 'bg-green-900/20 border-green-800/40' : achievement >= 80 ? 'bg-yellow-900/20 border-yellow-800/40' : 'bg-red-900/20 border-red-800/40'}`}>
+                        <p className={`text-[9px] sm:text-[10px] font-medium ${achievement >= 100 ? 'text-green-400' : achievement >= 80 ? 'text-yellow-400' : 'text-red-400'}`}>Achievement</p>
+                        <p className="text-lg sm:text-sm md:text-base font-bold text-white mt-0.5">{achievement.toFixed(1)}%</p>
+                        <p className="text-[9px] text-gray-500 mt-0.5">Gap: {(totalNet - dayBudget).toLocaleString(undefined, { maximumFractionDigits: 0 })}</p>
+                      </div>
+                      <div className="bg-indigo-900/20 border border-indigo-800/40 rounded-xl p-3">
+                        <p className="text-[9px] sm:text-[10px] text-indigo-400 font-medium">LY Sales</p>
+                        <p className="text-lg sm:text-sm md:text-base font-bold text-white mt-0.5">{dayLySales.toLocaleString(undefined, { maximumFractionDigits: 0 })}</p>
+                        <p className="text-[9px] text-gray-500 mt-0.5">vs Today: {totalNet > 0 && dayLySales > 0 ? ((totalNet / dayLySales * 100) - 100).toFixed(1) + '%' : '—'}</p>
+                      </div>
+                      <div className="bg-teal-900/20 border border-teal-800/40 rounded-xl p-3">
+                        <p className="text-[9px] sm:text-[10px] text-teal-400 font-medium">LY GC</p>
+                        <p className="text-lg sm:text-sm md:text-base font-bold text-white mt-0.5">{dayLyGC}</p>
+                        <p className="text-[9px] text-gray-500 mt-0.5">vs Today: {totalGC > 0 && dayLyGC > 0 ? ((totalGC / dayLyGC * 100) - 100).toFixed(1) + '%' : '—'}</p>
+                      </div>
+                    </div>
+                  )}
 
                   {/* Sales Channels — 2-col grid like flavor expert */}
                   <div className="grid grid-cols-2 gap-2">

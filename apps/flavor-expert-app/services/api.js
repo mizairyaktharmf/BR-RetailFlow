@@ -219,6 +219,10 @@ class ApiService {
     return this.request(`/sales/budget?branch_id=${branchId}&year=${year}&month=${month}`)
   }
 
+  async getBudgetChart(branchId, month) {
+    return this.request(`/budget/chart/${branchId}?month=${month}`)
+  }
+
   async getSmartAdvisor(branchId, date) {
     return this.request(`/budget/advisor/${branchId}?date=${date}`)
   }

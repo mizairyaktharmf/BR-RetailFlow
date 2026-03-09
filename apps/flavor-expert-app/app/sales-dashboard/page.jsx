@@ -77,6 +77,7 @@ export default function SalesDashboardPage() {
   const [activeTab, setActiveTab] = useState('sales') // 'sales' | 'advisor'
   const [advisorData, setAdvisorData] = useState(null)
   const [advisorLoading, setAdvisorLoading] = useState(false)
+  const [budgetChart, setBudgetChart] = useState(null)
 
   useEffect(() => {
     const userData = localStorage.getItem('br_user')
@@ -108,6 +109,8 @@ export default function SalesDashboardPage() {
           const d = new Date(selectedDate)
           const b = await api.getBranchBudget(branch.id, d.getFullYear(), d.getMonth() + 1)
           if (b) setBudget(b)
+          const chart = await api.getBudgetChart(branch.id, selectedDate.substring(0, 7))
+          if (chart) setBudgetChart(chart)
         } catch {}
       }
     } catch {} finally { setLoading(false) }
@@ -344,7 +347,14 @@ export default function SalesDashboardPage() {
 
   // Budget
   const daysInMonth = budget ? new Date(budget.year, budget.month, 0).getDate() : 30
-  const dailyBudget = budget ? budget.target_sales / daysInMonth : 0
+  const dayBudgetData = useMemo(() => {
+    if (!budgetChart?.days) return null
+    return budgetChart.days.find(d => d.date === selectedDate) || null
+  }, [budgetChart, selectedDate])
+  const dailyBudget = dayBudgetData?.budget || (budget ? budget.target_sales / daysInMonth : 0)
+  const dayLySales = dayBudgetData?.ly_sales || 0
+  const dayLyGC = dayBudgetData?.ly_gc || 0
+  const dayBudgetGC = dayBudgetData?.budget_gc || 0
   const achievement = dailyBudget > 0 ? totalNet / dailyBudget * 100 : 0
 
   if (!user) return <div className="min-h-screen flex items-center justify-center bg-gray-50"><Loader2 className="w-8 h-8 animate-spin text-green-500" /></div>
@@ -525,6 +535,44 @@ export default function SalesDashboardPage() {
                 </CardContent>
               </Card>
             </div>
+
+            {/* ===== BUDGET & LY DATA ===== */}
+            {dailyBudget > 0 && (
+              <div className="grid grid-cols-2 gap-3">
+                <Card className="bg-gradient-to-br from-purple-50 to-white border-purple-200">
+                  <CardContent className="p-4">
+                    <div className="flex items-center gap-2 text-purple-600 mb-2"><Target className="w-4 h-4" /><span className="text-xs font-medium">Day Budget</span></div>
+                    <p className="text-2xl font-bold text-gray-900">{dailyBudget.toFixed(0)}</p>
+                    <p className="text-[10px] text-gray-400 mt-0.5">GC: {dayBudgetGC}</p>
+                  </CardContent>
+                </Card>
+                <Card className={`bg-gradient-to-br ${achievement >= 100 ? 'from-green-50 border-green-200' : achievement >= 80 ? 'from-amber-50 border-amber-200' : 'from-red-50 border-red-200'} to-white`}>
+                  <CardContent className="p-4">
+                    <div className="flex items-center gap-2 mb-2"><TrendingUp className={`w-4 h-4 ${achievement >= 100 ? 'text-green-600' : achievement >= 80 ? 'text-amber-600' : 'text-red-600'}`} /><span className="text-xs font-medium text-gray-600">Achievement</span></div>
+                    <p className={`text-2xl font-bold ${achievement >= 100 ? 'text-green-600' : achievement >= 80 ? 'text-amber-600' : 'text-red-600'}`}>{achievement.toFixed(1)}%</p>
+                    <p className="text-[10px] text-gray-400 mt-0.5">Gap: {(totalNet - dailyBudget).toFixed(0)}</p>
+                  </CardContent>
+                </Card>
+                {dayLySales > 0 && (
+                  <Card className="bg-gradient-to-br from-indigo-50 to-white border-indigo-200">
+                    <CardContent className="p-4">
+                      <div className="flex items-center gap-2 text-indigo-600 mb-2"><BarChart3 className="w-4 h-4" /><span className="text-xs font-medium">LY Sales</span></div>
+                      <p className="text-2xl font-bold text-gray-900">{dayLySales.toLocaleString(undefined, { maximumFractionDigits: 0 })}</p>
+                      <p className="text-[10px] text-gray-400 mt-0.5">vs Today: {totalNet > 0 ? ((totalNet / dayLySales * 100) - 100).toFixed(1) + '%' : '—'}</p>
+                    </CardContent>
+                  </Card>
+                )}
+                {dayLyGC > 0 && (
+                  <Card className="bg-gradient-to-br from-teal-50 to-white border-teal-200">
+                    <CardContent className="p-4">
+                      <div className="flex items-center gap-2 text-teal-600 mb-2"><Users className="w-4 h-4" /><span className="text-xs font-medium">LY GC</span></div>
+                      <p className="text-2xl font-bold text-gray-900">{dayLyGC}</p>
+                      <p className="text-[10px] text-gray-400 mt-0.5">vs Today: {totalGC > 0 ? ((totalGC / dayLyGC * 100) - 100).toFixed(1) + '%' : '—'}</p>
+                    </CardContent>
+                  </Card>
+                )}
+              </div>
+            )}
 
             {/* ===== SALES CHANNELS BREAKDOWN ===== */}
             <div className="grid grid-cols-2 gap-2">
