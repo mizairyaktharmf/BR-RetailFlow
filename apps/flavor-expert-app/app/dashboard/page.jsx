@@ -22,6 +22,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { formatDate, getCurrentSalesWindow, getNextSalesWindow, SALES_WINDOWS } from '@/lib/utils'
 import api from '@/services/api'
+import { initPushNotifications } from '@/lib/push'
 
 export default function DashboardPage() {
   const router = useRouter()
@@ -65,6 +66,9 @@ export default function DashboardPage() {
       }
     }
     loadCakeAlerts()
+
+    // Re-register push notifications (in case subscription expired or new device)
+    initPushNotifications().catch(() => {})
 
     return () => {
       clearInterval(windowInterval)

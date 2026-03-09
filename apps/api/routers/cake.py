@@ -13,6 +13,7 @@ from utils.database import get_db
 from utils.security import get_current_user, require_role
 from models.user import User, UserRole
 from models.location import Branch, Area
+from services.push_service import check_and_notify_low_stock
 from models.cake import CakeProduct, CakeStock, CakeStockLog, CakeStockChangeType, CakeAlertConfig
 from schemas.cake import (
     CakeProductCreate, CakeProductUpdate, CakeProductResponse,
@@ -314,6 +315,17 @@ async def record_cake_sale(
             alert_threshold=threshold,
             is_low_stock=stock.current_quantity <= threshold,
         ))
+
+        # Send push notification if stock is low
+        check_and_notify_low_stock(
+            db=db,
+            branch_id=data.branch_id,
+            cake_name=product.name,
+            cake_code=product.code,
+            current_quantity=stock.current_quantity,
+            threshold=threshold,
+            triggered_by_user_id=current_user.id,
+        )
 
     return result
 

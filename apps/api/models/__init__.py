@@ -7,6 +7,7 @@ from models.location import Territory, Area, Branch
 from models.inventory import Flavor, DailyInventory, TubReceipt
 from models.sales import DailySales, CupUsage, Promotion, PromotionUsage, BranchBudget
 from models.cake import CakeProduct, CakeStock, CakeStockLog, CakeAlertConfig
+from models.notification import PushSubscription
 
 __all__ = [
     "User",
@@ -25,4 +26,5 @@ __all__ = [
     "CakeStock",
     "CakeStockLog",
     "CakeAlertConfig",
+    "PushSubscription",
 ]

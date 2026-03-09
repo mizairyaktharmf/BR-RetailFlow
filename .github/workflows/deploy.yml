@@ -54,6 +54,9 @@ jobs:
           USER: ${{ secrets.EC2_USERNAME }}
           GEMINI_KEY: ${{ secrets.GEMINI_API_KEY }}
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          VAPID_PUBLIC_KEY: ${{ secrets.VAPID_PUBLIC_KEY }}
+          VAPID_PRIVATE_KEY: ${{ secrets.VAPID_PRIVATE_KEY }}
+          VAPID_MAILTO: ${{ secrets.VAPID_MAILTO }}
           CORS_ORIGINS: "http://localhost:3000,http://localhost:3001,http://localhost:3002,https://d4oeur9mmvhxa.cloudfront.net,https://d38dkajjvnnmib.cloudfront.net"
         run: |
           echo "$PRIVATE_KEY" > key.pem && chmod 600 key.pem
@@ -66,6 +69,15 @@ jobs:
             # Ensure GEMINI_API_KEY is in .env
             grep -q "GEMINI_API_KEY" .env 2>/dev/null || echo "GEMINI_API_KEY=${GEMINI_KEY}" >> .env
             sed -i "s|^GEMINI_API_KEY=.*|GEMINI_API_KEY=${GEMINI_KEY}|" .env
+            # Ensure VAPID_PUBLIC_KEY is in .env
+            grep -q "VAPID_PUBLIC_KEY" .env 2>/dev/null || echo "VAPID_PUBLIC_KEY=${VAPID_PUBLIC_KEY}" >> .env
+            sed -i "s|^VAPID_PUBLIC_KEY=.*|VAPID_PUBLIC_KEY=${VAPID_PUBLIC_KEY}|" .env
+            # Ensure VAPID_PRIVATE_KEY is in .env
+            grep -q "VAPID_PRIVATE_KEY" .env 2>/dev/null || echo "VAPID_PRIVATE_KEY=${VAPID_PRIVATE_KEY}" >> .env
+            sed -i "s|^VAPID_PRIVATE_KEY=.*|VAPID_PRIVATE_KEY=${VAPID_PRIVATE_KEY}|" .env
+            # Ensure VAPID_MAILTO is in .env
+            grep -q "VAPID_MAILTO" .env 2>/dev/null || echo "VAPID_MAILTO=${VAPID_MAILTO}" >> .env
+            sed -i "s|^VAPID_MAILTO=.*|VAPID_MAILTO=${VAPID_MAILTO}|" .env
             # Update CORS_ORIGINS
             grep -q "CORS_ORIGINS" .env 2>/dev/null || echo "CORS_ORIGINS=${CORS_ORIGINS}" >> .env
             sed -i "s|^CORS_ORIGINS=.*|CORS_ORIGINS=${CORS_ORIGINS}|" .env

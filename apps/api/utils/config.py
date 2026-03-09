@@ -26,6 +26,11 @@ class Settings(BaseSettings):
     # Gemini Vision API
     GEMINI_API_KEY: str = ""
 
+    # Web Push VAPID keys (generate with: vapid --gen)
+    VAPID_PUBLIC_KEY: str = ""
+    VAPID_PRIVATE_KEY: str = ""
+    VAPID_MAILTO: str = "mailto:admin@br-retailflow.com"
+
     # CORS - comma-separated origins string
     CORS_ORIGINS: str = "http://localhost:3000,http://localhost:3001,http://localhost:3002"
 

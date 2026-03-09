@@ -9,6 +9,7 @@ import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import api from '@/services/api'
+import { initPushNotifications } from '@/lib/push'
 
 export default function LoginPage() {
   const router = useRouter()
@@ -27,6 +28,8 @@ export default function LoginPage() {
 
     try {
       await api.login(credentials.branchId, credentials.password)
+      // Register push notifications after successful login (non-blocking)
+      initPushNotifications().catch(() => {})
       router.push('/dashboard')
     } catch (err) {
       setError(err.message || 'Invalid Branch ID or password. Please try again.')
