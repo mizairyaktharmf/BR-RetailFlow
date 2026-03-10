@@ -33,6 +33,8 @@ export default function DashboardPage() {
   const [todayDate, setTodayDate] = useState('')
   const [cakeAlerts, setCakeAlerts] = useState([])
   const [expandedCategory, setExpandedCategory] = useState(null)
+  const [pushStatus, setPushStatus] = useState('unknown') // 'unknown' | 'prompt' | 'granted' | 'denied' | 'unsupported'
+  const [pushLoading, setPushLoading] = useState(false)
 
   useEffect(() => {
     // Check authentication
@@ -67,13 +69,37 @@ export default function DashboardPage() {
     }
     loadCakeAlerts()
 
-    // Re-register push notifications (in case subscription expired or new device)
-    initPushNotifications().catch(() => {})
+    // Check push notification status (don't request — just check)
+    if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
+      setPushStatus('unsupported')
+    } else if (typeof Notification !== 'undefined') {
+      if (Notification.permission === 'granted') {
+        setPushStatus('granted')
+        // Already granted — silently re-register subscription
+        initPushNotifications().catch(() => {})
+      } else if (Notification.permission === 'denied') {
+        setPushStatus('denied')
+      } else {
+        setPushStatus('prompt')
+      }
+    }
 
     return () => {
       clearInterval(windowInterval)
     }
   }, [router])
+
+  const handleEnablePush = async () => {
+    setPushLoading(true)
+    try {
+      const result = await initPushNotifications()
+      setPushStatus(result ? 'granted' : 'denied')
+    } catch {
+      setPushStatus('denied')
+    } finally {
+      setPushLoading(false)
+    }
+  }
 
   const handleLogout = () => {
     api.clearToken()
@@ -247,6 +273,30 @@ export default function DashboardPage() {
             {cakeAlerts.length > 3 && ` +${cakeAlerts.length - 3} more`}
           </AlertDescription>
         </Alert>
+      )}
+
+      {/* Push Notification Enable Banner */}
+      {pushStatus === 'prompt' && (
+        <div className="mx-4 mt-4 bg-blue-50 border border-blue-200 rounded-lg p-4">
+          <div className="flex items-start gap-3">
+            <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center flex-shrink-0">
+              <Bell className="w-5 h-5 text-blue-600" />
+            </div>
+            <div className="flex-1">
+              <h3 className="font-semibold text-blue-900 text-sm">Enable Notifications</h3>
+              <p className="text-xs text-blue-700 mt-0.5">
+                Get instant alerts when cake stock is running low
+              </p>
+              <button
+                onClick={handleEnablePush}
+                disabled={pushLoading}
+                className="mt-2 px-4 py-1.5 bg-blue-600 text-white text-xs font-semibold rounded-lg hover:bg-blue-700 active:scale-95 transition-all disabled:opacity-50"
+              >
+                {pushLoading ? 'Enabling...' : 'Enable Now'}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* Sales Window Alert */}
