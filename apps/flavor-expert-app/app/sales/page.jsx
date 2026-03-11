@@ -13,6 +13,9 @@ import {
   Eye,
   RotateCcw,
   Layers,
+  ChevronLeft,
+  ChevronRight,
+  Calendar,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
@@ -166,6 +169,14 @@ export default function SalesPage() {
   const router = useRouter()
   const [user, setUser] = useState(null)
   const [branch, setBranch] = useState(null)
+  const [selectedDate, setSelectedDate] = useState(() => {
+    const now = new Date()
+    // Before 10 AM, sales day is still yesterday (closing window extends to next day 10 AM)
+    if (now.getHours() < 10) {
+      now.setDate(now.getDate() - 1)
+    }
+    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
+  })
   const [selectedWindow, setSelectedWindow] = useState(null)
   const [saving, setSaving] = useState(false)
   const [submittedWindows, setSubmittedWindows] = useState([])
@@ -218,14 +229,14 @@ export default function SalesPage() {
     return () => { posPreviews.forEach(url => URL.revokeObjectURL(url)) }
   }, [])
 
-  const loadSubmittedWindows = async () => {
+  const loadSubmittedWindows = async (dateStr) => {
+    const date = dateStr || selectedDate
     setLoadingWindows(true)
     try {
       const branchData = localStorage.getItem('br_branch')
       const branchInfo = branchData ? JSON.parse(branchData) : null
       if (branchInfo?.id) {
-        const today = new Date().toISOString().split('T')[0]
-        const sales = await api.getDailySales(branchInfo.id, today)
+        const sales = await api.getDailySales(branchInfo.id, date)
         const submitted = Array.isArray(sales) ? sales.map(s => s.sales_window) : []
         setSubmittedWindows(submitted)
         const firstOpen = SALES_WINDOWS.find(w => !submitted.includes(w.id))
@@ -238,6 +249,32 @@ export default function SalesPage() {
     } finally {
       setLoadingWindows(false)
     }
+  }
+
+  const nowRef = new Date()
+  // Before 10 AM, the latest allowed sales day is yesterday
+  if (nowRef.getHours() < 10) {
+    nowRef.setDate(nowRef.getDate() - 1)
+  }
+  const todayStr = `${nowRef.getFullYear()}-${String(nowRef.getMonth() + 1).padStart(2, '0')}-${String(nowRef.getDate()).padStart(2, '0')}`
+  const isToday = selectedDate === todayStr
+
+  const changeDate = (offset) => {
+    const d = new Date(selectedDate + 'T00:00:00')
+    d.setDate(d.getDate() + offset)
+    const newDate = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+    // Don't allow future dates
+    if (newDate > todayStr) return
+    setSelectedDate(newDate)
+    resetAll()
+    loadSubmittedWindows(newDate)
+  }
+
+  const formatDisplayDate = (dateStr) => {
+    const d = new Date(dateStr + 'T00:00:00')
+    const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
+    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+    return `${days[d.getDay()]}, ${d.getDate()} ${months[d.getMonth()]} ${d.getFullYear()}`
   }
 
   const handleWindowSelect = (windowId) => {
@@ -440,7 +477,7 @@ export default function SalesPage() {
 
       await api.submitSales({
         branch_id: user.branch_id || 1,
-        date: new Date().toISOString().split('T')[0],
+        date: selectedDate,
         sales_window: selectedWindow,
         gross_sales: extractedSales.gross_sales || 0,
         total_sales: extractedSales.net_sales || extractedSales.total_sales || 0,
@@ -491,8 +528,32 @@ export default function SalesPage() {
             </button>
             <div>
               <h1 className="font-bold text-base">Sales Report</h1>
-              <p className="text-orange-100 text-xs">{branch?.name || 'My Branch'} &middot; {formatDate(new Date())}</p>
+              <p className="text-orange-100 text-xs">{branch?.name || 'My Branch'}</p>
             </div>
+          </div>
+        </div>
+        {/* Date Navigator */}
+        <div className="px-4 pb-3">
+          <div className="flex items-center justify-between bg-white/15 rounded-xl px-2 py-1.5">
+            <button
+              onClick={() => changeDate(-1)}
+              className="p-1.5 rounded-lg hover:bg-white/20 active:scale-90 transition-all"
+            >
+              <ChevronLeft className="w-5 h-5" />
+            </button>
+            <div className="flex items-center gap-2">
+              <Calendar className="w-4 h-4 text-orange-200" />
+              <span className="text-sm font-semibold">{formatDisplayDate(selectedDate)}</span>
+              {isToday && <span className="text-[10px] bg-white/25 px-1.5 py-0.5 rounded-full font-medium">Today</span>}
+              {!isToday && <span className="text-[10px] bg-yellow-400/30 px-1.5 py-0.5 rounded-full font-medium text-yellow-100">Past</span>}
+            </div>
+            <button
+              onClick={() => changeDate(1)}
+              disabled={isToday}
+              className={`p-1.5 rounded-lg transition-all ${isToday ? 'opacity-30 cursor-not-allowed' : 'hover:bg-white/20 active:scale-90'}`}
+            >
+              <ChevronRight className="w-5 h-5" />
+            </button>
           </div>
         </div>
       </div>
@@ -928,7 +989,7 @@ export default function SalesPage() {
                 {saving ? (
                   <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Saving...</>
                 ) : (
-                  <><Save className="w-4 h-4 mr-2" />Submit {SALES_WINDOWS.find(w => w.id === selectedWindow)?.label}</>
+                  <><Save className="w-4 h-4 mr-2" />Submit {SALES_WINDOWS.find(w => w.id === selectedWindow)?.label}{!isToday ? ` (${formatDisplayDate(selectedDate)})` : ''}</>
                 )}
               </Button>
 
