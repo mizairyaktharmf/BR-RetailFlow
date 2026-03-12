@@ -305,8 +305,7 @@ export default function DashboardPage() {
           <AlertCircle className="h-4 w-4 text-green-600" />
           <AlertTitle className="text-green-800">Sales Window Open!</AlertTitle>
           <AlertDescription className="text-green-700">
-            The {currentWindow.toUpperCase()} sales reporting window is now open.
-            Don't forget to submit your sales with a photo!
+            Take a photo of your POS and submit your {currentWindow.toUpperCase()} sales now!
           </AlertDescription>
         </Alert>
       )}
