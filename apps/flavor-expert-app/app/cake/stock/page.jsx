@@ -275,6 +275,17 @@ export default function CakeStockPage() {
               </AlertDescription>
             </Alert>
 
+            {/* Search */}
+            <div className="mb-4 relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+              <Input
+                placeholder="Search cakes..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-10"
+              />
+            </div>
+
             <Card>
               <CardHeader className="pb-2">
                 <CardTitle className="text-base flex items-center gap-2">
@@ -291,9 +302,16 @@ export default function CakeStockPage() {
                 ) : (
                   <div className="space-y-4">
                     {[...SIZE_CATEGORIES, '_uncategorized'].map(sizeKey => {
-                      const items = sizeKey === '_uncategorized'
+                      const initItems = sizeKey === '_uncategorized'
                         ? stock.filter(s => !SIZE_CATEGORIES.includes(s.category))
                         : stock.filter(s => s.category === sizeKey)
+                      // Apply search filter
+                      const items = initItems.filter(item => {
+                        if (!searchQuery) return true
+                        const name = (item.cake_name || '').toLowerCase()
+                        const code = (item.cake_code || '').toLowerCase()
+                        return name.includes(searchQuery.toLowerCase()) || code.includes(searchQuery.toLowerCase())
+                      })
                       if (items.length === 0) return null
                       const sizeLabel = sizeKey === '_uncategorized' ? 'Other' : `${sizeKey} Inch`
                       return (
