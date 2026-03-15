@@ -204,11 +204,20 @@ export default function CakeStockPage() {
     }
   }
 
+  const SIZE_CATEGORIES = ['6"', '8"', '9"']
+
   const filteredStock = stock.filter(item => {
     const name = (item.cake_name || '').toLowerCase()
     const code = (item.cake_code || '').toLowerCase()
     return name.includes(searchQuery.toLowerCase()) || code.includes(searchQuery.toLowerCase())
   })
+
+  // Group filtered stock by size category
+  const groupedStock = SIZE_CATEGORIES.reduce((acc, size) => {
+    acc[size] = filteredStock.filter(item => item.category === size)
+    return acc
+  }, {})
+  const uncategorizedStock = filteredStock.filter(item => !SIZE_CATEGORIES.includes(item.category))
 
   const lowStockCount = stock.filter(item =>
     item.current_quantity <= (item.alert_threshold || 3)
@@ -280,32 +289,48 @@ export default function CakeStockPage() {
                     <p className="text-gray-500">No cake products found. Ask admin to add products first.</p>
                   </div>
                 ) : (
-                  <div className="space-y-3">
-                    {stock.map(item => (
-                      <div key={item.cake_product_id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                        <div className="flex items-center gap-3 flex-1 min-w-0">
-                          <div className="w-9 h-9 rounded-full bg-orange-100 flex items-center justify-center flex-shrink-0">
-                            <Cake className="w-4 h-4 text-orange-500" />
+                  <div className="space-y-4">
+                    {[...SIZE_CATEGORIES, '_uncategorized'].map(sizeKey => {
+                      const items = sizeKey === '_uncategorized'
+                        ? stock.filter(s => !SIZE_CATEGORIES.includes(s.category))
+                        : stock.filter(s => s.category === sizeKey)
+                      if (items.length === 0) return null
+                      const sizeLabel = sizeKey === '_uncategorized' ? 'Other' : `${sizeKey} Inch`
+                      return (
+                        <div key={sizeKey}>
+                          <div className="flex items-center gap-2 mb-2">
+                            <span className="px-2.5 py-0.5 rounded-full bg-orange-100 text-orange-700 text-xs font-bold">{sizeLabel}</span>
                           </div>
-                          <div className="min-w-0">
-                            <p className="font-medium text-gray-900 text-sm truncate">{item.cake_name}</p>
-                            <p className="text-[10px] text-gray-500">{item.cake_code}</p>
+                          <div className="space-y-2">
+                            {items.map(item => (
+                              <div key={item.cake_product_id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                                <div className="flex items-center gap-3 flex-1 min-w-0">
+                                  <div className="w-9 h-9 rounded-full bg-orange-100 flex items-center justify-center flex-shrink-0">
+                                    <Cake className="w-4 h-4 text-orange-500" />
+                                  </div>
+                                  <div className="min-w-0">
+                                    <p className="font-medium text-gray-900 text-sm truncate">{item.cake_name}</p>
+                                    <p className="text-[10px] text-gray-500">{item.cake_code}</p>
+                                  </div>
+                                </div>
+                                <Input
+                                  type="number"
+                                  inputMode="numeric"
+                                  min="0"
+                                  placeholder="0"
+                                  value={initQuantities[item.cake_product_id] ?? ''}
+                                  onChange={(e) => setInitQuantities(prev => ({
+                                    ...prev,
+                                    [item.cake_product_id]: e.target.value
+                                  }))}
+                                  className="w-20 text-center h-9"
+                                />
+                              </div>
+                            ))}
                           </div>
                         </div>
-                        <Input
-                          type="number"
-                          inputMode="numeric"
-                          min="0"
-                          placeholder="0"
-                          value={initQuantities[item.cake_product_id] ?? ''}
-                          onChange={(e) => setInitQuantities(prev => ({
-                            ...prev,
-                            [item.cake_product_id]: e.target.value
-                          }))}
-                          className="w-20 text-center h-9"
-                        />
-                      </div>
-                    ))}
+                      )
+                    })}
                   </div>
                 )}
               </CardContent>
@@ -353,158 +378,165 @@ export default function CakeStockPage() {
               />
             </div>
 
-            {/* Stock List */}
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-base flex items-center justify-between">
-                  <span className="flex items-center gap-2">
-                    <Cake className="w-5 h-5 text-orange-500" />
-                    Current Stock
-                  </span>
-                  <span className="text-sm font-normal text-gray-500">
-                    {stock.length} products
-                  </span>
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                {filteredStock.length === 0 ? (
-                  <div className="text-center py-8">
-                    <Search className="w-12 h-12 mx-auto text-gray-300 mb-2" />
-                    <p className="text-gray-500">No cakes match your search</p>
-                  </div>
-                ) : (
-                  <div className="space-y-3">
-                    {filteredStock.map(item => {
-                      const threshold = item.alert_threshold || 3
-                      const isSelling = sellingItemId === item.cake_product_id
-                      const isReceiving = receivingItemId === item.cake_product_id
+            {/* Stock List Grouped by Size */}
+            {filteredStock.length === 0 ? (
+              <Card>
+                <CardContent className="py-8 text-center">
+                  <Search className="w-12 h-12 mx-auto text-gray-300 mb-2" />
+                  <p className="text-gray-500">No cakes match your search</p>
+                </CardContent>
+              </Card>
+            ) : (
+              <div className="space-y-5">
+                {[...SIZE_CATEGORIES, '_uncategorized'].map(sizeKey => {
+                  const items = sizeKey === '_uncategorized' ? uncategorizedStock : groupedStock[sizeKey]
+                  if (!items || items.length === 0) return null
+                  const sizeLabel = sizeKey === '_uncategorized' ? 'Other' : `${sizeKey} Inch`
 
-                      return (
-                        <div
-                          key={item.cake_product_id}
-                          className={`rounded-lg overflow-hidden ${getRowBackground(item.current_quantity, threshold)}`}
-                        >
-                          <div className="flex items-center justify-between p-3">
-                            <div className="flex items-center gap-3 flex-1 min-w-0">
-                              <div className="w-10 h-10 rounded-full bg-orange-100 flex items-center justify-center flex-shrink-0">
-                                <Cake className="w-5 h-5 text-orange-500" />
-                              </div>
-                              <div className="min-w-0">
-                                <p className="font-medium text-gray-900 text-sm truncate">{item.cake_name}</p>
-                                <p className="text-[10px] text-gray-500">{item.cake_code}</p>
-                              </div>
-                            </div>
-                            <div className="flex items-center gap-2">
-                              <span className={`px-3 py-1 rounded-full text-sm font-bold ${getQuantityColor(item.current_quantity, threshold)}`}>
-                                {item.current_quantity}
-                              </span>
-                              <Button
-                                variant="outline"
-                                size="icon"
-                                className="w-9 h-9 text-red-600 border-red-300 hover:bg-red-50"
-                                onClick={() => handleSellClick(item.cake_product_id)}
-                                disabled={item.current_quantity <= 0}
-                              >
-                                <Minus className="w-4 h-4" />
-                              </Button>
-                              <Button
-                                variant="outline"
-                                size="icon"
-                                className="w-9 h-9 text-green-600 border-green-300 hover:bg-green-50"
-                                onClick={() => handleReceiveClick(item.cake_product_id)}
-                              >
-                                <Plus className="w-4 h-4" />
-                              </Button>
-                            </div>
+                  return (
+                    <div key={sizeKey}>
+                      <div className="flex items-center gap-2 mb-2 px-1">
+                        <span className="px-2.5 py-0.5 rounded-full bg-orange-100 text-orange-700 text-xs font-bold">{sizeLabel}</span>
+                        <span className="text-gray-400 text-xs">{items.length} cake{items.length > 1 ? 's' : ''}</span>
+                      </div>
+                      <Card>
+                        <CardContent className="p-0">
+                          <div className="divide-y divide-gray-100">
+                            {items.map(item => {
+                              const threshold = item.alert_threshold || 3
+                              const isSelling = sellingItemId === item.cake_product_id
+                              const isReceiving = receivingItemId === item.cake_product_id
+
+                              return (
+                                <div
+                                  key={item.cake_product_id}
+                                  className={`overflow-hidden ${item.current_quantity <= threshold ? 'bg-red-50' : ''}`}
+                                >
+                                  <div className="flex items-center justify-between p-3">
+                                    <div className="flex items-center gap-3 flex-1 min-w-0">
+                                      <div className="w-10 h-10 rounded-full bg-orange-100 flex items-center justify-center flex-shrink-0">
+                                        <Cake className="w-5 h-5 text-orange-500" />
+                                      </div>
+                                      <div className="min-w-0">
+                                        <p className="font-medium text-gray-900 text-sm truncate">{item.cake_name}</p>
+                                        <p className="text-[10px] text-gray-500">{item.cake_code}</p>
+                                      </div>
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                      <span className={`px-3 py-1 rounded-full text-sm font-bold ${getQuantityColor(item.current_quantity, threshold)}`}>
+                                        {item.current_quantity}
+                                      </span>
+                                      <Button
+                                        variant="outline"
+                                        size="icon"
+                                        className="w-9 h-9 text-red-600 border-red-300 hover:bg-red-50"
+                                        onClick={() => handleSellClick(item.cake_product_id)}
+                                        disabled={item.current_quantity <= 0}
+                                      >
+                                        <Minus className="w-4 h-4" />
+                                      </Button>
+                                      <Button
+                                        variant="outline"
+                                        size="icon"
+                                        className="w-9 h-9 text-green-600 border-green-300 hover:bg-green-50"
+                                        onClick={() => handleReceiveClick(item.cake_product_id)}
+                                      >
+                                        <Plus className="w-4 h-4" />
+                                      </Button>
+                                    </div>
+                                  </div>
+
+                                  {/* Expanded Sell Controls */}
+                                  {isSelling && (
+                                    <div className="px-3 pb-3">
+                                      <Separator className="mb-3" />
+                                      <p className="text-xs text-red-600 font-medium mb-2 flex items-center gap-1">
+                                        <ShoppingCart className="w-3 h-3" /> Record Sale
+                                      </p>
+                                      <div className="flex items-center gap-3">
+                                        <div className="flex items-center gap-1.5">
+                                          {[1, 2, 3, 4, 5].map(qty => (
+                                            <button
+                                              key={qty}
+                                              onClick={() => setSellQuantity(qty)}
+                                              disabled={qty > item.current_quantity}
+                                              className={`w-9 h-9 rounded-lg text-sm font-medium transition-colors ${
+                                                sellQuantity === qty
+                                                  ? 'bg-red-500 text-white'
+                                                  : qty > item.current_quantity
+                                                    ? 'bg-gray-100 text-gray-300 cursor-not-allowed'
+                                                    : 'bg-gray-100 text-gray-700 hover:bg-red-100'
+                                              }`}
+                                            >
+                                              {qty}
+                                            </button>
+                                          ))}
+                                        </div>
+                                        <Button
+                                          size="sm"
+                                          className="ml-auto bg-red-500 hover:bg-red-600"
+                                          onClick={() => handleConfirmSale(item)}
+                                          disabled={submitting || sellQuantity > item.current_quantity}
+                                        >
+                                          {submitting ? (
+                                            <Loader2 className="w-4 h-4 animate-spin" />
+                                          ) : (
+                                            <><Minus className="w-3 h-3 mr-1" /> Sell</>
+                                          )}
+                                        </Button>
+                                      </div>
+                                    </div>
+                                  )}
+
+                                  {/* Expanded Receive Controls */}
+                                  {isReceiving && (
+                                    <div className="px-3 pb-3">
+                                      <Separator className="mb-3" />
+                                      <p className="text-xs text-green-600 font-medium mb-2 flex items-center gap-1">
+                                        <PackagePlus className="w-3 h-3" /> Receive Stock
+                                      </p>
+                                      <div className="flex items-center gap-3">
+                                        <div className="flex items-center gap-1.5">
+                                          {[1, 2, 3, 5, 10].map(qty => (
+                                            <button
+                                              key={qty}
+                                              onClick={() => setReceiveQuantity(qty)}
+                                              className={`w-9 h-9 rounded-lg text-sm font-medium transition-colors ${
+                                                receiveQuantity === qty
+                                                  ? 'bg-green-500 text-white'
+                                                  : 'bg-gray-100 text-gray-700 hover:bg-green-100'
+                                              }`}
+                                            >
+                                              {qty}
+                                            </button>
+                                          ))}
+                                        </div>
+                                        <Button
+                                          size="sm"
+                                          className="ml-auto bg-green-500 hover:bg-green-600"
+                                          onClick={() => handleConfirmReceive(item)}
+                                          disabled={submitting}
+                                        >
+                                          {submitting ? (
+                                            <Loader2 className="w-4 h-4 animate-spin" />
+                                          ) : (
+                                            <><Plus className="w-3 h-3 mr-1" /> Receive</>
+                                          )}
+                                        </Button>
+                                      </div>
+                                    </div>
+                                  )}
+                                </div>
+                              )
+                            })}
                           </div>
-
-                          {/* Expanded Sell Controls */}
-                          {isSelling && (
-                            <div className="px-3 pb-3">
-                              <Separator className="mb-3" />
-                              <p className="text-xs text-red-600 font-medium mb-2 flex items-center gap-1">
-                                <ShoppingCart className="w-3 h-3" /> Record Sale
-                              </p>
-                              <div className="flex items-center gap-3">
-                                <div className="flex items-center gap-1.5">
-                                  {[1, 2, 3, 4, 5].map(qty => (
-                                    <button
-                                      key={qty}
-                                      onClick={() => setSellQuantity(qty)}
-                                      disabled={qty > item.current_quantity}
-                                      className={`w-9 h-9 rounded-lg text-sm font-medium transition-colors ${
-                                        sellQuantity === qty
-                                          ? 'bg-red-500 text-white'
-                                          : qty > item.current_quantity
-                                            ? 'bg-gray-100 text-gray-300 cursor-not-allowed'
-                                            : 'bg-gray-100 text-gray-700 hover:bg-red-100'
-                                      }`}
-                                    >
-                                      {qty}
-                                    </button>
-                                  ))}
-                                </div>
-                                <Button
-                                  size="sm"
-                                  className="ml-auto bg-red-500 hover:bg-red-600"
-                                  onClick={() => handleConfirmSale(item)}
-                                  disabled={submitting || sellQuantity > item.current_quantity}
-                                >
-                                  {submitting ? (
-                                    <Loader2 className="w-4 h-4 animate-spin" />
-                                  ) : (
-                                    <><Minus className="w-3 h-3 mr-1" /> Sell</>
-                                  )}
-                                </Button>
-                              </div>
-                            </div>
-                          )}
-
-                          {/* Expanded Receive Controls */}
-                          {isReceiving && (
-                            <div className="px-3 pb-3">
-                              <Separator className="mb-3" />
-                              <p className="text-xs text-green-600 font-medium mb-2 flex items-center gap-1">
-                                <PackagePlus className="w-3 h-3" /> Receive Stock
-                              </p>
-                              <div className="flex items-center gap-3">
-                                <div className="flex items-center gap-1.5">
-                                  {[1, 2, 3, 5, 10].map(qty => (
-                                    <button
-                                      key={qty}
-                                      onClick={() => setReceiveQuantity(qty)}
-                                      className={`w-9 h-9 rounded-lg text-sm font-medium transition-colors ${
-                                        receiveQuantity === qty
-                                          ? 'bg-green-500 text-white'
-                                          : 'bg-gray-100 text-gray-700 hover:bg-green-100'
-                                      }`}
-                                    >
-                                      {qty}
-                                    </button>
-                                  ))}
-                                </div>
-                                <Button
-                                  size="sm"
-                                  className="ml-auto bg-green-500 hover:bg-green-600"
-                                  onClick={() => handleConfirmReceive(item)}
-                                  disabled={submitting}
-                                >
-                                  {submitting ? (
-                                    <Loader2 className="w-4 h-4 animate-spin" />
-                                  ) : (
-                                    <><Plus className="w-3 h-3 mr-1" /> Receive</>
-                                  )}
-                                </Button>
-                              </div>
-                            </div>
-                          )}
-                        </div>
-                      )
-                    })}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
+                        </CardContent>
+                      </Card>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
 
             {/* Stock Level Guide */}
             <Card className="mt-4 bg-gray-50">
