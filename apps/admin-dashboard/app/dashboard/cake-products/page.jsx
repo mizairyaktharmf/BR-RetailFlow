@@ -59,7 +59,9 @@ export default function CakeProductsPage() {
     }
   }
 
-  const SIZE_CATEGORIES = ['6"', '8"', '9"']
+  const ALL_CATEGORIES = ['ATC', '6"', '8"', '9"', '9"3D', 'Full Sheet', 'Log Cake', 'Roll Cake', 'Cool Mood']
+  // Cool Mood renders after uncategorized
+  const CAKE_CATEGORIES = ALL_CATEGORIES.filter(c => c !== 'Cool Mood')
 
   const filteredProducts = products.filter(p =>
     p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -67,13 +69,13 @@ export default function CakeProductsPage() {
     (p.category || '').toLowerCase().includes(searchTerm.toLowerCase())
   )
 
-  // Group products by size category
-  const groupedProducts = SIZE_CATEGORIES.reduce((acc, size) => {
-    acc[size] = filteredProducts.filter(p => p.category === size)
+  // Group products by category
+  const groupedProducts = ALL_CATEGORIES.reduce((acc, cat) => {
+    acc[cat] = filteredProducts.filter(p => p.category === cat)
     return acc
   }, {})
   // Uncategorized products
-  const uncategorized = filteredProducts.filter(p => !SIZE_CATEGORIES.includes(p.category))
+  const uncategorized = filteredProducts.filter(p => !ALL_CATEGORIES.includes(p.category))
 
   const handleOpenModal = (product = null) => {
     setSelectedProduct(product)
@@ -209,13 +211,13 @@ export default function CakeProductsPage() {
           </Card>
         ) : (
           <div className="space-y-6">
-            {SIZE_CATEGORIES.map(size => {
+            {CAKE_CATEGORIES.map(size => {
               const items = groupedProducts[size]
               if (items.length === 0) return null
               return (
                 <div key={size}>
                   <div className="flex items-center gap-2 mb-3">
-                    <span className="px-3 py-1 rounded-full bg-orange-500/20 text-orange-400 text-sm font-bold">{size} Inch</span>
+                    <span className="px-3 py-1 rounded-full bg-orange-500/20 text-orange-400 text-sm font-bold">{size}</span>
                     <span className="text-slate-500 text-xs">{items.length} product{items.length > 1 ? 's' : ''}</span>
                   </div>
                   <Card className="bg-slate-800/50 border-slate-700">
@@ -323,6 +325,62 @@ export default function CakeProductsPage() {
                 </Card>
               </div>
             )}
+
+            {/* Cool Mood — always last */}
+            {groupedProducts['Cool Mood']?.length > 0 && (
+              <div>
+                <div className="flex items-center gap-2 mb-3">
+                  <span className="px-3 py-1 rounded-full bg-cyan-500/20 text-cyan-400 text-sm font-bold">Cool Mood</span>
+                  <span className="text-slate-500 text-xs">{groupedProducts['Cool Mood'].length} product{groupedProducts['Cool Mood'].length > 1 ? 's' : ''}</span>
+                </div>
+                <Card className="bg-slate-800/50 border-slate-700">
+                  <CardContent className="p-0">
+                    <table className="w-full">
+                      <thead>
+                        <tr className="border-b border-slate-700">
+                          <th className="text-left p-4 text-xs font-medium text-slate-400 uppercase">Product</th>
+                          <th className="text-left p-4 text-xs font-medium text-slate-400 uppercase">Code</th>
+                          <th className="text-right p-4 text-xs font-medium text-slate-400 uppercase">Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {groupedProducts['Cool Mood'].map((product) => (
+                          <tr key={product.id} className="border-b border-slate-700/50 hover:bg-slate-700/20 transition-colors">
+                            <td className="p-4">
+                              <div className="flex items-center gap-3">
+                                <div className="w-8 h-8 rounded-full bg-cyan-500/20 flex items-center justify-center">
+                                  <Cake className="w-4 h-4 text-cyan-400" />
+                                </div>
+                                <span className="text-white font-medium">{product.name}</span>
+                              </div>
+                            </td>
+                            <td className="p-4">
+                              <span className="px-2 py-1 rounded bg-slate-700 text-slate-300 text-xs font-mono">{product.code}</span>
+                            </td>
+                            <td className="p-4">
+                              <div className="flex justify-end gap-1">
+                                <button
+                                  onClick={() => handleOpenModal(product)}
+                                  className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-700 transition-colors"
+                                >
+                                  <Edit2 className="w-4 h-4" />
+                                </button>
+                                <button
+                                  onClick={() => handleDelete(product)}
+                                  className="p-1.5 rounded-lg text-slate-400 hover:text-red-400 hover:bg-red-500/10 transition-colors"
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </CardContent>
+                </Card>
+              </div>
+            )}
           </div>
         )
       )}
@@ -373,17 +431,23 @@ export default function CakeProductsPage() {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="category" className="text-slate-300">Size</Label>
+                <Label htmlFor="category" className="text-slate-300">Category</Label>
                 <select
                   id="category"
                   value={formData.category}
                   onChange={(e) => setFormData({ ...formData, category: e.target.value })}
                   className="w-full h-10 px-3 rounded-md bg-slate-700/50 border border-slate-600 text-white text-sm focus:outline-none focus:ring-2 focus:ring-orange-500"
                 >
-                  <option value="">Select size</option>
-                  <option value='6"'>6" Inch</option>
-                  <option value='8"'>8" Inch</option>
-                  <option value='9"'>9" Inch</option>
+                  <option value="">Select category</option>
+                  <option value="ATC">ATC</option>
+                  <option value='6"'>6"</option>
+                  <option value='8"'>8"</option>
+                  <option value='9"'>9"</option>
+                  <option value='9"3D'>9"3D</option>
+                  <option value="Full Sheet">Full Sheet</option>
+                  <option value="Log Cake">Log Cake</option>
+                  <option value="Roll Cake">Roll Cake</option>
+                  <option value="Cool Mood">Cool Mood</option>
                 </select>
               </div>
 

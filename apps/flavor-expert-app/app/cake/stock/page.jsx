@@ -204,7 +204,9 @@ export default function CakeStockPage() {
     }
   }
 
-  const SIZE_CATEGORIES = ['6"', '8"', '9"']
+  // Cool Mood renders after uncategorized (last)
+  const ALL_CATEGORIES = ['ATC', '6"', '8"', '9"', '9"3D', 'Full Sheet', 'Log Cake', 'Roll Cake', 'Cool Mood']
+  const CAKE_CATEGORIES = ALL_CATEGORIES.filter(c => c !== 'Cool Mood')
 
   const filteredStock = stock.filter(item => {
     const name = (item.cake_name || '').toLowerCase()
@@ -212,12 +214,12 @@ export default function CakeStockPage() {
     return name.includes(searchQuery.toLowerCase()) || code.includes(searchQuery.toLowerCase())
   })
 
-  // Group filtered stock by size category
-  const groupedStock = SIZE_CATEGORIES.reduce((acc, size) => {
-    acc[size] = filteredStock.filter(item => item.category === size)
+  // Group filtered stock by category
+  const groupedStock = ALL_CATEGORIES.reduce((acc, cat) => {
+    acc[cat] = filteredStock.filter(item => item.category === cat)
     return acc
   }, {})
-  const uncategorizedStock = filteredStock.filter(item => !SIZE_CATEGORIES.includes(item.category))
+  const uncategorizedStock = filteredStock.filter(item => !ALL_CATEGORIES.includes(item.category))
 
   const lowStockCount = stock.filter(item =>
     item.current_quantity <= (item.alert_threshold || 3)
@@ -301,9 +303,9 @@ export default function CakeStockPage() {
                   </div>
                 ) : (
                   <div className="space-y-4">
-                    {[...SIZE_CATEGORIES, '_uncategorized'].map(sizeKey => {
+                    {[...CAKE_CATEGORIES, '_uncategorized', 'Cool Mood'].map(sizeKey => {
                       const initItems = sizeKey === '_uncategorized'
-                        ? stock.filter(s => !SIZE_CATEGORIES.includes(s.category))
+                        ? stock.filter(s => !ALL_CATEGORIES.includes(s.category))
                         : stock.filter(s => s.category === sizeKey)
                       // Apply search filter
                       const items = initItems.filter(item => {
@@ -313,7 +315,7 @@ export default function CakeStockPage() {
                         return name.includes(searchQuery.toLowerCase()) || code.includes(searchQuery.toLowerCase())
                       })
                       if (items.length === 0) return null
-                      const sizeLabel = sizeKey === '_uncategorized' ? 'Other' : `${sizeKey} Inch`
+                      const sizeLabel = sizeKey === '_uncategorized' ? 'Other' : `${sizeKey}`
                       return (
                         <div key={sizeKey}>
                           <div className="flex items-center gap-2 mb-2">
@@ -406,10 +408,10 @@ export default function CakeStockPage() {
               </Card>
             ) : (
               <div className="space-y-5">
-                {[...SIZE_CATEGORIES, '_uncategorized'].map(sizeKey => {
+                {[...CAKE_CATEGORIES, '_uncategorized', 'Cool Mood'].map(sizeKey => {
                   const items = sizeKey === '_uncategorized' ? uncategorizedStock : groupedStock[sizeKey]
                   if (!items || items.length === 0) return null
-                  const sizeLabel = sizeKey === '_uncategorized' ? 'Other' : `${sizeKey} Inch`
+                  const sizeLabel = sizeKey === '_uncategorized' ? 'Other' : `${sizeKey}`
 
                   return (
                     <div key={sizeKey}>
