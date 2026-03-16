@@ -22,7 +22,12 @@ import {
   Sparkles,
   AlertTriangle,
   Zap,
+  Edit3,
+  Save,
+  X,
 } from 'lucide-react'
+import { Input } from '@/components/ui/input'
+import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { formatDate, SALES_WINDOWS } from '@/lib/utils'
 import api from '@/services/api'
@@ -78,6 +83,10 @@ export default function SalesDashboardPage() {
   const [advisorData, setAdvisorData] = useState(null)
   const [advisorLoading, setAdvisorLoading] = useState(false)
   const [budgetChart, setBudgetChart] = useState(null)
+  // Edit mode for HD, Deliveroo, Cool Mood
+  const [editingExtras, setEditingExtras] = useState(false)
+  const [editExtras, setEditExtras] = useState({})
+  const [savingExtras, setSavingExtras] = useState(false)
 
   useEffect(() => {
     const userData = localStorage.getItem('br_user')
@@ -357,6 +366,57 @@ export default function SalesDashboardPage() {
   const dayBudgetGC = dayBudgetData?.budget_gc || 0
   const achievement = dailyBudget > 0 ? totalNet / dailyBudget * 100 : 0
 
+  const startEditExtras = () => {
+    setEditExtras({
+      hd_gross_sales: hdGross || '',
+      hd_net_sales: hdNet || '',
+      hd_orders: hdOrders || '',
+      deliveroo_gross_sales: delGross || '',
+      deliveroo_net_sales: delNet || '',
+      deliveroo_orders: delOrders || '',
+      cm_gross_sales: cmGross || '',
+      cm_net_sales: cmNet || '',
+      cm_orders: cmOrders || '',
+    })
+    setEditingExtras(true)
+  }
+
+  const saveExtras = async () => {
+    if (!activeRecord || !user) return
+    setSavingExtras(true)
+    try {
+      const payload = {
+        branch_id: activeRecord.branch_id,
+        date: activeRecord.date,
+        sales_window: activeRecord.sales_window,
+        total_sales: activeRecord.total_sales || 0,
+        transaction_count: activeRecord.transaction_count || 0,
+        gross_sales: activeRecord.gross_sales || 0,
+        cash_sales: activeRecord.cash_sales || 0,
+        cash_gc: activeRecord.cash_gc || 0,
+        atv: activeRecord.atv || 0,
+        hd_gross_sales: parseFloat(editExtras.hd_gross_sales) || 0,
+        hd_net_sales: parseFloat(editExtras.hd_net_sales) || 0,
+        hd_orders: parseInt(editExtras.hd_orders) || 0,
+        deliveroo_gross_sales: parseFloat(editExtras.deliveroo_gross_sales) || 0,
+        deliveroo_net_sales: parseFloat(editExtras.deliveroo_net_sales) || 0,
+        deliveroo_orders: parseInt(editExtras.deliveroo_orders) || 0,
+        cm_gross_sales: parseFloat(editExtras.cm_gross_sales) || 0,
+        cm_net_sales: parseFloat(editExtras.cm_net_sales) || 0,
+        cm_orders: parseInt(editExtras.cm_orders) || 0,
+      }
+      await api.submitSales(payload)
+      // Reload sales data
+      const salesData = await api.getSales(branch.id, selectedDate)
+      setTodaySales(salesData || [])
+      setEditingExtras(false)
+    } catch (err) {
+      alert('Failed to update: ' + (err.message || 'Unknown error'))
+    } finally {
+      setSavingExtras(false)
+    }
+  }
+
   if (!user) return <div className="min-h-screen flex items-center justify-center bg-gray-50"><Loader2 className="w-8 h-8 animate-spin text-green-500" /></div>
 
   return (
@@ -609,6 +669,99 @@ export default function SalesDashboardPage() {
                 </CardContent>
               </Card>
             </div>
+
+            {/* Edit HD / Deliveroo / Cool Mood */}
+            {activeRecord && !editingExtras && (
+              <button
+                onClick={startEditExtras}
+                className="w-full flex items-center justify-center gap-1.5 py-2 text-xs text-blue-600 bg-blue-50 rounded-lg border border-blue-200 active:scale-95 transition-all"
+              >
+                <Edit3 className="w-3.5 h-3.5" />
+                Edit HD / Deliveroo / Cool Mood
+              </button>
+            )}
+
+            {editingExtras && (
+              <Card className="border-blue-300 bg-blue-50/50">
+                <CardContent className="p-4 space-y-4">
+                  <div className="flex items-center justify-between">
+                    <p className="text-sm font-semibold text-blue-800">Edit Sales Channels</p>
+                    <button onClick={() => setEditingExtras(false)} className="p-1 rounded hover:bg-blue-100">
+                      <X className="w-4 h-4 text-blue-600" />
+                    </button>
+                  </div>
+
+                  {/* Home Delivery */}
+                  <div>
+                    <p className="text-[10px] font-bold text-cyan-600 uppercase mb-1.5">Home Delivery</p>
+                    <div className="grid grid-cols-3 gap-2">
+                      <div>
+                        <label className="text-[9px] text-gray-500">Net Sales</label>
+                        <Input type="number" inputMode="decimal" value={editExtras.hd_net_sales} onChange={e => setEditExtras(p => ({ ...p, hd_net_sales: e.target.value }))} className="h-8 text-sm" />
+                      </div>
+                      <div>
+                        <label className="text-[9px] text-gray-500">Gross</label>
+                        <Input type="number" inputMode="decimal" value={editExtras.hd_gross_sales} onChange={e => setEditExtras(p => ({ ...p, hd_gross_sales: e.target.value }))} className="h-8 text-sm" />
+                      </div>
+                      <div>
+                        <label className="text-[9px] text-gray-500">Orders</label>
+                        <Input type="number" inputMode="numeric" value={editExtras.hd_orders} onChange={e => setEditExtras(p => ({ ...p, hd_orders: e.target.value }))} className="h-8 text-sm" />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Deliveroo */}
+                  <div>
+                    <p className="text-[10px] font-bold text-teal-600 uppercase mb-1.5">Deliveroo</p>
+                    <div className="grid grid-cols-3 gap-2">
+                      <div>
+                        <label className="text-[9px] text-gray-500">Net Sales</label>
+                        <Input type="number" inputMode="decimal" value={editExtras.deliveroo_net_sales} onChange={e => setEditExtras(p => ({ ...p, deliveroo_net_sales: e.target.value }))} className="h-8 text-sm" />
+                      </div>
+                      <div>
+                        <label className="text-[9px] text-gray-500">Gross</label>
+                        <Input type="number" inputMode="decimal" value={editExtras.deliveroo_gross_sales} onChange={e => setEditExtras(p => ({ ...p, deliveroo_gross_sales: e.target.value }))} className="h-8 text-sm" />
+                      </div>
+                      <div>
+                        <label className="text-[9px] text-gray-500">Orders</label>
+                        <Input type="number" inputMode="numeric" value={editExtras.deliveroo_orders} onChange={e => setEditExtras(p => ({ ...p, deliveroo_orders: e.target.value }))} className="h-8 text-sm" />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Cool Mood */}
+                  <div>
+                    <p className="text-[10px] font-bold text-violet-600 uppercase mb-1.5">Cool Mood</p>
+                    <div className="grid grid-cols-3 gap-2">
+                      <div>
+                        <label className="text-[9px] text-gray-500">Net Sales</label>
+                        <Input type="number" inputMode="decimal" value={editExtras.cm_net_sales} onChange={e => setEditExtras(p => ({ ...p, cm_net_sales: e.target.value }))} className="h-8 text-sm" />
+                      </div>
+                      <div>
+                        <label className="text-[9px] text-gray-500">Gross</label>
+                        <Input type="number" inputMode="decimal" value={editExtras.cm_gross_sales} onChange={e => setEditExtras(p => ({ ...p, cm_gross_sales: e.target.value }))} className="h-8 text-sm" />
+                      </div>
+                      <div>
+                        <label className="text-[9px] text-gray-500">Orders</label>
+                        <Input type="number" inputMode="numeric" value={editExtras.cm_orders} onChange={e => setEditExtras(p => ({ ...p, cm_orders: e.target.value }))} className="h-8 text-sm" />
+                      </div>
+                    </div>
+                  </div>
+
+                  <Button
+                    onClick={saveExtras}
+                    disabled={savingExtras}
+                    className="w-full bg-blue-600 hover:bg-blue-700 text-white h-10"
+                  >
+                    {savingExtras ? (
+                      <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Saving...</>
+                    ) : (
+                      <><Save className="w-4 h-4 mr-2" /> Save Changes</>
+                    )}
+                  </Button>
+                </CardContent>
+              </Card>
+            )}
 
             {/* ===== PROMOTION TRACKING ===== */}
             {promotionData.length > 0 && (() => {
