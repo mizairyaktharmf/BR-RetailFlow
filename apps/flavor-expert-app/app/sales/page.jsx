@@ -417,12 +417,22 @@ export default function SalesPage() {
         return { trackedName: catName, trackedCode: tracked.item_code, columns, isCategory: true }
       }
 
-      // Item tracking: exact match + variants
-      const baseName = tracked.item_name.replace(/\s+(Sgl|Val|Dbl|Kids|S|M|L|XL|Single|Value|Double|Regular|Large|Small)$/i, '').trim()
+      // Item tracking: match by name — strip prefixes (TA, 6", etc.) and suffixes (Sgl, Val, S, etc.)
+      const sizeRe = /\s+(Sgl|Val|Dbl|Kids|S|M|L|XL|Single|Value|Double|Regular|Large|Small|1 Serve|2 Serve)$/i
+      const prefixRe = /^(TA|T\/A|6"|8"|9"|6\s|8\s|9\s)\s*/i
+      const baseName = tracked.item_name.replace(sizeRe, '').replace(prefixRe, '').trim().toLowerCase()
+
       const matchedItems = items.filter(it => {
+        // Exact code match
         if (it.code === tracked.item_code) return true
-        const itBase = it.name?.replace(/\s+(Sgl|Val|Dbl|Kids|S|M|L|XL|Single|Value|Double|Regular|Large|Small)$/i, '').trim()
-        return itBase && itBase.toLowerCase() === baseName.toLowerCase() && it.code !== tracked.item_code
+        const itClean = (it.name || '').replace(sizeRe, '').replace(prefixRe, '').trim().toLowerCase()
+        // Exact cleaned name match
+        if (itClean && itClean === baseName) return true
+        // POS item name contains the tracked name (e.g. "TA Umm Ali S" contains "umm ali")
+        if (itClean.includes(baseName)) return true
+        // Tracked name contains POS item name (e.g. tracked "Umm Ali" found in "umm ali")
+        if (baseName.includes(itClean) && itClean.length >= 4) return true
+        return false
       })
 
       const exactMatch = matchedItems.find(it => it.code === tracked.item_code)
