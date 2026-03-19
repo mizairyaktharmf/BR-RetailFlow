@@ -407,7 +407,7 @@ export default function SalesDashboardPage() {
       }
       await api.submitSales(payload)
       // Reload sales data
-      const salesData = await api.getSales(branch.id, selectedDate)
+      const salesData = await api.getDailySales(branch.id, selectedDate)
       setTodaySales(salesData || [])
       setEditingExtras(false)
     } catch (err) {
