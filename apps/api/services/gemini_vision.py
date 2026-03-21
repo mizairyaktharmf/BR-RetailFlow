@@ -5,6 +5,7 @@ Extracts structured sales data from receipt photos using Google Gemini Vision AP
 
 from google import genai
 from PIL import Image
+import asyncio
 import io
 import json
 import logging
@@ -13,6 +14,10 @@ import re
 from utils.config import settings
 
 logger = logging.getLogger(__name__)
+
+# Max retries on failure
+MAX_RETRIES = 3
+RETRY_DELAY = 2  # seconds
 
 # ============== PROMPTS ==============
 
@@ -81,7 +86,7 @@ Rules:
 - contribution_pct is the percentage shown in the last column
 - Return ONLY the JSON object, no other text"""
 
-POS_COMBINED_PROMPT = """Analyze these POS sales receipt images. You may receive 1-5 images showing different parts of the SAME receipt. Extract ALL data from ALL images combined.
+POS_COMBINED_PROMPT = """You are an expert OCR system for Baskin Robbins POS receipts. Analyze these POS sales receipt images with EXTREME PRECISION. You may receive 1-5 images showing different parts of the SAME receipt. Extract ALL data from ALL images combined.
 
 The POS receipt has these sections IN ORDER:
 
@@ -113,9 +118,15 @@ The POS receipt has these sections IN ORDER:
 6. **Non Sales Item Summary** — non-sales items (ignore these)
 7. **Discount / Promo Summary** — discount info (ignore these)
 
-CRITICAL RULES:
+CRITICAL ACCURACY RULES:
+- READ EACH LINE CHARACTER BY CHARACTER. Do not guess or estimate numbers.
+- Each item row has EXACTLY this format: CODE  NAME  QUANTITY  SALES  PCT
+- The QUANTITY column is a whole number (integer). Read it VERY carefully for each item.
+- The SALES column is a decimal number (e.g., 579.60). Do NOT confuse it with quantity.
+- DOUBLE CHECK: For each item, verify the quantity makes sense (usually 1-50 range for individual items).
+- If an item shows quantity like 32, verify it's really 32 and not misread from the sales column.
+- The sum of all item quantities within a category MUST equal the T> category total quantity.
 - Extract EVERY SINGLE item visible across ALL images. Do NOT skip any item. Do NOT truncate.
-- The sum of item quantities for each category MUST equal the T> category total quantity.
 - Each item has: 4-digit code, name, quantity, sales amount, contribution %
 - Items belong to the category whose T> header appears BELOW them in the list.
 - If multiple images show the same section, do NOT duplicate items.
@@ -127,6 +138,11 @@ CRITICAL RULES:
 - cash_gc = GC from the Cash Sales section
 - categories: from Category Sales Summary OR from T> total lines
 - If a section is not visible in any image, use empty array [] or 0
+
+VALIDATION STEP (do this before returning):
+1. For each category, sum up item quantities → must equal category total quantity
+2. If they don't match, re-read the items more carefully
+3. Check that no single item has a suspiciously high quantity compared to others
 
 Return ONLY a valid JSON object:
 
@@ -352,26 +368,69 @@ def _image_from_bytes(image_bytes: bytes) -> Image.Image:
     return Image.open(io.BytesIO(image_bytes))
 
 
+def _validate_pos_combined(data: dict) -> dict:
+    """Validate and fix extracted POS combined data."""
+    items = data.get("items", [])
+    categories = data.get("categories", [])
+
+    # Build category totals map
+    cat_totals = {}
+    for cat in categories:
+        cat_totals[cat["name"].lower()] = cat.get("quantity", 0)
+
+    # Check each category: sum of item quantities vs category total
+    cat_item_sums = {}
+    for item in items:
+        cat = (item.get("category") or "").lower()
+        cat_item_sums[cat] = cat_item_sums.get(cat, 0) + (item.get("quantity") or 0)
+
+    mismatches = []
+    for cat_name, expected_qty in cat_totals.items():
+        actual_qty = cat_item_sums.get(cat_name, 0)
+        if expected_qty > 0 and actual_qty != expected_qty:
+            mismatches.append(f"{cat_name}: expected {expected_qty}, got {actual_qty}")
+
+    if mismatches:
+        logger.warning(f"POS extraction quantity mismatches: {'; '.join(mismatches)}")
+
+    return data
+
+
+async def _call_gemini_with_retry(model: str, contents: list, config=None) -> str:
+    """Call Gemini API with automatic retry on failure."""
+    client = _get_client()
+    last_error = None
+
+    for attempt in range(MAX_RETRIES):
+        try:
+            kwargs = {"model": model, "contents": contents}
+            if config:
+                kwargs["config"] = config
+            response = client.models.generate_content(**kwargs)
+            if response.text:
+                return response.text
+            raise ValueError("Empty response from Gemini")
+        except Exception as e:
+            last_error = e
+            logger.warning(f"Gemini attempt {attempt + 1}/{MAX_RETRIES} failed: {e}")
+            if attempt < MAX_RETRIES - 1:
+                await asyncio.sleep(RETRY_DELAY * (attempt + 1))
+
+    raise last_error
+
+
 async def extract_pos_sales(image_bytes: bytes) -> dict:
     """Extract POS sales summary from receipt photo."""
-    client = _get_client()
     img = _image_from_bytes(image_bytes)
-    response = client.models.generate_content(
-        model="gemini-2.5-flash",
-        contents=[img, POS_SALES_PROMPT],
-    )
-    return _parse_json_response(response.text)
+    text = await _call_gemini_with_retry("gemini-2.5-flash", [img, POS_SALES_PROMPT])
+    return _parse_json_response(text)
 
 
 async def extract_pos_categories(image_bytes: bytes) -> dict:
     """Extract category and item breakdown from POS receipt photo."""
-    client = _get_client()
     img = _image_from_bytes(image_bytes)
-    response = client.models.generate_content(
-        model="gemini-2.5-flash",
-        contents=[img, CATEGORY_ITEMS_PROMPT],
-    )
-    return _parse_json_response(response.text)
+    text = await _call_gemini_with_retry("gemini-2.5-flash", [img, CATEGORY_ITEMS_PROMPT])
+    return _parse_json_response(text)
 
 
 async def extract_pos_combined(image_bytes_list) -> dict:
@@ -379,7 +438,6 @@ async def extract_pos_combined(image_bytes_list) -> dict:
     Accepts a single bytes object or a list of bytes (multi-image).
     """
     from google.genai import types
-    client = _get_client()
 
     # Support both single image and multiple images
     if isinstance(image_bytes_list, bytes):
@@ -390,47 +448,38 @@ async def extract_pos_combined(image_bytes_list) -> dict:
         contents.append(_image_from_bytes(img_bytes))
     contents.append(POS_COMBINED_PROMPT)
 
-    response = client.models.generate_content(
-        model="gemini-2.5-flash",
-        contents=contents,
-        config=types.GenerateContentConfig(temperature=0.1, max_output_tokens=65536),
-    )
-    return _parse_json_response(response.text)
+    config = types.GenerateContentConfig(temperature=0, max_output_tokens=65536)
+    text = await _call_gemini_with_retry("gemini-2.5-flash", contents, config)
+    data = _parse_json_response(text)
+
+    # Validate extraction
+    data = _validate_pos_combined(data)
+
+    logger.info(f"POS Combined: {len(data.get('categories', []))} categories, {len(data.get('items', []))} items")
+    return data
 
 
 async def extract_hd_sales(image_bytes: bytes) -> dict:
     """Extract Home Delivery data from report photo."""
-    client = _get_client()
     img = _image_from_bytes(image_bytes)
-    response = client.models.generate_content(
-        model="gemini-2.5-flash",
-        contents=[img, HOME_DELIVERY_PROMPT],
-    )
-    return _parse_json_response(response.text)
+    text = await _call_gemini_with_retry("gemini-2.5-flash", [img, HOME_DELIVERY_PROMPT])
+    return _parse_json_response(text)
 
 
 async def extract_deliveroo_sales(image_bytes: bytes) -> dict:
     """Extract Deliveroo data from dashboard photo."""
-    client = _get_client()
     img = _image_from_bytes(image_bytes)
-    response = client.models.generate_content(
-        model="gemini-2.5-flash",
-        contents=[img, DELIVEROO_PROMPT],
-    )
-    return _parse_json_response(response.text)
+    text = await _call_gemini_with_retry("gemini-2.5-flash", [img, DELIVEROO_PROMPT])
+    return _parse_json_response(text)
 
 
 async def extract_budget_sheet(image_bytes: bytes) -> dict:
     """Extract monthly budget sheet data from photo (DAILY SALES TRACKER format)."""
     from google.genai import types
-    client = _get_client()
     img = _image_from_bytes(image_bytes)
-    response = client.models.generate_content(
-        model="gemini-2.5-flash",
-        contents=[img, BUDGET_SHEET_PROMPT],
-        config=types.GenerateContentConfig(temperature=0.1, max_output_tokens=65536),
-    )
-    budget_data = _parse_json_response(response.text)
+    config = types.GenerateContentConfig(temperature=0, max_output_tokens=65536)
+    text = await _call_gemini_with_retry("gemini-2.5-flash", [img, BUDGET_SHEET_PROMPT], config)
+    budget_data = _parse_json_response(text)
 
     # Get overall LY ATV from KPIs footer
     kpis = budget_data.get("kpis", {})
