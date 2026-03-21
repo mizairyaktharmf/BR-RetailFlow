@@ -285,17 +285,28 @@ export default function SalesDashboardPage() {
 
       // Name-based tracking: match ALL items whose name contains the base name
       const isNameTrack = tracked.item_code?.startsWith('NAME:')
+      // Strip prefixes (TA, TA-, numbers like 6", 8") and size suffixes to get core product name
+      const stripName = (name) => name
+        ?.replace(/^(TA\s*-?\s*|T\s*A\s+)/i, '')
+        .replace(/\s+(Sgl|Val|Dbl|Kids|S|M|L|XL|Single|Value|Double|Regular|Large|Small)$/i, '')
+        .replace(/^\d+"\s*/, '')
+        .trim()
       const baseName = isNameTrack
-        ? tracked.item_code.replace('NAME:', '').trim()
-        : tracked.item_name.replace(/\s+(Sgl|Val|Dbl|Kids|S|M|L|XL|Single|Value|Double|Regular|Large|Small)$/i, '').trim()
+        ? stripName(tracked.item_code.replace('NAME:', ''))
+        : stripName(tracked.item_name)
+      const baseNameLower = baseName.toLowerCase()
+      // Split into keywords for fuzzy matching (words > 2 chars)
+      const baseKeywords = baseNameLower.split(/\s+/).filter(w => w.length > 2)
 
       const matchedItems = branchItems.filter(it => {
         if (!isNameTrack && it.code === tracked.item_code) return true
-        if (isNameTrack) {
-          return it.name && it.name.toLowerCase().includes(baseName.toLowerCase())
-        }
-        const itBase = it.name?.replace(/\s+(Sgl|Val|Dbl|Kids|S|M|L|XL|Single|Value|Double|Regular|Large|Small)$/i, '').trim()
-        return itBase && itBase.toLowerCase() === baseName.toLowerCase()
+        if (!it.name) return false
+        const itStripped = stripName(it.name).toLowerCase()
+        // Direct contains match
+        if (itStripped.includes(baseNameLower) || baseNameLower.includes(itStripped)) return true
+        // Keyword match: all keywords from tracked name must appear in item name
+        if (baseKeywords.length > 0 && baseKeywords.every(kw => itStripped.includes(kw))) return true
+        return false
       })
 
       const columns = []
