@@ -295,17 +295,14 @@ export default function SalesDashboardPage() {
         ? stripName(tracked.item_code.replace('NAME:', ''))
         : stripName(tracked.item_name)
       const baseNameLower = baseName.toLowerCase()
-      // Split into keywords for fuzzy matching (words > 2 chars)
-      const baseKeywords = baseNameLower.split(/\s+/).filter(w => w.length > 2)
 
       const matchedItems = branchItems.filter(it => {
+        // Exact code match
         if (!isNameTrack && it.code === tracked.item_code) return true
         if (!it.name) return false
         const itStripped = stripName(it.name).toLowerCase()
-        // Direct contains match
-        if (itStripped.includes(baseNameLower) || baseNameLower.includes(itStripped)) return true
-        // Keyword match: all keywords from tracked name must appear in item name
-        if (baseKeywords.length > 0 && baseKeywords.every(kw => itStripped.includes(kw))) return true
+        // Only match if POS item name contains the tracked name (not the other way around)
+        if (itStripped.includes(baseNameLower)) return true
         return false
       })
 
