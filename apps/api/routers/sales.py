@@ -262,7 +262,7 @@ async def extract_receipt(
             """Resize large images to reduce Gemini processing time."""
             try:
                 img = Image.open(io.BytesIO(raw_bytes))
-                max_dim = 2048
+                max_dim = 1600
                 if max(img.size) > max_dim:
                     ratio = max_dim / max(img.size)
                     new_size = (int(img.size[0] * ratio), int(img.size[1] * ratio))
