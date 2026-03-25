@@ -403,18 +403,37 @@ export default function SalesReportsPage() {
 
       // Name-based tracking: match ALL items whose base name matches
       const isNameTrack = tracked.item_code?.startsWith('NAME:')
+      // Strip prefixes (TA, TA-, numbers like 6", 8") and size suffixes to get core product name
+      const stripName = (name) => name
+        ?.replace(/^(TA\s*-?\s*|T\s*A\s+)/i, '')
+        .replace(/\s+(Sgl|Val|Dbl|Kids|S|M|L|XL|Single|Value|Double|Regular|Large|Small)$/i, '')
+        .replace(/^\d+"\s*/, '')
+        .trim()
       const baseName = isNameTrack
-        ? tracked.item_code.replace('NAME:', '').trim()
-        : tracked.item_name.replace(/\s+(Sgl|Val|Dbl|Kids|S|M|L|XL|Single|Value|Double|Regular|Large|Small)$/i, '').trim()
+        ? stripName(tracked.item_code.replace('NAME:', ''))
+        : stripName(tracked.item_name)
+      const baseNameLower = baseName.toLowerCase()
+
+      // Split base name into significant keywords (2+ chars) for fuzzy matching
+      const baseKeywords = baseNameLower.split(/\s+/).filter(w => w.length >= 2)
 
       const matchedItems = branchItems.filter(it => {
+        // Exact code match
         if (!isNameTrack && it.code === tracked.item_code) return true
-        // For name tracking, use contains match — item name should contain the base name
-        if (isNameTrack) {
-          return it.name && it.name.toLowerCase().includes(baseName.toLowerCase())
+        if (!it.name) return false
+        const itStripped = stripName(it.name).toLowerCase()
+        // Direct contains match (e.g. "umm ali" found in "umm ali sgl kid")
+        if (itStripped.includes(baseNameLower)) return true
+        if (baseNameLower.includes(itStripped) && itStripped.length >= 4) return true
+        // Keyword match: ALL significant keywords must appear as exact word matches
+        if (baseKeywords.length >= 2) {
+          const itWords = itStripped.split(/\s+/)
+          const allMatch = baseKeywords.every(kw =>
+            itWords.some(iw => iw === kw || iw.startsWith(kw) || kw.startsWith(iw))
+          )
+          if (allMatch) return true
         }
-        const itBase = it.name?.replace(/\s+(Sgl|Val|Dbl|Kids|S|M|L|XL|Single|Value|Double|Regular|Large|Small)$/i, '').trim()
-        return itBase && itBase.toLowerCase() === baseName.toLowerCase()
+        return false
       })
 
       const columns = []

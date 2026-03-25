@@ -297,7 +297,7 @@ export default function SalesDashboardPage() {
       const baseNameLower = baseName.toLowerCase()
 
       // Split base name into significant keywords (3+ chars) for fuzzy matching
-      const baseKeywords = baseNameLower.split(/\s+/).filter(w => w.length >= 3)
+      const baseKeywords = baseNameLower.split(/\s+/).filter(w => w.length >= 2)
 
       const matchedItems = branchItems.filter(it => {
         // Exact code match
@@ -306,16 +306,14 @@ export default function SalesDashboardPage() {
         const itStripped = stripName(it.name).toLowerCase()
         // Direct contains match (e.g. "umm ali" found in "umm ali sgl kid")
         if (itStripped.includes(baseNameLower)) return true
-        // Keyword match: check if POS item contains the core words from tracked name
-        // Handles abbreviations like "Pstl" for "Pastel" by matching other keywords
+        if (baseNameLower.includes(itStripped) && itStripped.length >= 4) return true
+        // Keyword match: ALL significant keywords must appear as exact word matches
         if (baseKeywords.length >= 2) {
           const itWords = itStripped.split(/\s+/)
-          // Check how many base keywords appear in the item name (partial word match)
-          const matched = baseKeywords.filter(kw =>
-            itWords.some(iw => iw.includes(kw) || kw.includes(iw) || (iw.length >= 3 && kw.startsWith(iw.slice(0, 3))))
+          const allMatch = baseKeywords.every(kw =>
+            itWords.some(iw => iw === kw || iw.startsWith(kw) || kw.startsWith(iw))
           )
-          // If most keywords match (at least half + 1, minimum 2), it's a match
-          if (matched.length >= Math.max(2, Math.ceil(baseKeywords.length * 0.6))) return true
+          if (allMatch) return true
         }
         return false
       })
