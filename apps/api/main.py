@@ -8,7 +8,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 import logging
 
-from routers import auth, users, territories, areas, branches, flavors, inventory, analytics, cake, sales, budget, notification
+from routers import auth, users, territories, areas, branches, flavors, inventory, analytics, cake, sales, budget, notification, expiry
 from utils.database import engine, Base
 from utils.config import settings
 
@@ -217,6 +217,7 @@ app.include_router(cake.router, prefix="/api/v1/cake", tags=["Cake Inventory"])
 app.include_router(sales.router, prefix="/api/v1/sales", tags=["Sales"])
 app.include_router(budget.router, prefix="/api/v1/budget", tags=["Budget"])
 app.include_router(notification.router, prefix="/api/v1/notifications", tags=["Push Notifications"])
+app.include_router(expiry.router, prefix="/api/v1/expiry", tags=["Expiry Tracking"])
 
 
 @app.get("/")

@@ -20,7 +20,8 @@ import {
   BarChart3,
   Target,
   Tag,
-  Bell
+  Bell,
+  CalendarClock
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 
@@ -36,6 +37,7 @@ const navigation = [
   { name: 'Ice Cream Flavors', href: '/dashboard/flavors', icon: IceCream, roles: ['supreme_admin'] },
   { name: 'Cake Products', href: '/dashboard/cake-products', icon: Cake, roles: ['supreme_admin'] },
   { name: 'Cake Alerts', href: '/dashboard/cake-alerts', icon: Bell, roles: ['supreme_admin', 'super_admin', 'admin'] },
+  { name: 'Expiry Tracking', href: '/dashboard/expiry-tracking', icon: CalendarClock, roles: ['supreme_admin', 'super_admin', 'admin'] },
 ]
 
 const roleLabels = {

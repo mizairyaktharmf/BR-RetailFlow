@@ -478,6 +478,38 @@ class ApiService {
       method: 'DELETE',
     })
   }
+
+  // ============ EXPIRY TRACKING ============
+  async getExpiryRequests(status) {
+    const params = status ? `?status_filter=${status}` : ''
+    return this.request(`/expiry/requests${params}`)
+  }
+
+  async createExpiryRequest(data) {
+    return this.request('/expiry/requests', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    })
+  }
+
+  async getExpiryRequestDetail(id) {
+    return this.request(`/expiry/requests/${id}`)
+  }
+
+  async updateExpiryRequest(id, data) {
+    return this.request(`/expiry/requests/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    })
+  }
+
+  async closeExpiryRequest(id) {
+    return this.request(`/expiry/requests/${id}/close`, { method: 'POST' })
+  }
+
+  async deleteExpiryRequest(id) {
+    return this.request(`/expiry/requests/${id}`, { method: 'DELETE' })
+  }
 }
 
 const api = new ApiService()

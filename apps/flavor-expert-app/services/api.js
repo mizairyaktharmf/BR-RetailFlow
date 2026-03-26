@@ -313,6 +313,26 @@ class ApiService {
   async getTrackedItems(branchId) {
     return this.request(`/sales/tracked-items?branch_id=${branchId}`)
   }
+
+  // ============ EXPIRY TRACKING ============
+  async getBranchExpiryRequests() {
+    return this.request('/expiry/branch-requests')
+  }
+
+  async getExpiryRequestDetail(id) {
+    return this.request(`/expiry/requests/${id}`)
+  }
+
+  async submitExpiryResponses(data) {
+    return this.request('/expiry/responses', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    })
+  }
+
+  async getExpiryResponses(requestId) {
+    return this.request(`/expiry/responses/${requestId}`)
+  }
 }
 
 export const api = new ApiService()

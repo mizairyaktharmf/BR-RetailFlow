@@ -15,7 +15,8 @@ import {
   ClipboardList,
   AlertCircle,
   Cake,
-  Bell
+  Bell,
+  CalendarClock
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -32,6 +33,7 @@ export default function DashboardPage() {
   const [nextWindow, setNextWindow] = useState(null)
   const [todayDate, setTodayDate] = useState('')
   const [cakeAlerts, setCakeAlerts] = useState([])
+  const [expiryRequests, setExpiryRequests] = useState([])
   const [expandedCategory, setExpandedCategory] = useState(null)
   const [pushStatus, setPushStatus] = useState('unknown') // 'unknown' | 'prompt' | 'granted' | 'denied' | 'unsupported'
   const [pushLoading, setPushLoading] = useState(false)
@@ -68,6 +70,17 @@ export default function DashboardPage() {
       }
     }
     loadCakeAlerts()
+
+    // Load expiry tracking requests
+    const loadExpiryRequests = async () => {
+      try {
+        const data = await api.getBranchExpiryRequests()
+        setExpiryRequests(data || [])
+      } catch (err) {
+        // Silently fail
+      }
+    }
+    loadExpiryRequests()
 
     // Check push notification status (don't request — just check)
     if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
@@ -192,6 +205,32 @@ export default function DashboardPage() {
           iconBg: currentWindow ? 'bg-green-100' : 'bg-gray-100',
           iconColor: currentWindow ? 'text-green-600' : 'text-gray-600',
           highlight: !!currentWindow,
+        },
+      ],
+    },
+    {
+      id: 'expiry',
+      name: 'Expiry Tracking',
+      description: 'Report near-expiry items',
+      icon: CalendarClock,
+      color: 'purple',
+      gradient: 'from-purple-500 to-violet-500',
+      bgLight: 'bg-purple-50',
+      borderColor: 'border-l-purple-500',
+      badge: expiryRequests.filter(r => r.branch_status === 'pending').length > 0
+        ? { count: expiryRequests.filter(r => r.branch_status === 'pending').length, type: 'danger' }
+        : null,
+      items: [
+        {
+          title: 'Expiry Requests',
+          description: expiryRequests.length > 0
+            ? `${expiryRequests.filter(r => r.branch_status === 'pending').length} pending requests`
+            : 'No active requests',
+          icon: CalendarClock,
+          href: '/expiry',
+          iconBg: 'bg-purple-100',
+          iconColor: 'text-purple-600',
+          highlight: expiryRequests.filter(r => r.branch_status === 'pending').length > 0,
         },
       ],
     },
