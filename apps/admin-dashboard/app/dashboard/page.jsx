@@ -13,7 +13,9 @@ import {
   CheckCircle2,
   Cake,
   UserPlus,
-  Loader2
+  Loader2,
+  Sparkles,
+  RefreshCw
 } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import api from '@/services/api'
@@ -31,6 +33,8 @@ export default function DashboardPage() {
   const [statsLoading, setStatsLoading] = useState(true)
   const [cakeAlerts, setCakeAlerts] = useState({ alerts: [], total_count: 0, critical_count: 0, warning_count: 0 })
   const [pendingApprovals, setPendingApprovals] = useState([])
+  const [brief, setBrief] = useState(null)
+  const [briefLoading, setBriefLoading] = useState(false)
 
   useEffect(() => {
     const storedUser = localStorage.getItem('br_admin_user')
@@ -82,10 +86,25 @@ export default function DashboardPage() {
           // Silently fail
         }
       }
+
+      // Load AI Daily Brief (async, don't block dashboard)
+      loadDailyBrief()
     } catch (err) {
       // Silently fail
     } finally {
       setStatsLoading(false)
+    }
+  }
+
+  const loadDailyBrief = async () => {
+    setBriefLoading(true)
+    try {
+      const data = await api.getDailyBrief()
+      if (data?.success) setBrief(data)
+    } catch (err) {
+      // Silently fail — brief is not critical
+    } finally {
+      setBriefLoading(false)
     }
   }
 
@@ -190,6 +209,44 @@ export default function DashboardPage() {
           </CardContent>
         </Card>
       </div>
+
+      {/* AI Daily Brief */}
+      <Card className="bg-gradient-to-r from-indigo-900/50 to-purple-900/50 border-indigo-500/30">
+        <CardContent className="p-5">
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center gap-2">
+              <div className="w-8 h-8 rounded-lg bg-indigo-500/20 flex items-center justify-center">
+                <Sparkles className="w-4 h-4 text-indigo-400" />
+              </div>
+              <div>
+                <h3 className="text-sm font-semibold text-white">AI Daily Brief</h3>
+                <p className="text-[10px] text-indigo-300/70">{brief?.date || 'Today'}</p>
+              </div>
+            </div>
+            <button
+              onClick={loadDailyBrief}
+              disabled={briefLoading}
+              className="p-1.5 rounded-lg text-indigo-400 hover:text-indigo-300 hover:bg-indigo-500/20 transition-colors disabled:opacity-50"
+            >
+              <RefreshCw className={`w-4 h-4 ${briefLoading ? 'animate-spin' : ''}`} />
+            </button>
+          </div>
+          {briefLoading && !brief ? (
+            <div className="flex items-center gap-2 text-sm text-indigo-300/70 py-4">
+              <Loader2 className="w-4 h-4 animate-spin" />
+              Analyzing today's data...
+            </div>
+          ) : brief?.brief ? (
+            <div className="space-y-1.5">
+              {brief.brief.split('\n').filter(l => l.trim()).map((line, i) => (
+                <p key={i} className="text-sm text-slate-300 leading-relaxed">{line}</p>
+              ))}
+            </div>
+          ) : (
+            <p className="text-sm text-indigo-300/50 py-2">No brief available yet. Click refresh to generate.</p>
+          )}
+        </CardContent>
+      </Card>
 
       {/* Pending Approvals Banner */}
       {user.role === 'supreme_admin' && pendingApprovals.length > 0 && (

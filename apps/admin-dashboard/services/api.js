@@ -562,6 +562,12 @@ class ApiService {
     const query = params.toString() ? `?${params.toString()}` : ''
     return this.request(`/users${query}`)
   }
+
+  // ============ AI DAILY BRIEF ============
+  async getDailyBrief(targetDate = null) {
+    const params = targetDate ? `?target_date=${targetDate}` : ''
+    return this.request(`/reports/daily-brief${params}`)
+  }
 }
 
 const api = new ApiService()

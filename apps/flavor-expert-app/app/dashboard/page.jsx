@@ -16,7 +16,9 @@ import {
   AlertCircle,
   Cake,
   Bell,
-  CalendarClock
+  CalendarClock,
+  Sparkles,
+  Loader2
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -37,6 +39,8 @@ export default function DashboardPage() {
   const [expandedCategory, setExpandedCategory] = useState(null)
   const [pushStatus, setPushStatus] = useState('unknown') // 'unknown' | 'prompt' | 'granted' | 'denied' | 'unsupported'
   const [pushLoading, setPushLoading] = useState(false)
+  const [brief, setBrief] = useState(null)
+  const [briefLoading, setBriefLoading] = useState(false)
 
   useEffect(() => {
     // Check authentication
@@ -81,6 +85,17 @@ export default function DashboardPage() {
       }
     }
     loadExpiryRequests()
+
+    // Load AI Daily Brief
+    const loadBrief = async () => {
+      setBriefLoading(true)
+      try {
+        const data = await api.getDailyBrief()
+        if (data?.success) setBrief(data)
+      } catch (err) { /* Silently fail */ }
+      finally { setBriefLoading(false) }
+    }
+    loadBrief()
 
     // Check push notification status (don't request — just check)
     if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
@@ -348,6 +363,50 @@ export default function DashboardPage() {
           </AlertDescription>
         </Alert>
       )}
+
+      {/* AI Daily Brief */}
+      <div className="mx-4 mt-4">
+        <Card className="bg-gradient-to-r from-indigo-50 to-purple-50 border-indigo-200">
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between mb-2">
+              <div className="flex items-center gap-2">
+                <div className="w-7 h-7 rounded-lg bg-indigo-100 flex items-center justify-center">
+                  <Sparkles className="w-4 h-4 text-indigo-600" />
+                </div>
+                <h3 className="text-sm font-semibold text-indigo-900">AI Daily Brief</h3>
+              </div>
+              <button
+                onClick={async () => {
+                  setBriefLoading(true)
+                  try {
+                    const data = await api.getDailyBrief()
+                    if (data?.success) setBrief(data)
+                  } catch {}
+                  finally { setBriefLoading(false) }
+                }}
+                disabled={briefLoading}
+                className="p-1.5 rounded-lg text-indigo-500 hover:bg-indigo-100 transition-colors disabled:opacity-50"
+              >
+                <RefreshCw className={`w-3.5 h-3.5 ${briefLoading ? 'animate-spin' : ''}`} />
+              </button>
+            </div>
+            {briefLoading && !brief ? (
+              <div className="flex items-center gap-2 text-sm text-indigo-400 py-3">
+                <Loader2 className="w-4 h-4 animate-spin" />
+                Analyzing your branch data...
+              </div>
+            ) : brief?.brief ? (
+              <div className="space-y-1">
+                {brief.brief.split('\n').filter(l => l.trim()).map((line, i) => (
+                  <p key={i} className="text-sm text-gray-700 leading-relaxed">{line}</p>
+                ))}
+              </div>
+            ) : (
+              <p className="text-sm text-indigo-400 py-2">Tap refresh to generate your daily brief.</p>
+            )}
+          </CardContent>
+        </Card>
+      </div>
 
       {/* Main Content */}
       <div className="px-4 py-6">

@@ -333,6 +333,11 @@ class ApiService {
   async getExpiryResponses(requestId) {
     return this.request(`/expiry/responses/${requestId}`)
   }
+
+  // ============ AI DAILY BRIEF ============
+  async getDailyBrief() {
+    return this.request('/reports/daily-brief')
+  }
 }
 
 export const api = new ApiService()
