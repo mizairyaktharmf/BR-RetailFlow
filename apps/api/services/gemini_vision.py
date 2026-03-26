@@ -507,3 +507,36 @@ async def extract_budget_sheet(image_bytes: bytes) -> dict:
         day["_budget_atv"] = round(budget / day["_budget_gc"], 2) if day["_budget_gc"] > 0 else 0
 
     return budget_data
+
+
+# ============== VISIT TIME EXTRACTION ==============
+
+VISIT_TIME_PROMPT = """Analyze this POS terminal or clock-in/clock-out photo.
+Extract the swipe in and swipe out times shown.
+
+Look for:
+- Clock in / Clock out times
+- Login / Logout times
+- Start / End times
+- Any timestamp pairs that indicate arrival and departure
+
+Return ONLY valid JSON:
+{
+  "swipe_in": "HH:MM" (24-hour format, e.g. "09:30"),
+  "swipe_out": "HH:MM" (24-hour format, e.g. "17:45"),
+  "date": "YYYY-MM-DD" (if visible, otherwise null),
+  "branch_name": "string" (if visible, otherwise null)
+}
+
+If only one time is visible, set the other to null.
+If no times found, return both as null.
+"""
+
+
+async def extract_visit_times(image_bytes: bytes) -> dict:
+    """Extract swipe in/out times from a POS or clock photo."""
+    img = _image_from_bytes(image_bytes)
+    from google.genai import types
+    config = types.GenerateContentConfig(temperature=0)
+    text = await _call_gemini_with_retry("gemini-2.5-flash", [img, VISIT_TIME_PROMPT], config)
+    return _parse_json_response(text)

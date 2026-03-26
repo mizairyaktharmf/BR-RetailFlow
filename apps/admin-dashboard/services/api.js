@@ -510,6 +510,58 @@ class ApiService {
   async deleteExpiryRequest(id) {
     return this.request(`/expiry/requests/${id}`, { method: 'DELETE' })
   }
+
+  // ============ BRANCH VISITS ============
+  async getBranchVisits(filters = {}) {
+    const params = new URLSearchParams()
+    if (filters.date_from) params.append('date_from', filters.date_from)
+    if (filters.date_to) params.append('date_to', filters.date_to)
+    if (filters.user_id) params.append('user_id', filters.user_id)
+    if (filters.branch_id) params.append('branch_id', filters.branch_id)
+    const query = params.toString() ? `?${params.toString()}` : ''
+    return this.request(`/visits${query}`)
+  }
+
+  async createBranchVisit(data) {
+    return this.request('/visits', { method: 'POST', body: JSON.stringify(data) })
+  }
+
+  async updateBranchVisit(id, data) {
+    return this.request(`/visits/${id}`, { method: 'PUT', body: JSON.stringify(data) })
+  }
+
+  async deleteBranchVisit(id) {
+    return this.request(`/visits/${id}`, { method: 'DELETE' })
+  }
+
+  async getVisitSummary(filters = {}) {
+    const params = new URLSearchParams()
+    if (filters.date_from) params.append('date_from', filters.date_from)
+    if (filters.date_to) params.append('date_to', filters.date_to)
+    const query = params.toString() ? `?${params.toString()}` : ''
+    return this.request(`/visits/summary${query}`)
+  }
+
+  async extractVisitTimes(file) {
+    const formData = new FormData()
+    formData.append('file', file)
+    const token = localStorage.getItem('br_admin_token')
+    const res = await fetch(`${this.baseUrl}/visits/extract-times`, {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${token}` },
+      body: formData,
+    })
+    if (!res.ok) throw new Error('Extraction failed')
+    return res.json()
+  }
+
+  // ============ ADMIN USERS LIST ============
+  async getUsers(filters = {}) {
+    const params = new URLSearchParams()
+    if (filters.role) params.append('role', filters.role)
+    const query = params.toString() ? `?${params.toString()}` : ''
+    return this.request(`/users${query}`)
+  }
 }
 
 const api = new ApiService()
