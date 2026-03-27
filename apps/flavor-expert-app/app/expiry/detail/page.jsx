@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from 'react'
-import { useRouter, useParams } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import {
   ArrowLeft, CalendarClock, Loader2, Save, CheckCircle2,
   Package, Calendar, MessageSquare
@@ -13,17 +13,18 @@ import api from '@/services/api'
 
 export default function ExpiryResponsePage() {
   const router = useRouter()
-  const params = useParams()
-  const requestId = params.id
+  const searchParams = useSearchParams()
+  const requestId = searchParams.get('id')
 
   const [detail, setDetail] = useState(null)
-  const [responses, setResponses] = useState({}) // { item_id: { quantity, expiry_date, notes } }
+  const [responses, setResponses] = useState({})
   const [loading, setLoading] = useState(true)
   const [submitting, setSubmitting] = useState(false)
   const [submitted, setSubmitted] = useState(false)
   const [branchId, setBranchId] = useState(null)
 
   useEffect(() => {
+    if (!requestId) return
     const userData = localStorage.getItem('br_user')
     if (!userData) {
       router.push('/login')
@@ -43,7 +44,6 @@ export default function ExpiryResponsePage() {
       ])
       setDetail(detailData)
 
-      // Pre-fill existing responses
       const prefilled = {}
       if (existingResponses && existingResponses.length > 0) {
         existingResponses.forEach(r => {
@@ -55,7 +55,6 @@ export default function ExpiryResponsePage() {
         })
       }
 
-      // Initialize empty responses for items not yet responded to
       if (detailData?.items) {
         detailData.items.forEach(item => {
           if (!prefilled[item.id]) {
@@ -105,6 +104,15 @@ export default function ExpiryResponsePage() {
     } finally {
       setSubmitting(false)
     }
+  }
+
+  if (!requestId) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center gap-3">
+        <p className="text-gray-500">No request ID provided</p>
+        <Button variant="ghost" onClick={() => router.push('/expiry')} className="text-purple-500">Go Back</Button>
+      </div>
+    )
   }
 
   if (loading) {

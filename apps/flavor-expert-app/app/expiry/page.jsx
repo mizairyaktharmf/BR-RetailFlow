@@ -85,7 +85,7 @@ export default function ExpiryListPage() {
             <Card
               key={req.id}
               className="border-0 shadow-sm cursor-pointer active:scale-[0.98] transition-transform"
-              onClick={() => router.push(`/expiry/${req.id}`)}
+              onClick={() => router.push(`/expiry/detail?id=${req.id}`)}
             >
               <CardContent className="p-4">
                 <div className="flex items-center justify-between">
