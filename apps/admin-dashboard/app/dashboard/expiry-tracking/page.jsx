@@ -389,7 +389,7 @@ export default function ExpiryTrackingPage() {
                   <div className="flex items-center gap-1 ml-4">
                     <Button
                       variant="ghost" size="sm"
-                      onClick={() => router.push(`/dashboard/expiry-tracking/${req.id}`)}
+                      onClick={() => router.push(`/dashboard/expiry-tracking/detail?id=${req.id}`)}
                       className="text-blue-400 hover:text-blue-300"
                       title="View Details"
                     >

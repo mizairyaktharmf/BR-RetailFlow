@@ -1,7 +1,7 @@
 "use client"
 
 import React, { useState, useEffect } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import {
@@ -10,9 +10,10 @@ import {
 } from 'lucide-react'
 import api from '@/services/api'
 
-export default function ExpiryDetailClient({ id }) {
+export default function ExpiryRequestDetailPage() {
   const router = useRouter()
-  const requestId = id
+  const searchParams = useSearchParams()
+  const requestId = searchParams.get('id')
 
   const [data, setData] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -64,6 +65,15 @@ export default function ExpiryDetailClient({ id }) {
     a.download = `expiry-${data.title.replace(/\s+/g, '-')}.csv`
     a.click()
     URL.revokeObjectURL(url)
+  }
+
+  if (!requestId) {
+    return (
+      <div className="text-center py-20 text-gray-400">
+        <p>No request ID provided</p>
+        <Button variant="ghost" onClick={() => router.push('/dashboard/expiry-tracking')} className="mt-4 text-orange-400">Go Back</Button>
+      </div>
+    )
   }
 
   if (loading) {
