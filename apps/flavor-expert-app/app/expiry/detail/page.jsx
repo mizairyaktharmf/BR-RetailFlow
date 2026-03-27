@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import {
   ArrowLeft, CalendarClock, Loader2, Save, CheckCircle2,
@@ -12,6 +12,14 @@ import { Card, CardContent } from '@/components/ui/card'
 import api from '@/services/api'
 
 export default function ExpiryResponsePage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-gray-50 flex items-center justify-center"><Loader2 className="h-8 w-8 animate-spin text-purple-500" /></div>}>
+      <ExpiryResponseContent />
+    </Suspense>
+  )
+}
+
+function ExpiryResponseContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const requestId = searchParams.get('id')
