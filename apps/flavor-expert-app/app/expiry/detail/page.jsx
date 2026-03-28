@@ -108,7 +108,7 @@ function ExpiryResponseContent() {
     try {
       const responseItems = detail.items.map(item => ({
         expiry_request_item_id: item.id,
-        quantity: responses[item.id]?.quantity !== '' ? parseInt(responses[item.id]?.quantity) || 0 : null,
+        quantity: responses[item.id]?.quantity !== '' ? parseFloat(responses[item.id]?.quantity) || 0 : null,
         expiry_date: responses[item.id]?.expiry_date || null,
         notes: responses[item.id]?.notes || null,
       }))

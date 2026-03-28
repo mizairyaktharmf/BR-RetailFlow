@@ -166,6 +166,17 @@ def run_migrations():
                 conn.commit()
                 logger.info("Migration: budget_uploads new columns added")
 
+        # Migrate expiry_responses quantity from INTEGER to FLOAT (support decimal like 1.25)
+        if 'expiry_responses' in inspector.get_table_names():
+            er_columns = {c['name']: c for c in inspector.get_columns('expiry_responses')}
+            if 'quantity' in er_columns:
+                col_type = str(er_columns['quantity']['type'])
+                if 'INT' in col_type.upper() and 'FLOAT' not in col_type.upper():
+                    logger.info("Migration: Changing expiry_responses.quantity from INTEGER to FLOAT")
+                    conn.execute(text("ALTER TABLE expiry_responses ALTER COLUMN quantity TYPE DOUBLE PRECISION USING quantity::double precision"))
+                    conn.commit()
+                    logger.info("Migration: expiry_responses.quantity is now FLOAT")
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):

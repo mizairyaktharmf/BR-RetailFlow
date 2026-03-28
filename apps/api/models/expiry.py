@@ -3,7 +3,7 @@ Expiry Tracking models: ExpiryRequest, ExpiryRequestItem, ExpiryRequestBranch, E
 Area Managers create expiry check requests, branches respond with expiry data
 """
 
-from sqlalchemy import Column, Integer, String, Boolean, DateTime, Date, ForeignKey, Text, Enum, UniqueConstraint
+from sqlalchemy import Column, Integer, Float, String, Boolean, DateTime, Date, ForeignKey, Text, Enum, UniqueConstraint
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 import enum
@@ -110,7 +110,7 @@ class ExpiryResponse(Base):
     expiry_request_id = Column(Integer, ForeignKey("expiry_requests.id", ondelete="CASCADE"), nullable=False)
     expiry_request_item_id = Column(Integer, ForeignKey("expiry_request_items.id", ondelete="CASCADE"), nullable=False)
     branch_id = Column(Integer, ForeignKey("branches.id"), nullable=False)
-    quantity = Column(Integer, nullable=True)
+    quantity = Column(Float, nullable=True)
     expiry_date = Column(Date, nullable=True)
     notes = Column(Text, nullable=True)
     submitted_by_id = Column(Integer, ForeignKey("users.id"), nullable=False)

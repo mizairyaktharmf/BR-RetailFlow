@@ -33,7 +33,7 @@ class ExpiryRequestUpdate(BaseModel):
 
 class ExpiryResponseItem(BaseModel):
     expiry_request_item_id: int
-    quantity: Optional[int] = Field(None, ge=0)
+    quantity: Optional[float] = Field(None, ge=0)
     expiry_date: Optional[date] = None
     notes: Optional[str] = None
 
@@ -67,7 +67,7 @@ class ExpiryBranchResponse(BaseModel):
 
 class ExpiryResponseData(BaseModel):
     id: int
-    quantity: Optional[int] = None
+    quantity: Optional[float] = None
     expiry_date: Optional[date] = None
     notes: Optional[str] = None
     submitted_by_name: Optional[str] = None
