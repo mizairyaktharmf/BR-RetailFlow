@@ -411,6 +411,10 @@ class ApiService {
     return this.request('/cake/cake-stock/alerts')
   }
 
+  async notifyLowStockNow() {
+    return this.request('/cake/cake-stock/alerts/notify', { method: 'POST' })
+  }
+
   async getCakeAlertConfigs(branchId) {
     return this.request(`/cake/cake-stock/alerts/config/${branchId}`)
   }

@@ -11,8 +11,11 @@ import {
   AlertTriangle,
   CheckCircle2,
   Cake,
-  Building2
+  Building2,
+  BellRing,
+  RefreshCw
 } from 'lucide-react'
+import { Button } from '@/components/ui/button'
 import api from '@/services/api'
 
 export default function CakeAlertsPage() {
@@ -24,6 +27,8 @@ export default function CakeAlertsPage() {
   const [totalCount, setTotalCount] = useState(0)
   const [criticalCount, setCriticalCount] = useState(0)
   const [warningCount, setWarningCount] = useState(0)
+  const [notifying, setNotifying] = useState(false)
+  const [notifyResult, setNotifyResult] = useState(null)
 
   useEffect(() => {
     const storedUser = localStorage.getItem('br_admin_user')
@@ -49,6 +54,20 @@ export default function CakeAlertsPage() {
     }
   }
 
+  const handleNotifyNow = async () => {
+    setNotifying(true)
+    setNotifyResult(null)
+    try {
+      const res = await api.notifyLowStockNow()
+      setNotifyResult({ success: true, message: res.message })
+    } catch (err) {
+      setNotifyResult({ success: false, message: 'Failed to send notifications' })
+    } finally {
+      setNotifying(false)
+      setTimeout(() => setNotifyResult(null), 5000)
+    }
+  }
+
   const filteredAlerts = alerts.filter(a => {
     const q = searchTerm.toLowerCase()
     return (a.cake_name || '').toLowerCase().includes(q) ||
@@ -68,15 +87,38 @@ export default function CakeAlertsPage() {
   return (
     <div className="p-6 space-y-6">
       {/* Header */}
-      <div>
-        <h1 className="text-2xl font-bold text-white flex items-center gap-2">
-          <Bell className="w-6 h-6 text-red-400" />
-          Cake Stock Alerts
-        </h1>
-        <p className="text-slate-400 text-sm mt-1">
-          Low stock alerts across all branches in your scope
-        </p>
+      <div className="flex items-start justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-white flex items-center gap-2">
+            <Bell className="w-6 h-6 text-red-400" />
+            Cake Stock Alerts
+          </h1>
+          <p className="text-slate-400 text-sm mt-1">
+            Low stock alerts across all branches in your scope
+          </p>
+        </div>
+        <div className="flex items-center gap-2">
+          <Button variant="ghost" size="sm" onClick={loadAlerts} className="text-slate-400 hover:text-white">
+            <RefreshCw className="w-4 h-4" />
+          </Button>
+          {totalCount > 0 && (
+            <Button
+              size="sm"
+              onClick={handleNotifyNow}
+              disabled={notifying}
+              className="bg-red-600 hover:bg-red-700 text-white"
+            >
+              {notifying ? <Loader2 className="w-4 h-4 mr-1.5 animate-spin" /> : <BellRing className="w-4 h-4 mr-1.5" />}
+              {notifying ? 'Sending...' : 'Notify Branches Now'}
+            </Button>
+          )}
+        </div>
       </div>
+      {notifyResult && (
+        <div className={`px-4 py-2 rounded-lg text-sm ${notifyResult.success ? 'bg-green-500/20 text-green-400 border border-green-500/30' : 'bg-red-500/20 text-red-400 border border-red-500/30'}`}>
+          {notifyResult.message}
+        </div>
+      )}
 
       {/* Summary Cards */}
       <div className="grid grid-cols-3 gap-4">

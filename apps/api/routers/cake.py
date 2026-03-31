@@ -447,6 +447,18 @@ async def adjust_cake_stock(
     db.refresh(stock)
 
     threshold = get_effective_threshold(db, data.branch_id, product.id, product.default_alert_threshold)
+
+    # Send push notification if adjusted stock is at/below threshold
+    check_and_notify_low_stock(
+        db=db,
+        branch_id=data.branch_id,
+        cake_name=product.name,
+        cake_code=product.code,
+        current_quantity=stock.current_quantity,
+        threshold=threshold,
+        triggered_by_user_id=current_user.id,
+    )
+
     return CakeStockResponse(
         id=stock.id,
         branch_id=stock.branch_id,
@@ -526,37 +538,43 @@ async def get_low_stock_alerts(
         branches = db.query(Branch).filter(Branch.is_active == True).all()
         branch_ids = [b.id for b in branches]
 
+    # Build a lookup of existing stock records: {(branch_id, cake_product_id): stock}
     stocks = db.query(CakeStock).filter(CakeStock.branch_id.in_(branch_ids)).all()
+    stock_map = {(s.branch_id, s.cake_product_id): s for s in stocks}
+
+    # Get all active products and all active branches in scope
+    all_products = db.query(CakeProduct).filter(CakeProduct.is_active == True).all()
+    all_branches = db.query(Branch).filter(Branch.id.in_(branch_ids), Branch.is_active == True).all()
+    branch_map = {b.id: b for b in all_branches}
 
     alerts = []
     critical_count = 0
     warning_count = 0
 
-    for stock in stocks:
-        product = stock.cake_product
-        if not product or not product.is_active:
-            continue
+    for branch in all_branches:
+        for product in all_products:
+            stock = stock_map.get((branch.id, product.id))
+            current_qty = stock.current_quantity if stock else 0
 
-        threshold = get_effective_threshold(db, stock.branch_id, product.id, product.default_alert_threshold)
+            threshold = get_effective_threshold(db, branch.id, product.id, product.default_alert_threshold)
 
-        if stock.current_quantity <= threshold:
-            severity = "critical" if stock.current_quantity == 0 else "warning"
-            if severity == "critical":
-                critical_count += 1
-            else:
-                warning_count += 1
+            if current_qty <= threshold:
+                severity = "critical" if current_qty == 0 else "warning"
+                if severity == "critical":
+                    critical_count += 1
+                else:
+                    warning_count += 1
 
-            branch = stock.branch
-            alerts.append(LowStockAlert(
-                cake_product_id=product.id,
-                cake_name=product.name,
-                cake_code=product.code,
-                branch_id=stock.branch_id,
-                branch_name=branch.name if branch else "Unknown",
-                current_quantity=stock.current_quantity,
-                threshold=threshold,
-                severity=severity,
-            ))
+                alerts.append(LowStockAlert(
+                    cake_product_id=product.id,
+                    cake_name=product.name,
+                    cake_code=product.code,
+                    branch_id=branch.id,
+                    branch_name=branch.name,
+                    current_quantity=current_qty,
+                    threshold=threshold,
+                    severity=severity,
+                ))
 
     alerts.sort(key=lambda a: (0 if a.severity == "critical" else 1, a.current_quantity))
 
@@ -566,6 +584,50 @@ async def get_low_stock_alerts(
         critical_count=critical_count,
         warning_count=warning_count,
     )
+
+
+@router.post("/cake-stock/alerts/notify")
+async def notify_low_stock_now(
+    current_user: User = Depends(require_role([UserRole.SUPREME_ADMIN, UserRole.SUPER_ADMIN, UserRole.ADMIN])),
+    db: Session = Depends(get_db),
+):
+    """Manually trigger push notifications for ALL currently low-stock items in scope.
+    Use this when stock was already low before a sale (notifications normally only fire on sales)."""
+    if current_user.role == UserRole.ADMIN:
+        branches = db.query(Branch).filter(Branch.area_id == current_user.area_id).all()
+        branch_ids = [b.id for b in branches]
+    elif current_user.role == UserRole.SUPER_ADMIN:
+        from models.location import Area
+        areas = db.query(Area).filter(Area.territory_id == current_user.territory_id).all()
+        area_ids = [a.id for a in areas]
+        branches = db.query(Branch).filter(Branch.area_id.in_(area_ids)).all()
+        branch_ids = [b.id for b in branches]
+    else:
+        branch_ids = [b.id for b in db.query(Branch).filter(Branch.is_active == True).all()]
+
+    stock_map = {(s.branch_id, s.cake_product_id): s for s in
+                 db.query(CakeStock).filter(CakeStock.branch_id.in_(branch_ids)).all()}
+    all_products = db.query(CakeProduct).filter(CakeProduct.is_active == True).all()
+    all_branches = db.query(Branch).filter(Branch.id.in_(branch_ids), Branch.is_active == True).all()
+
+    notified = 0
+    for branch in all_branches:
+        for product in all_products:
+            stock = stock_map.get((branch.id, product.id))
+            current_qty = stock.current_quantity if stock else 0
+            threshold = get_effective_threshold(db, branch.id, product.id, product.default_alert_threshold)
+            if current_qty <= threshold:
+                check_and_notify_low_stock(
+                    db=db,
+                    branch_id=branch.id,
+                    cake_name=product.name,
+                    cake_code=product.code,
+                    current_quantity=current_qty,
+                    threshold=threshold,
+                )
+                notified += 1
+
+    return {"notified": notified, "message": f"Sent notifications for {notified} low-stock items"}
 
 
 # ============== ALERT CONFIGURATION ==============
