@@ -33,6 +33,8 @@ class ExpiryRequest(Base):
     notes = Column(Text, nullable=True)
     status = Column(Enum(ExpiryRequestStatus), default=ExpiryRequestStatus.OPEN, nullable=False)
     created_by_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    template_file_data = Column(Text, nullable=True)      # base64 encoded Excel file
+    template_filename = Column(String(255), nullable=True)
 
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())

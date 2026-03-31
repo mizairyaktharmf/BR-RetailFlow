@@ -6,7 +6,7 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import {
   CalendarClock, ArrowLeft, Loader2, Lock, RefreshCw,
-  CheckCircle2, Clock, Download
+  CheckCircle2, Clock, Download, FileSpreadsheet
 } from 'lucide-react'
 import api from '@/services/api'
 
@@ -44,27 +44,70 @@ export default function ExpiryRequestDetailPage() {
     }
   }
 
-  const exportCSV = () => {
+  const exportExcel = async () => {
     if (!data) return
+    const XLSX = (await import('xlsx')).default
     const { items, branches, responses } = data
-    let csv = 'Product,Expiry Date'
-    branches.forEach(b => { csv += `,${b.branch_name} (Qty),${b.branch_name} (Exp),${b.branch_name} (Notes)` })
-    csv += '\n'
-    items.forEach(item => {
-      csv += `"${item.product_name}",${item.expiry_date || ''}`
+
+    // Row 1: merged branch headers
+    // Row 2: sub-headers (QTY / EXP / NOTES per branch)
+    // Row 3+: data
+
+    const headerRow1 = ['#', 'Product', 'Exp. Date (Manager)']
+    const headerRow2 = ['', '', '']
+    branches.forEach(b => {
+      headerRow1.push(b.branch_name, '', '')
+      headerRow2.push('QTY', 'EXP', 'NOTES')
+    })
+
+    const dataRows = items.map((item, idx) => {
+      const row = [idx + 1, item.product_name, item.expiry_date || '']
       branches.forEach(b => {
         const resp = responses?.[String(b.branch_id)]?.[String(item.id)]
-        csv += `,${resp?.quantity ?? ''},${resp?.expiry_date ?? ''},"${resp?.notes ?? ''}"`
+        row.push(
+          resp?.quantity ?? '',
+          resp?.expiry_date ?? '',
+          resp?.notes ?? ''
+        )
       })
-      csv += '\n'
+      return row
     })
-    const blob = new Blob([csv], { type: 'text/csv' })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = `expiry-${data.title.replace(/\s+/g, '-')}.csv`
-    a.click()
-    URL.revokeObjectURL(url)
+
+    const aoa = [headerRow1, headerRow2, ...dataRows]
+    const ws = XLSX.utils.aoa_to_sheet(aoa)
+
+    // Merge branch name cells across QTY/EXP/NOTES
+    ws['!merges'] = []
+    branches.forEach((_, i) => {
+      const startCol = 3 + i * 3
+      ws['!merges'].push({ s: { r: 0, c: startCol }, e: { r: 0, c: startCol + 2 } })
+    })
+
+    // Column widths
+    ws['!cols'] = [
+      { wch: 5 },   // #
+      { wch: 30 },  // Product
+      { wch: 16 },  // Exp Date
+      ...branches.flatMap(() => [{ wch: 10 }, { wch: 14 }, { wch: 20 }]),
+    ]
+
+    const wb = XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(wb, ws, 'Expiry Responses')
+    XLSX.writeFile(wb, `expiry-${data.title.replace(/\s+/g, '-')}.xlsx`)
+  }
+
+  const downloadTemplate = async () => {
+    try {
+      const blob = await api.getExpiryTemplate(requestId)
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = data.template_filename || `expiry-template-${requestId}.xlsx`
+      a.click()
+      URL.revokeObjectURL(url)
+    } catch (err) {
+      alert('No template file uploaded for this request')
+    }
   }
 
   if (!requestId) {
@@ -121,8 +164,13 @@ export default function ExpiryRequestDetailPage() {
           <Button variant="ghost" size="sm" onClick={loadDetail} className="text-gray-400" title="Refresh">
             <RefreshCw className="h-4 w-4" />
           </Button>
-          <Button variant="ghost" size="sm" onClick={exportCSV} className="text-green-400 hover:text-green-300" title="Export CSV">
-            <Download className="h-4 w-4 mr-1" /> CSV
+          {data.has_template && (
+            <Button variant="ghost" size="sm" onClick={downloadTemplate} className="text-blue-400 hover:text-blue-300" title="Download uploaded template">
+              <FileSpreadsheet className="h-4 w-4 mr-1" /> Template
+            </Button>
+          )}
+          <Button variant="ghost" size="sm" onClick={exportExcel} className="text-green-400 hover:text-green-300" title="Export Excel">
+            <Download className="h-4 w-4 mr-1" /> Excel
           </Button>
           {data.status === 'open' && (
             <Button size="sm" onClick={handleClose} className="bg-yellow-600 hover:bg-yellow-700 text-white">

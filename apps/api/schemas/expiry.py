@@ -20,6 +20,8 @@ class ExpiryRequestCreate(BaseModel):
     items: List[Union[ExpiryItemInput, str]] = Field(..., min_length=1)
     branch_ids: List[int] = Field(..., min_length=1)
     copy_from_id: Optional[int] = None  # Copy items from a previous request
+    template_file_data: Optional[str] = None   # base64 encoded Excel file
+    template_filename: Optional[str] = None
 
 
 class ExpiryRequestUpdate(BaseModel):

@@ -7,7 +7,8 @@ import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import {
   CalendarClock, Plus, Search, Loader2, X, Send, Trash2,
-  CheckCircle2, Clock, Eye, Lock, Building2, Copy, Download
+  CheckCircle2, Clock, Eye, Lock, Building2, Copy, Download,
+  FileSpreadsheet, Upload
 } from 'lucide-react'
 import api from '@/services/api'
 
@@ -27,6 +28,9 @@ export default function ExpiryTrackingPage() {
   const [selectedBranches, setSelectedBranches] = useState([])
   const [creating, setCreating] = useState(false)
   const [selectAll, setSelectAll] = useState(false)
+  const [createMode, setCreateMode] = useState('manual') // 'manual' | 'excel'
+  const [excelFile, setExcelFile] = useState(null)      // { name, base64 }
+  const [excelParsing, setExcelParsing] = useState(false)
 
   useEffect(() => {
     const storedUser = localStorage.getItem('br_admin_user')
@@ -65,6 +69,61 @@ export default function ExpiryTrackingPage() {
     const updated = [...items]
     updated[index] = { ...updated[index], [field]: value }
     setItems(updated)
+  }
+
+  const handleExcelUpload = async (e) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setExcelParsing(true)
+    try {
+      const XLSX = (await import('xlsx')).default
+      const arrayBuffer = await file.arrayBuffer()
+      const wb = XLSX.read(arrayBuffer, { type: 'array', cellDates: true })
+      const ws = wb.Sheets[wb.SheetNames[0]]
+      const rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' })
+
+      // Skip header row (row 0), read col A = product, col B = expiry date
+      const parsed = []
+      for (let i = 1; i < rows.length; i++) {
+        const row = rows[i]
+        const name = String(row[0] || '').trim()
+        if (!name) continue
+        let expDate = ''
+        if (row[1]) {
+          const d = row[1]
+          if (d instanceof Date) {
+            expDate = d.toISOString().split('T')[0]
+          } else if (typeof d === 'string' && d.match(/\d{4}-\d{2}-\d{2}/)) {
+            expDate = d.split('T')[0]
+          } else if (typeof d === 'number') {
+            // Excel serial date
+            const jsDate = new Date(Math.round((d - 25569) * 86400 * 1000))
+            expDate = jsDate.toISOString().split('T')[0]
+          } else {
+            expDate = String(d)
+          }
+        }
+        parsed.push({ product_name: name, expiry_date: expDate })
+      }
+
+      if (parsed.length === 0) {
+        alert('No products found. Make sure Column A has product names (row 1 is header).')
+        return
+      }
+
+      setItems(parsed)
+
+      // Store base64 for saving to backend
+      const bytes = new Uint8Array(arrayBuffer)
+      let binary = ''
+      bytes.forEach(b => { binary += String.fromCharCode(b) })
+      const base64 = btoa(binary)
+      setExcelFile({ name: file.name, base64 })
+    } catch (err) {
+      alert('Failed to read Excel file: ' + err.message)
+    } finally {
+      setExcelParsing(false)
+    }
   }
 
   const toggleBranch = (branchId) => {
@@ -120,6 +179,8 @@ export default function ExpiryTrackingPage() {
           expiry_date: i.expiry_date || null,
         })),
         branch_ids: selectedBranches,
+        template_file_data: excelFile?.base64 || null,
+        template_filename: excelFile?.name || null,
       })
       setShowCreate(false)
       setTitle('')
@@ -127,6 +188,8 @@ export default function ExpiryTrackingPage() {
       setItems([{ product_name: '', expiry_date: '' }])
       setSelectedBranches([])
       setSelectAll(false)
+      setExcelFile(null)
+      setCreateMode('manual')
       loadRequests()
     } catch (err) {
       alert('Failed to create request: ' + (err.message || 'Unknown error'))
@@ -209,9 +272,54 @@ export default function ExpiryTrackingPage() {
               </div>
             </div>
 
-            {/* Excel-like Product Table */}
+            {/* Mode Toggle */}
             <div>
               <label className="text-sm text-gray-400 mb-2 block">Products to Check</label>
+              <div className="flex gap-2 mb-3">
+                <button
+                  onClick={() => setCreateMode('manual')}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
+                    createMode === 'manual'
+                      ? 'bg-orange-500/20 border border-orange-500 text-orange-300'
+                      : 'bg-gray-700/50 border border-gray-600 text-gray-400 hover:border-gray-500'
+                  }`}
+                >
+                  <Plus className="h-3.5 w-3.5" /> Manual Entry
+                </button>
+                <button
+                  onClick={() => setCreateMode('excel')}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
+                    createMode === 'excel'
+                      ? 'bg-green-500/20 border border-green-500 text-green-300'
+                      : 'bg-gray-700/50 border border-gray-600 text-gray-400 hover:border-gray-500'
+                  }`}
+                >
+                  <FileSpreadsheet className="h-3.5 w-3.5" /> Upload Excel
+                </button>
+              </div>
+
+              {/* Excel Upload Area */}
+              {createMode === 'excel' && (
+                <div className="mb-3">
+                  <label className={`flex flex-col items-center justify-center w-full h-24 border-2 border-dashed rounded-xl cursor-pointer transition-all ${
+                    excelFile ? 'border-green-500/50 bg-green-500/10' : 'border-gray-600 bg-gray-700/30 hover:border-orange-500/50 hover:bg-orange-500/10'
+                  }`}>
+                    <input type="file" accept=".xlsx,.xls" className="hidden" onChange={handleExcelUpload} />
+                    {excelParsing ? (
+                      <><Loader2 className="h-5 w-5 animate-spin text-orange-400 mb-1" /><span className="text-xs text-gray-400">Parsing Excel...</span></>
+                    ) : excelFile ? (
+                      <><FileSpreadsheet className="h-5 w-5 text-green-400 mb-1" /><span className="text-xs text-green-400 font-medium">{excelFile.name}</span><span className="text-[10px] text-gray-500 mt-0.5">{items.length} products loaded — click to replace</span></>
+                    ) : (
+                      <><Upload className="h-5 w-5 text-gray-500 mb-1" /><span className="text-xs text-gray-400">Click to upload .xlsx file</span><span className="text-[10px] text-gray-500 mt-0.5">Col A = Product Name, Col B = Expiry Date (row 1 = header)</span></>
+                    )}
+                  </label>
+                </div>
+              )}
+            </div>
+
+            {/* Excel-like Product Table */}
+            <div>
+              <label className="text-sm text-gray-400 mb-2 block">{createMode === 'excel' && items.length > 1 ? `${items.length} Products (from Excel)` : ''}</label>
               <div className="border border-gray-600 rounded-lg overflow-hidden">
                 {/* Table Header */}
                 <div className="grid grid-cols-[40px_1fr_160px_40px] bg-gray-700/80 text-xs text-gray-400 font-medium">

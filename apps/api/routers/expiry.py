@@ -62,6 +62,8 @@ async def create_expiry_request(
         title=data.title,
         notes=data.notes,
         created_by_id=current_user.id,
+        template_file_data=data.template_file_data,
+        template_filename=data.template_filename,
     )
     db.add(req)
     db.flush()
@@ -206,10 +208,37 @@ async def get_expiry_request_detail(
         "status": req.status.value if req.status else "open",
         "created_by_name": req.created_by.full_name if req.created_by else "Unknown",
         "created_at": req.created_at.isoformat() if req.created_at else None,
+        "template_filename": req.template_filename,
+        "has_template": bool(req.template_file_data),
         "items": items,
         "branches": branches,
         "responses": responses,
     }
+
+
+@router.get("/requests/{request_id}/template")
+async def download_expiry_template(
+    request_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Download the original Excel template file uploaded when creating the request"""
+    from fastapi.responses import Response
+    import base64
+
+    req = db.query(ExpiryRequest).filter(ExpiryRequest.id == request_id).first()
+    if not req:
+        raise HTTPException(status_code=404, detail="Request not found")
+    if not req.template_file_data:
+        raise HTTPException(status_code=404, detail="No template file for this request")
+
+    file_bytes = base64.b64decode(req.template_file_data)
+    filename = req.template_filename or f"expiry-template-{request_id}.xlsx"
+    return Response(
+        content=file_bytes,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
 
 
 @router.put("/requests/{request_id}")

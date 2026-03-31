@@ -511,6 +511,15 @@ class ApiService {
     return this.request(`/expiry/requests/${id}`, { method: 'DELETE' })
   }
 
+  async getExpiryTemplate(id) {
+    const token = typeof window !== 'undefined' ? localStorage.getItem('br_admin_token') : null
+    const res = await fetch(`${this.baseURL}/expiry/requests/${id}/template`, {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    })
+    if (!res.ok) throw new Error('No template file')
+    return res.blob()
+  }
+
   // ============ BRANCH VISITS ============
   async getBranchVisits(filters = {}) {
     const params = new URLSearchParams()

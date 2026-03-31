@@ -166,6 +166,18 @@ def run_migrations():
                 conn.commit()
                 logger.info("Migration: budget_uploads new columns added")
 
+        # Migrate expiry_requests: add template file columns
+        if 'expiry_requests' in inspector.get_table_names():
+            er_cols = [c['name'] for c in inspector.get_columns('expiry_requests')]
+            if 'template_file_data' not in er_cols:
+                logger.info("Migration: Adding template_file_data to expiry_requests")
+                conn.execute(text("ALTER TABLE expiry_requests ADD COLUMN template_file_data TEXT"))
+                conn.commit()
+            if 'template_filename' not in er_cols:
+                logger.info("Migration: Adding template_filename to expiry_requests")
+                conn.execute(text("ALTER TABLE expiry_requests ADD COLUMN template_filename VARCHAR(255)"))
+                conn.commit()
+
         # Migrate expiry_responses quantity from INTEGER to FLOAT (support decimal like 1.25)
         if 'expiry_responses' in inspector.get_table_names():
             er_columns = {c['name']: c for c in inspector.get_columns('expiry_responses')}
