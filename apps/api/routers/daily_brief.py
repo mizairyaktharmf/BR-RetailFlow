@@ -284,6 +284,149 @@ Start directly with the most important insight."""
         return None
 
 
+def _build_email_html(data: dict, target_date: str, user_name: str) -> str:
+    """Build an HTML email body from gathered daily brief data."""
+    budget = data.get("budget", {})
+    visits = data.get("visits", {})
+    expiry = data.get("expiry", {})
+    cake_alerts = data.get("cake_alerts", [])
+
+    branch_rows = ""
+    for b in budget.get("branches", []):
+        status_color = "#27ae60" if b["status"] == "achieved" else "#f39c12" if b["status"] == "on_track" else "#e74c3c"
+        branch_rows += f"""
+        <tr>
+            <td style="padding:6px 12px;border-bottom:1px solid #eee;">{b['branch']}</td>
+            <td style="padding:6px 12px;border-bottom:1px solid #eee;text-align:right;">AED {b['budget']:,}</td>
+            <td style="padding:6px 12px;border-bottom:1px solid #eee;text-align:right;">AED {b['actual']:,}</td>
+            <td style="padding:6px 12px;border-bottom:1px solid #eee;text-align:right;">
+                <span style="color:{status_color};font-weight:bold;">{b['achievement']}%</span>
+            </td>
+        </tr>"""
+
+    cake_section = ""
+    if cake_alerts:
+        cake_items = "".join(
+            f"<li>{a['product']} at {a.get('branch', 'Unknown')} — Qty: {a['qty']} (threshold: {a['threshold']})</li>"
+            for a in cake_alerts
+        )
+        cake_section = f"""
+        <h3 style="color:#e74c3c;">Cake Stock Alerts</h3>
+        <ul>{cake_items}</ul>"""
+
+    html = f"""
+    <!DOCTYPE html>
+    <html>
+    <head><meta charset="utf-8"></head>
+    <body style="font-family:Arial,sans-serif;color:#333;max-width:700px;margin:0 auto;padding:20px;">
+        <div style="background:#c0392b;color:#fff;padding:16px 24px;border-radius:6px 6px 0 0;">
+            <h1 style="margin:0;font-size:22px;">BR-RetailFlow Daily Report</h1>
+            <p style="margin:4px 0 0;">Prepared for {user_name} &mdash; {target_date}</p>
+        </div>
+        <div style="background:#f9f9f9;padding:20px;border:1px solid #ddd;border-top:none;border-radius:0 0 6px 6px;">
+
+            <h2 style="color:#c0392b;margin-top:0;">Sales vs Budget</h2>
+            <p>
+                <strong>Overall:</strong>
+                AED {budget.get('total_actual', 0):,} of AED {budget.get('total_budget', 0):,}
+                ({budget.get('overall_achievement', 0)}% achievement)
+            </p>
+            <table style="width:100%;border-collapse:collapse;background:#fff;border:1px solid #ddd;">
+                <thead>
+                    <tr style="background:#ecf0f1;">
+                        <th style="padding:8px 12px;text-align:left;">Branch</th>
+                        <th style="padding:8px 12px;text-align:right;">Budget</th>
+                        <th style="padding:8px 12px;text-align:right;">Actual</th>
+                        <th style="padding:8px 12px;text-align:right;">Achievement</th>
+                    </tr>
+                </thead>
+                <tbody>{branch_rows}</tbody>
+            </table>
+
+            <h2 style="color:#c0392b;margin-top:24px;">Branch Visits</h2>
+            <p>
+                {visits.get('total_visits', 0)} visits logged today &mdash;
+                {visits.get('total_hours', 0)} hours across
+                {visits.get('unique_users', 0)} area manager(s),
+                covering {visits.get('branches_visited', 0)} branch(es).
+            </p>
+            {('<p style="color:#e74c3c;">No visits from: ' + ', '.join(visits.get('ams_no_visit', [])) + '</p>')
+              if visits.get('ams_no_visit') else ''}
+
+            <h2 style="color:#c0392b;margin-top:24px;">Expiry Tracking</h2>
+            <p>
+                Open requests: <strong>{expiry.get('open_requests', 0)}</strong> &mdash;
+                Pending branch responses: <strong>{expiry.get('pending_branch_responses', 0)}</strong>
+            </p>
+
+            {cake_section}
+
+            <hr style="margin-top:32px;border:none;border-top:1px solid #ddd;">
+            <p style="font-size:12px;color:#999;text-align:center;">
+                This is an automated report from BR-RetailFlow. Do not reply to this email.
+            </p>
+        </div>
+    </body>
+    </html>
+    """
+    return html
+
+
+@router.post("/send-email-report")
+async def send_email_report(
+    target_date: Optional[date] = None,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Send the daily brief as an HTML email to configured recipients + the current user."""
+    from utils.security import require_role
+    # Enforce admin-level access (ADMIN and above)
+    if current_user.role == UserRole.STAFF:
+        from fastapi import HTTPException as _HTTPException
+        raise _HTTPException(status_code=403, detail="Not authorized")
+
+    today = target_date or _get_today()
+    data = _gather_admin_data(db, current_user, today)
+
+    # Build recipient list
+    recipients = []
+    if settings.REPORT_EMAIL_TO:
+        for addr in settings.REPORT_EMAIL_TO.split(","):
+            addr = addr.strip()
+            if addr:
+                recipients.append(addr)
+    if current_user.email and current_user.email not in recipients:
+        recipients.append(current_user.email)
+
+    if not recipients:
+        return {
+            "sent": False,
+            "recipients": [],
+            "message": "No recipients configured. Set REPORT_EMAIL_TO in environment variables.",
+        }
+
+    html_body = _build_email_html(data, str(today), current_user.full_name)
+    subject = f"BR-RetailFlow Daily Report — {today.strftime('%d %b %Y')}"
+
+    try:
+        from services.email_service import send_email
+        send_email(recipients, subject, html_body)
+        return {"sent": True, "recipients": recipients, "message": "Report sent"}
+    except ValueError:
+        return {
+            "sent": False,
+            "recipients": [],
+            "message": "SMTP not configured. Add SMTP settings to environment variables.",
+        }
+    except Exception as e:
+        logger.error(f"Email report failed: {e}")
+        return {
+            "sent": False,
+            "recipients": recipients,
+            "message": f"Failed to send email: {str(e)}",
+        }
+
+
 @router.get("/daily-brief")
 async def get_daily_brief(
     target_date: Optional[date] = None,

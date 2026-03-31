@@ -577,6 +577,38 @@ class ApiService {
     const params = targetDate ? `?target_date=${targetDate}` : ''
     return this.request(`/reports/daily-brief${params}`)
   }
+
+  // ============ FEEDBACK ============
+  async getFeedback(filters = {}) {
+    const params = new URLSearchParams()
+    if (filters.branch_id) params.append('branch_id', filters.branch_id)
+    if (filters.feedback_type) params.append('feedback_type', filters.feedback_type)
+    if (filters.limit) params.append('limit', filters.limit)
+    const q = params.toString() ? `?${params.toString()}` : ''
+    return this.request(`/feedback${q}`)
+  }
+
+  async getFeedbackStats() {
+    return this.request('/feedback/stats')
+  }
+
+  // ============ KPI SCORECARDS ============
+  async getKpiScorecards(date) {
+    return this.request(`/reports/scorecards?date=${date}`)
+  }
+
+  // ============ YEAR-OVER-YEAR SALES ============
+  async getMonthlySalesYoY(branchId, year) {
+    const params = new URLSearchParams()
+    if (branchId) params.append('branch_id', branchId)
+    if (year) params.append('year', year)
+    return this.request(`/sales/monthly-yoy?${params.toString()}`)
+  }
+
+  // ============ EMAIL REPORT ============
+  async sendDailyEmailReport(targetDate) {
+    return this.request(`/reports/send-email-report?target_date=${targetDate}`, { method: 'POST' })
+  }
 }
 
 const api = new ApiService()

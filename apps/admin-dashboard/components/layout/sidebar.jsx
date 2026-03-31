@@ -22,7 +22,9 @@ import {
   Tag,
   Bell,
   CalendarClock,
-  ClipboardCheck
+  ClipboardCheck,
+  TrendingUp,
+  MessageSquare
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 
@@ -40,6 +42,8 @@ const navigation = [
   { name: 'Cake Alerts', href: '/dashboard/cake-alerts', icon: Bell, roles: ['supreme_admin', 'super_admin', 'admin'] },
   { name: 'Expiry Tracking', href: '/dashboard/expiry-tracking', icon: CalendarClock, roles: ['supreme_admin', 'super_admin', 'admin'] },
   { name: 'Branch Visits', href: '/dashboard/visits', icon: ClipboardCheck, roles: ['supreme_admin', 'super_admin', 'admin'] },
+  { name: 'KPI Scorecards', href: '/dashboard/kpi', icon: TrendingUp, roles: ['supreme_admin', 'super_admin', 'admin'] },
+  { name: 'Customer Feedback', href: '/dashboard/feedback', icon: MessageSquare, roles: ['supreme_admin', 'super_admin', 'admin'] },
 ]
 
 const roleLabels = {

@@ -15,7 +15,8 @@ import {
   UserPlus,
   Loader2,
   Sparkles,
-  RefreshCw
+  RefreshCw,
+  Mail
 } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import api from '@/services/api'
@@ -35,6 +36,9 @@ export default function DashboardPage() {
   const [pendingApprovals, setPendingApprovals] = useState([])
   const [brief, setBrief] = useState(null)
   const [briefLoading, setBriefLoading] = useState(false)
+  const [emailSending, setEmailSending] = useState(false)
+  const [emailStatus, setEmailStatus] = useState(null) // null | 'sent' | 'error'
+  const [emailMsg, setEmailMsg] = useState('')
 
   useEffect(() => {
     const storedUser = localStorage.getItem('br_admin_user')
@@ -105,6 +109,29 @@ export default function DashboardPage() {
       // Silently fail — brief is not critical
     } finally {
       setBriefLoading(false)
+    }
+  }
+
+  const sendEmailReport = async () => {
+    setEmailSending(true)
+    setEmailStatus(null)
+    setEmailMsg('')
+    try {
+      const today = new Date().toISOString().split('T')[0]
+      const result = await api.sendDailyEmailReport(today)
+      setEmailStatus('sent')
+      setEmailMsg(result?.email ? `Report sent to ${result.email}` : 'Report sent successfully')
+    } catch (err) {
+      setEmailStatus('error')
+      const msg = err.message || ''
+      if (msg.toLowerCase().includes('smtp') || msg.toLowerCase().includes('email') || msg.toLowerCase().includes('not configured')) {
+        setEmailMsg('Email not configured')
+      } else {
+        setEmailMsg(msg || 'Failed to send report')
+      }
+    } finally {
+      setEmailSending(false)
+      setTimeout(() => { setEmailStatus(null); setEmailMsg('') }, 5000)
     }
   }
 
@@ -245,6 +272,27 @@ export default function DashboardPage() {
           ) : (
             <p className="text-sm text-slate-400 py-2">No brief available yet. Click refresh to generate.</p>
           )}
+
+          {/* Send Daily Email Report */}
+          <div className="flex items-center gap-3 mt-3 pt-3 border-t border-purple-500/20">
+            <button
+              onClick={sendEmailReport}
+              disabled={emailSending}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border border-purple-500/40 text-purple-400 hover:bg-purple-500/10 transition-colors disabled:opacity-50"
+            >
+              {emailSending
+                ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                : <Mail className="w-3.5 h-3.5" />
+              }
+              {emailSending ? 'Sending...' : 'Send Daily Email Report'}
+            </button>
+            {emailStatus === 'sent' && (
+              <span className="text-xs text-green-400">✅ {emailMsg}</span>
+            )}
+            {emailStatus === 'error' && (
+              <span className="text-xs text-amber-400">⚠️ {emailMsg}</span>
+            )}
+          </div>
         </CardContent>
       </Card>
 

@@ -5,14 +5,14 @@ Handles daily sales submissions and Gemini Vision extraction
 
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Query
 from sqlalchemy.orm import Session
-from sqlalchemy import and_
-from typing import List
+from sqlalchemy import and_, func
+from typing import List, Optional
 from datetime import date
 import logging
 
 from utils.database import get_db
 from utils.security import get_current_user
-from models.user import User
+from models.user import User, UserRole
 from models.location import Branch
 from models.sales import DailySales, SalesWindowType, BranchBudget, TrackedItem
 from schemas.sales import (
@@ -380,3 +380,95 @@ async def remove_tracked_item(
     item.is_active = False
     db.commit()
     return {"success": True, "message": f"Stopped tracking {item.item_name}"}
+
+
+# ============== YEAR-OVER-YEAR MONTHLY SALES ==============
+
+_MONTH_LABELS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun",
+                 "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
+
+
+@router.get("/monthly-yoy")
+async def monthly_year_over_year(
+    branch_id: int = Query(None),
+    year: int = Query(None),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """
+    Return monthly gross sales for a given year and the previous year.
+    If branch_id is omitted, aggregates across all branches the user has access to.
+    """
+    from datetime import datetime as dt
+    current_year = year or dt.utcnow().year
+    previous_year = current_year - 1
+
+    # Determine accessible branch IDs
+    branch_query = db.query(Branch).filter(Branch.is_active == True)
+    if current_user.role == UserRole.SUPER_ADMIN:
+        branch_query = branch_query.filter(Branch.territory_id == current_user.territory_id)
+    elif current_user.role == UserRole.ADMIN:
+        branch_query = branch_query.filter(Branch.manager_id == current_user.id)
+    elif current_user.role == UserRole.STAFF:
+        if current_user.branch_id:
+            branch_query = branch_query.filter(Branch.id == current_user.branch_id)
+        else:
+            branch_query = branch_query.filter(Branch.id == -1)  # Empty result
+
+    accessible_ids = [b.id for b in branch_query.all()]
+
+    if branch_id is not None:
+        if branch_id not in accessible_ids:
+            from fastapi import HTTPException
+            raise HTTPException(status_code=403, detail="Not authorized to view this branch")
+        filter_ids = [branch_id]
+    else:
+        filter_ids = accessible_ids
+
+    def _query_monthly(yr: int):
+        """Return {month: total_gross_sales} for a given year."""
+        rows = (
+            db.query(
+                func.extract("month", DailySales.date).label("month"),
+                func.sum(DailySales.gross_sales).label("total"),
+            )
+            .filter(
+                DailySales.branch_id.in_(filter_ids),
+                func.extract("year", DailySales.date) == yr,
+            )
+            .group_by(func.extract("month", DailySales.date))
+            .all()
+        )
+        return {int(r.month): float(r.total or 0) for r in rows}
+
+    current_data = _query_monthly(current_year)
+    previous_data = _query_monthly(previous_year)
+
+    months = []
+    total_current = 0.0
+    total_previous = 0.0
+    for m in range(1, 13):
+        cur = current_data.get(m, 0.0)
+        prev = previous_data.get(m, 0.0)
+        total_current += cur
+        total_previous += prev
+        months.append({
+            "month": m,
+            "label": _MONTH_LABELS[m - 1],
+            "current": cur,
+            "previous": prev,
+        })
+
+    growth_pct = 0.0
+    if total_previous > 0:
+        growth_pct = round((total_current - total_previous) / total_previous * 100, 1)
+
+    return {
+        "current_year": current_year,
+        "months": months,
+        "totals": {
+            "current": total_current,
+            "previous": total_previous,
+            "growth_pct": growth_pct,
+        },
+    }

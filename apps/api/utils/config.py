@@ -31,6 +31,14 @@ class Settings(BaseSettings):
     VAPID_PRIVATE_KEY: str = ""
     VAPID_MAILTO: str = "mailto:admin@br-retailflow.com"
 
+    # SMTP Email Settings
+    SMTP_HOST: str = ""
+    SMTP_PORT: int = 587
+    SMTP_USER: str = ""
+    SMTP_PASS: str = ""
+    SMTP_FROM: str = "noreply@br-retailflow.com"
+    REPORT_EMAIL_TO: str = ""  # comma-separated list of recipient emails
+
     # CORS - comma-separated origins string
     CORS_ORIGINS: str = "http://localhost:3000,http://localhost:3001,http://localhost:3002"
 

@@ -179,6 +179,108 @@ function BudgetLineChart({ data, selectedDate }) {
   )
 }
 
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+
+function YoYBarChart({ data, currentYear, prevYear }) {
+  if (!data?.months?.length) return null
+
+  const months = data.months
+  const maxVal = Math.max(...months.flatMap(m => [m.current ?? 0, m.previous ?? 0]), 1)
+
+  const w = 600, h = 180
+  const padL = 42, padR = 10, padT = 24, padB = 30
+  const chartW = w - padL - padR
+  const chartH = h - padT - padB
+  const groupW = chartW / 12
+  const barW = Math.min(groupW * 0.38, 14)
+  const gap = groupW * 0.06
+
+  const yScale = (v) => padT + chartH - (v / maxVal) * chartH
+  const fmt = (v) => {
+    if (v == null || v === 0) return ''
+    if (v >= 1000000) return `${(v / 1000000).toFixed(1)}M`
+    if (v >= 1000) return `${(v / 1000).toFixed(0)}k`
+    return `${v}`
+  }
+
+  const yLabels = [0, Math.round(maxVal / 2), Math.round(maxVal)]
+
+  return (
+    <div className="bg-gray-800/50 border border-gray-700 rounded-xl overflow-hidden">
+      <div className="px-3 sm:px-4 py-2.5 border-b border-gray-700 flex items-center justify-between">
+        <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Year-over-Year Sales</p>
+        <div className="flex items-center gap-4 text-[9px] text-gray-300">
+          <span className="flex items-center gap-1.5">
+            <span className="w-3 h-3 rounded-sm bg-indigo-500 inline-block" /> {currentYear}
+          </span>
+          <span className="flex items-center gap-1.5">
+            <span className="w-3 h-3 rounded-sm bg-gray-500 inline-block" /> {prevYear}
+          </span>
+        </div>
+      </div>
+      <div className="p-3 overflow-x-auto">
+        <svg viewBox={`0 0 ${w} ${h}`} className="w-full min-w-[380px]" style={{ height: 180 }}>
+          {/* Y-axis labels + grid */}
+          {yLabels.map((val, i) => (
+            <g key={i}>
+              <line x1={padL} y1={yScale(val)} x2={w - padR} y2={yScale(val)} stroke="#374151" strokeWidth="0.5" strokeDasharray="4,4" />
+              <text x={padL - 4} y={yScale(val) + 3} textAnchor="end" fill="#6b7280" fontSize="8">{fmt(val)}</text>
+            </g>
+          ))}
+
+          {months.map((m, idx) => {
+            const cx = padL + idx * groupW + groupW / 2
+            const curX = cx - barW - gap / 2
+            const prevX = cx + gap / 2
+            const curH = ((m.current ?? 0) / maxVal) * chartH
+            const prevH = ((m.previous ?? 0) / maxVal) * chartH
+            const curY = yScale(m.current ?? 0)
+            const prevY = yScale(m.previous ?? 0)
+
+            const growth = m.previous > 0 ? Math.round(((m.current - m.previous) / m.previous) * 100) : null
+
+            return (
+              <g key={idx}>
+                {/* Previous year bar */}
+                {prevH > 0 && (
+                  <rect x={prevX} y={prevY} width={barW} height={prevH} fill="#6b7280" rx="1" opacity="0.7" />
+                )}
+                {/* Current year bar */}
+                {curH > 0 && (
+                  <rect x={curX} y={curY} width={barW} height={curH} fill="#6366f1" rx="1" />
+                )}
+                {/* Value label on current bar */}
+                {m.current > 0 && (
+                  <text x={curX + barW / 2} y={curY - 3} textAnchor="middle" fill="#a5b4fc" fontSize="7">
+                    {fmt(m.current)}
+                  </text>
+                )}
+                {/* Growth % label */}
+                {growth !== null && growth !== 0 && (
+                  <text
+                    x={cx}
+                    y={Math.min(curY, prevY) - (growth > 0 ? 12 : 3)}
+                    textAnchor="middle"
+                    fill={growth > 0 ? '#4ade80' : '#f87171'}
+                    fontSize="7"
+                    fontWeight="bold"
+                  >
+                    {growth > 0 ? '+' : ''}{growth}%
+                  </text>
+                )}
+                {/* Month label */}
+                <text x={cx} y={h - 6} textAnchor="middle" fill="#6b7280" fontSize="8">
+                  {MONTHS[idx]}
+                </text>
+              </g>
+            )
+          })}
+        </svg>
+      </div>
+    </div>
+  )
+}
+
 export default function SalesReportsPage() {
   const router = useRouter()
   const [user, setUser] = useState(null)
@@ -191,6 +293,8 @@ export default function SalesReportsPage() {
   const [activeWindowId, setActiveWindowId] = useState(null)
   const [trackedItems, setTrackedItems] = useState([])
   const [budgetChart, setBudgetChart] = useState(null)
+  const [yoyData, setYoyData] = useState(null)
+  const [yoyLoading, setYoyLoading] = useState(false)
 
   useEffect(() => {
     const userData = localStorage.getItem('br_admin_user')
@@ -216,6 +320,16 @@ export default function SalesReportsPage() {
     api.getBudgetChart(selectedBranch.id, month)
       .then(data => setBudgetChart(data))
       .catch(() => setBudgetChart(null))
+  }, [selectedBranch, selectedDate])
+
+  useEffect(() => {
+    if (!selectedBranch) return
+    const year = parseInt(selectedDate.split('-')[0])
+    setYoyLoading(true)
+    api.getMonthlySalesYoY(selectedBranch.id, year)
+      .then(data => setYoyData(data))
+      .catch(() => setYoyData(null))
+      .finally(() => setYoyLoading(false))
   }, [selectedBranch, selectedDate])
 
   const loadBranches = async () => {
@@ -957,6 +1071,25 @@ export default function SalesReportsPage() {
                   )}
                 </>
               )}
+
+              {/* Year-over-Year Sales Chart */}
+              <div>
+                <div className="flex items-center gap-2 mb-2">
+                  <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Year-over-Year Comparison</p>
+                  {yoyLoading && <Loader2 className="w-3.5 h-3.5 animate-spin text-gray-500" />}
+                </div>
+                {yoyData ? (
+                  <YoYBarChart
+                    data={yoyData}
+                    currentYear={parseInt(selectedDate.split('-')[0])}
+                    prevYear={parseInt(selectedDate.split('-')[0]) - 1}
+                  />
+                ) : !yoyLoading ? (
+                  <div className="bg-gray-800/50 border border-gray-700 rounded-xl p-6 text-center">
+                    <p className="text-xs text-gray-500">No year-over-year data available for this branch.</p>
+                  </div>
+                ) : null}
+              </div>
             </div>
           )}
         </>

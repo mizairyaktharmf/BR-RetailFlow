@@ -8,7 +8,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 import logging
 
-from routers import auth, users, territories, areas, branches, flavors, inventory, analytics, cake, sales, budget, notification, expiry, visits, daily_brief
+from routers import auth, users, territories, areas, branches, flavors, inventory, analytics, cake, sales, budget, notification, expiry, visits, daily_brief, feedback, kpi
 from utils.database import engine, Base
 from utils.config import settings
 
@@ -178,6 +178,11 @@ def run_migrations():
                 conn.execute(text("ALTER TABLE expiry_requests ADD COLUMN template_filename VARCHAR(255)"))
                 conn.commit()
 
+        # Customer feedback table migration
+        if 'branches' in inspector.get_table_names() and 'customer_feedback' not in inspector.get_table_names():
+            # Table will be created by create_all, just log
+            logger.info("customer_feedback table will be created by create_all")
+
         # Migrate expiry_responses quantity from INTEGER to FLOAT (support decimal like 1.25)
         if 'expiry_responses' in inspector.get_table_names():
             er_columns = {c['name']: c for c in inspector.get_columns('expiry_responses')}
@@ -243,6 +248,8 @@ app.include_router(notification.router, prefix="/api/v1/notifications", tags=["P
 app.include_router(expiry.router, prefix="/api/v1/expiry", tags=["Expiry Tracking"])
 app.include_router(visits.router, prefix="/api/v1/visits", tags=["Branch Visits"])
 app.include_router(daily_brief.router, prefix="/api/v1/reports", tags=["Daily Brief"])
+app.include_router(feedback.router, prefix="/api/v1/feedback", tags=["Feedback"])
+app.include_router(kpi.router, prefix="/api/v1/reports", tags=["KPI"])
 
 
 @app.get("/")

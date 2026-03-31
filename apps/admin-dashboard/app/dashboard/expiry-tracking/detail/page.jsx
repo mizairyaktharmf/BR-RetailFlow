@@ -6,7 +6,7 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import {
   CalendarClock, ArrowLeft, Loader2, Lock, RefreshCw,
-  CheckCircle2, Clock, Download, FileSpreadsheet
+  CheckCircle2, Clock, Download, FileSpreadsheet, FileText
 } from 'lucide-react'
 import api from '@/services/api'
 
@@ -96,6 +96,103 @@ export default function ExpiryRequestDetailPage() {
     XLSX.writeFile(wb, `expiry-${data.title.replace(/\s+/g, '-')}.xlsx`)
   }
 
+  const exportPDF = async () => {
+    if (!data) return
+    const { items, branches, responses } = data
+
+    const jsPDF = (await import('jspdf')).default
+    await import('jspdf-autotable')
+
+    const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' })
+
+    // Dark background
+    doc.setFillColor(17, 24, 39)
+    doc.rect(0, 0, 297, 210, 'F')
+
+    // Title
+    doc.setTextColor(167, 139, 250)
+    doc.setFontSize(14)
+    doc.text(data.title, 14, 15)
+
+    doc.setTextColor(156, 163, 175)
+    doc.setFontSize(9)
+    doc.text(
+      `Expiry Tracking Report — ${data.status === 'open' ? 'Open' : 'Closed'}   |   Created: ${new Date(data.created_at).toLocaleDateString()}   |   By: ${data.created_by_name}`,
+      14, 22
+    )
+
+    // Build table columns: #, Product, Exp Date, then per branch: QTY / EXP / NOTES
+    const head1 = ['#', 'Product', 'Exp. Date']
+    branches.forEach(b => { head1.push(b.branch_name, '', '') })
+
+    const head2 = ['', '', '']
+    branches.forEach(() => { head2.push('QTY', 'EXP', 'NOTES') })
+
+    const body = items.map((item, idx) => {
+      const row = [idx + 1, item.product_name, item.expiry_date || '-']
+      branches.forEach(b => {
+        const resp = responses?.[String(b.branch_id)]?.[String(item.id)]
+        row.push(
+          resp?.quantity != null ? resp.quantity : '-',
+          resp?.expiry_date || '-',
+          resp?.notes || '-'
+        )
+      })
+      return row
+    })
+
+    const colWidths = [8, 48, 20, ...branches.flatMap(() => [14, 20, 28])]
+
+    doc.autoTable({
+      head: [head1, head2],
+      body,
+      startY: 28,
+      theme: 'grid',
+      headStyles: { fillColor: [55, 65, 81], textColor: [209, 213, 219], fontSize: 7, fontStyle: 'bold', cellPadding: 2 },
+      bodyStyles: { fillColor: [31, 41, 55], textColor: [209, 213, 219], fontSize: 7, cellPadding: 2 },
+      alternateRowStyles: { fillColor: [37, 49, 65] },
+      columnStyles: Object.fromEntries(colWidths.map((w, i) => [i, { cellWidth: w }])),
+      didParseCell: (hookData) => {
+        // Red QTY if > 0
+        if (hookData.section === 'body') {
+          const colIdx = hookData.column.index
+          // QTY columns start at index 3, then every 3rd: 3, 6, 9...
+          if (colIdx >= 3 && (colIdx - 3) % 3 === 0) {
+            const val = parseFloat(hookData.cell.raw)
+            if (!isNaN(val) && val > 0) {
+              hookData.cell.styles.textColor = [248, 113, 113]
+              hookData.cell.styles.fontStyle = 'bold'
+            }
+          }
+          // Exp date column (index 2) in orange
+          if (colIdx === 2 && hookData.cell.raw !== '-') {
+            hookData.cell.styles.textColor = [251, 146, 60]
+          }
+        }
+      },
+    })
+
+    // Branch status summary
+    const finalY = (doc.lastAutoTable?.finalY || 170) + 6
+    if (finalY < 195) {
+      doc.setFontSize(8)
+      doc.setTextColor(156, 163, 175)
+      doc.text('Branch Status Summary:', 14, finalY)
+      let xOff = 14
+      branches.forEach(b => {
+        const branchResps = responses?.[String(b.branch_id)] || {}
+        const totalQty = Object.values(branchResps).reduce((s, r) => s + (r.quantity || 0), 0)
+        const isSubmitted = b.status === 'submitted' || b.status === 'updated'
+        doc.setTextColor(isSubmitted ? 74 : 107, isSubmitted ? 222 : 114, isSubmitted ? 128 : 128)
+        doc.text(`${b.branch_name}: ${isSubmitted ? `${totalQty} items` : 'Pending'}`, xOff, finalY + 6)
+        xOff += 60
+        if (xOff > 260) xOff = 14
+      })
+    }
+
+    doc.save(`expiry-${data.title.replace(/\s+/g, '-')}.pdf`)
+  }
+
   const downloadTemplate = async () => {
     try {
       const blob = await api.getExpiryTemplate(requestId)
@@ -171,6 +268,9 @@ export default function ExpiryRequestDetailPage() {
           )}
           <Button variant="ghost" size="sm" onClick={exportExcel} className="text-green-400 hover:text-green-300" title="Export Excel">
             <Download className="h-4 w-4 mr-1" /> Excel
+          </Button>
+          <Button variant="ghost" size="sm" onClick={exportPDF} className="text-purple-400 hover:text-purple-300" title="Export PDF">
+            <FileText className="h-4 w-4 mr-1" /> PDF
           </Button>
           {data.status === 'open' && (
             <Button size="sm" onClick={handleClose} className="bg-yellow-600 hover:bg-yellow-700 text-white">

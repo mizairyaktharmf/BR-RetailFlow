@@ -8,6 +8,7 @@ from models.inventory import Flavor, DailyInventory, TubReceipt
 from models.sales import DailySales, CupUsage, Promotion, PromotionUsage, BranchBudget
 from models.cake import CakeProduct, CakeStock, CakeStockLog, CakeAlertConfig
 from models.notification import PushSubscription
+from models.feedback import CustomerFeedback
 
 __all__ = [
     "User",
@@ -27,4 +28,5 @@ __all__ = [
     "CakeStockLog",
     "CakeAlertConfig",
     "PushSubscription",
+    "CustomerFeedback",
 ]

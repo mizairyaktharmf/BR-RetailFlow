@@ -338,6 +338,18 @@ class ApiService {
   async getDailyBrief() {
     return this.request('/reports/daily-brief')
   }
+
+  // ============ CUSTOMER FEEDBACK ============
+  async submitFeedback(data) {
+    return this.request('/feedback/submit', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    })
+  }
+
+  async getFeedbackBranchInfo(branchId) {
+    return this.request(`/feedback/branch-info?branch_id=${branchId}`)
+  }
 }
 
 export const api = new ApiService()
