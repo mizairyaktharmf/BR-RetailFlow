@@ -11,6 +11,9 @@ import {
   ChevronLeft,
   ChevronRight,
   AlertCircle,
+  Download,
+  FileSpreadsheet,
+  FileText,
 } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -372,6 +375,105 @@ export default function SalesReportsPage() {
   const currentLoading = selectedBranch ? loadingSales[selectedBranch.id] : false
   const submittedWindows = currentSales.map(s => s.sales_window)
 
+  const exportExcel = async () => {
+    if (!selectedBranch || currentSales.length === 0) return
+    const XLSX = (await import('xlsx')).default
+    const rows = [
+      ['Branch', 'Date', 'Window', 'Gross Sales', 'Net Sales', 'GC', 'ATV', 'HD Gross', 'HD Net', 'HD Orders', 'Deliveroo Gross', 'Deliveroo Net', 'Cool Mood Gross', 'Cash Sales'],
+      ...currentSales.map(s => [
+        selectedBranch.name, selectedDate, s.sales_window,
+        s.gross_sales || 0, s.total_sales || 0, s.transaction_count || 0, s.atv || 0,
+        s.hd_gross_sales || 0, s.hd_net_sales || 0, s.hd_orders || 0,
+        s.deliveroo_gross_sales || 0, s.deliveroo_net_sales || 0,
+        s.cm_gross_sales || 0, s.cash_sales || 0,
+      ])
+    ]
+    const ws = XLSX.utils.aoa_to_sheet(rows)
+    ws['!cols'] = rows[0].map(() => ({ wch: 16 }))
+    const wb = XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(wb, ws, 'Sales Report')
+
+    // Add budget sheet if available
+    if (budgetChart?.days?.length) {
+      const budgetRows = [
+        ['Date', 'Day', 'Budget', 'Actual', 'LY Sales', 'Achievement %'],
+        ...budgetChart.days.map(d => [
+          d.date, d.day_name, d.budget || 0, d.actual || 0, d.ly_sales || 0,
+          d.budget > 0 ? ((d.actual / d.budget) * 100).toFixed(1) + '%' : '-'
+        ])
+      ]
+      const ws2 = XLSX.utils.aoa_to_sheet(budgetRows)
+      XLSX.utils.book_append_sheet(wb, ws2, 'Budget vs Actual')
+    }
+
+    XLSX.writeFile(wb, `sales-${selectedBranch.name.replace(/\s+/g, '-')}-${selectedDate}.xlsx`)
+  }
+
+  const exportPDF = async () => {
+    if (!selectedBranch || currentSales.length === 0) return
+    const jsPDF = (await import('jspdf')).default
+    await import('jspdf-autotable')
+
+    const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' })
+    doc.setFillColor(17, 24, 39)
+    doc.rect(0, 0, 297, 210, 'F')
+
+    doc.setTextColor(167, 139, 250)
+    doc.setFontSize(14)
+    doc.text(`Sales Report — ${selectedBranch.name}`, 14, 15)
+    doc.setTextColor(156, 163, 175)
+    doc.setFontSize(9)
+    doc.text(`Date: ${selectedDate}  |  Generated: ${new Date().toLocaleString()}`, 14, 22)
+
+    const body = currentSales.map(s => [
+      s.sales_window,
+      (s.gross_sales || 0).toLocaleString(undefined, { maximumFractionDigits: 0 }),
+      (s.total_sales || 0).toLocaleString(undefined, { maximumFractionDigits: 0 }),
+      s.transaction_count || 0,
+      s.atv ? Number(s.atv).toFixed(2) : '-',
+      (s.hd_gross_sales || 0).toLocaleString(undefined, { maximumFractionDigits: 0 }),
+      (s.deliveroo_gross_sales || 0).toLocaleString(undefined, { maximumFractionDigits: 0 }),
+      (s.cm_gross_sales || 0).toLocaleString(undefined, { maximumFractionDigits: 0 }),
+      (s.cash_sales || 0).toLocaleString(undefined, { maximumFractionDigits: 0 }),
+    ])
+
+    doc.autoTable({
+      head: [['Window', 'Gross', 'Net', 'GC', 'ATV', 'HD Gross', 'Deliveroo', 'Cool Mood', 'Cash']],
+      body,
+      startY: 28,
+      theme: 'grid',
+      headStyles: { fillColor: [55, 65, 81], textColor: [209, 213, 219], fontSize: 8, fontStyle: 'bold' },
+      bodyStyles: { fillColor: [31, 41, 55], textColor: [209, 213, 219], fontSize: 8 },
+      alternateRowStyles: { fillColor: [37, 49, 65] },
+    })
+
+    // Budget summary if available
+    if (budgetChart?.days?.length) {
+      const todayBudget = budgetChart.days.find(d => d.date === selectedDate)
+      if (todayBudget && doc.lastAutoTable) {
+        const y = (doc.lastAutoTable.finalY || 80) + 8
+        doc.setTextColor(167, 139, 250)
+        doc.setFontSize(10)
+        doc.text('Budget vs Actual (Today)', 14, y)
+        doc.autoTable({
+          head: [['Budget', 'Actual', 'LY Sales', 'Achievement']],
+          body: [[
+            (todayBudget.budget || 0).toLocaleString(),
+            (todayBudget.actual || 0).toLocaleString(),
+            (todayBudget.ly_sales || 0).toLocaleString(),
+            todayBudget.budget > 0 ? `${((todayBudget.actual / todayBudget.budget) * 100).toFixed(1)}%` : '-'
+          ]],
+          startY: y + 4,
+          theme: 'grid',
+          headStyles: { fillColor: [55, 65, 81], textColor: [209, 213, 219], fontSize: 8 },
+          bodyStyles: { fillColor: [31, 41, 55], textColor: [209, 213, 219], fontSize: 8 },
+        })
+      }
+    }
+
+    doc.save(`sales-${selectedBranch.name.replace(/\s+/g, '-')}-${selectedDate}.pdf`)
+  }
+
   const windowOrder = SALES_WINDOWS.map(w => w.id)
   const latestWindowId = useMemo(() => {
     for (let i = windowOrder.length - 1; i >= 0; i--) {
@@ -717,6 +819,17 @@ export default function SalesReportsPage() {
                   </div>
                 </div>
                 <div className="flex items-center gap-1.5">
+                  {currentSales.length > 0 && (
+                    <>
+                      <Button variant="ghost" size="sm" onClick={exportExcel} className="text-green-400 hover:text-green-300 text-xs h-8 px-2">
+                        <FileSpreadsheet className="h-3.5 w-3.5 mr-1" /> Excel
+                      </Button>
+                      <Button variant="ghost" size="sm" onClick={exportPDF} className="text-purple-400 hover:text-purple-300 text-xs h-8 px-2">
+                        <FileText className="h-3.5 w-3.5 mr-1" /> PDF
+                      </Button>
+                    </>
+                  )}
+
                   {SALES_WINDOWS.map(w => (
                     <div
                       key={w.id}

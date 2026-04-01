@@ -37,71 +37,71 @@ function MetricRow({ label, value, status, note }) {
 
 function ScorecardCard({ card }) {
   const overallConf = STATUS_CONFIG[card.overall_status || 'green']
-  const todayPct = card.today_budget > 0
-    ? Math.round((card.today_sales / card.today_budget) * 100)
-    : null
-  const mtdPct = card.mtd_budget > 0
-    ? Math.round((card.mtd_sales / card.mtd_budget) * 100)
-    : null
+
+  // Backend returns nested: card.sales.today, card.mtd.actual, card.feedback.avg_rating etc.
+  const todayActual = card.sales?.today ?? 0
+  const todayBudget = card.sales?.budget_today ?? 0
+  const todayPct = card.sales?.achievement_pct ?? (todayBudget > 0 ? Math.round(todayActual / todayBudget * 100) : null)
+  const todaySt = card.sales?.status || statusColor(todayPct, [70, 90])
+
+  const mtdActual = card.mtd?.actual ?? 0
+  const mtdBudget = card.mtd?.budget ?? 0
+  const mtdPct = card.mtd?.achievement_pct ?? (mtdBudget > 0 ? Math.round(mtdActual / mtdBudget * 100) : null)
+  const mtdSt = card.mtd?.status || statusColor(mtdPct, [80, 95])
+
+  const avgRating = card.feedback?.avg_rating ?? null
+  const complaints = card.feedback?.complaints_7d ?? 0
+  const fbSt = card.feedback?.status || 'green'
+
+  const nearExpiry = card.expiry?.near_expiry_items ?? null
+  const expSt = card.expiry?.status || 'green'
+
+  const visitCount = card.visits?.this_month ?? null
+  const visitSt = card.visits?.status || 'red'
 
   const fmtAed = (v) => {
-    if (v == null) return '-'
+    if (v == null || v === 0) return 'AED 0'
     if (v >= 1000000) return `AED ${(v / 1000000).toFixed(1)}M`
     if (v >= 1000) return `AED ${(v / 1000).toFixed(0)}k`
-    return `AED ${v}`
+    return `AED ${Math.round(v)}`
   }
 
-  const todayStatus = statusColor(todayPct, [70, 90])
-  const mtdStatus = statusColor(mtdPct, [80, 95])
-
   return (
-    <Card className={`bg-gray-800/50 border-gray-700 overflow-hidden`}>
-      {/* Card Header */}
+    <Card className="bg-gray-800/50 border-gray-700 overflow-hidden">
       <div className={`flex items-center justify-between px-4 py-2.5 border-b border-gray-700 ${overallConf.bg}`}>
         <span className="text-sm font-bold text-white truncate">{card.branch_name}</span>
         <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full flex-shrink-0 ml-2 ${overallConf.bg} ${overallConf.text} border ${overallConf.border}`}>
           {overallConf.dot} {overallConf.label}
         </span>
       </div>
-      {/* Metrics */}
       <CardContent className="p-3 space-y-0">
         <MetricRow
           label="Today Sales"
-          value={card.today_sales != null
-            ? `${fmtAed(card.today_sales)} / ${fmtAed(card.today_budget)}`
-            : 'No data'}
-          status={todayStatus}
+          value={`${fmtAed(todayActual)} / ${fmtAed(todayBudget)}`}
+          status={todaySt}
           note={todayPct != null ? `${todayPct}%` : ''}
         />
         <MetricRow
           label="MTD"
-          value={card.mtd_sales != null
-            ? `${fmtAed(card.mtd_sales)} / ${fmtAed(card.mtd_budget)}`
-            : 'No data'}
-          status={mtdStatus}
+          value={`${fmtAed(mtdActual)} / ${fmtAed(mtdBudget)}`}
+          status={mtdSt}
           note={mtdPct != null ? `${mtdPct}%` : ''}
         />
         <MetricRow
           label="Feedback"
-          value={card.avg_rating != null
-            ? `⭐ ${Number(card.avg_rating).toFixed(1)}`
-            : 'No data'}
-          status={card.feedback_status || (card.complaint_count > 2 ? 'red' : card.complaint_count > 0 ? 'yellow' : 'green')}
-          note={card.complaint_count > 0 ? `${card.complaint_count} complaint${card.complaint_count > 1 ? 's' : ''}` : ''}
+          value={avgRating != null && avgRating > 0 ? `⭐ ${Number(avgRating).toFixed(1)}` : 'No feedback yet'}
+          status={fbSt}
+          note={complaints > 0 ? `${complaints} complaint${complaints > 1 ? 's' : ''}` : ''}
         />
         <MetricRow
           label="Expiry"
-          value={card.expiry_items != null
-            ? `${card.expiry_items} near-expiry item${card.expiry_items !== 1 ? 's' : ''}`
-            : 'No data'}
-          status={card.expiry_status || (card.expiry_items > 5 ? 'red' : card.expiry_items > 0 ? 'yellow' : 'green')}
+          value={nearExpiry != null ? `${nearExpiry} near-expiry item${nearExpiry !== 1 ? 's' : ''}` : '0 items'}
+          status={expSt}
         />
         <MetricRow
           label="Visits"
-          value={card.visits_count != null
-            ? `${card.visits_count} visit${card.visits_count !== 1 ? 's' : ''} this month`
-            : 'No data'}
-          status={card.visits_status || (card.visits_count >= 3 ? 'green' : card.visits_count >= 1 ? 'yellow' : 'red')}
+          value={visitCount != null ? `${visitCount} visit${visitCount !== 1 ? 's' : ''} this month` : '0 visits'}
+          status={visitSt}
         />
       </CardContent>
     </Card>
@@ -169,16 +169,20 @@ export default function KpiScorecardsPage() {
       }
 
       const tableData = cards.map(card => {
-        const todayPct = card.today_budget > 0 ? Math.round((card.today_sales / card.today_budget) * 100) : null
-        const mtdPct = card.mtd_budget > 0 ? Math.round((card.mtd_sales / card.mtd_budget) * 100) : null
+        const todayPct = card.sales?.achievement_pct ?? null
+        const mtdPct = card.mtd?.achievement_pct ?? null
+        const avgRating = card.feedback?.avg_rating ?? null
+        const complaints = card.feedback?.complaints_7d ?? 0
+        const nearExpiry = card.expiry?.near_expiry_items ?? 0
+        const visitCount = card.visits?.this_month ?? 0
         return [
           card.branch_name || '-',
           statusDot(card.overall_status || 'green'),
-          card.today_sales != null ? `${fmtAed(card.today_sales)} / ${fmtAed(card.today_budget)}${todayPct != null ? ` (${todayPct}%)` : ''}` : '-',
-          card.mtd_sales != null ? `${fmtAed(card.mtd_sales)} / ${fmtAed(card.mtd_budget)}${mtdPct != null ? ` (${mtdPct}%)` : ''}` : '-',
-          card.avg_rating != null ? `${Number(card.avg_rating).toFixed(1)} ★${card.complaint_count > 0 ? ` (${card.complaint_count} cmplt)` : ''}` : '-',
-          card.expiry_items != null ? `${card.expiry_items} items` : '-',
-          card.visits_count != null ? `${card.visits_count} visits` : '-',
+          `${fmtAed(card.sales?.today ?? 0)} / ${fmtAed(card.sales?.budget_today ?? 0)}${todayPct != null ? ` (${todayPct}%)` : ''}`,
+          `${fmtAed(card.mtd?.actual ?? 0)} / ${fmtAed(card.mtd?.budget ?? 0)}${mtdPct != null ? ` (${mtdPct}%)` : ''}`,
+          avgRating != null && avgRating > 0 ? `${Number(avgRating).toFixed(1)} ★${complaints > 0 ? ` (${complaints} cmplt)` : ''}` : 'No data',
+          `${nearExpiry} items`,
+          `${visitCount} visits`,
         ]
       })
 
