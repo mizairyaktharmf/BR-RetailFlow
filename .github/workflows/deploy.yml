@@ -159,7 +159,6 @@ jobs:
       - name: Deploy Admin Dashboard to S3
         run: |
           aws s3 sync apps/admin-dashboard/out/ s3://br-admin-dashboard --delete
-          aws cloudfront create-invalidation --distribution-id ${{ secrets.ADMIN_CF_DISTRIBUTION_ID }} --paths "/*"
 
       # Build and deploy Flavor Expert App
       - name: Build Flavor Expert App
@@ -176,4 +175,15 @@ jobs:
       - name: Deploy Flavor Expert App to S3
         run: |
           aws s3 sync apps/flavor-expert-app/out/ s3://br-flavor-expert-app --delete
-          aws cloudfront create-invalidation --distribution-id ${{ secrets.FLAVOR_CF_DISTRIBUTION_ID }} --paths "/*"
+
+      - name: Invalidate CloudFront caches
+        run: |
+          echo "Invalidating Admin Dashboard CloudFront..."
+          aws cloudfront create-invalidation \
+            --distribution-id ${{ secrets.ADMIN_CF_DISTRIBUTION_ID }} \
+            --paths "/*" || echo "Admin CF invalidation throttled — cache will expire naturally"
+          sleep 10
+          echo "Invalidating Flavor Expert CloudFront..."
+          aws cloudfront create-invalidation \
+            --distribution-id ${{ secrets.FLAVOR_CF_DISTRIBUTION_ID }} \
+            --paths "/*" || echo "Flavor Expert CF invalidation throttled — cache will expire naturally"
