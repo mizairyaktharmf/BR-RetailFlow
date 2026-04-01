@@ -76,7 +76,8 @@ export default function ExpiryTrackingPage() {
     if (!file) return
     setExcelParsing(true)
     try {
-      const XLSX = (await import('xlsx')).default
+      const xlsxModule = await import('xlsx')
+      const XLSX = xlsxModule.default || xlsxModule
       const arrayBuffer = await file.arrayBuffer()
       const wb = XLSX.read(arrayBuffer, { type: 'array', cellDates: true })
       const ws = wb.Sheets[wb.SheetNames[0]]

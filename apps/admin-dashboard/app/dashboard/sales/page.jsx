@@ -377,7 +377,8 @@ export default function SalesReportsPage() {
 
   const exportExcel = async () => {
     if (!selectedBranch || currentSales.length === 0) return
-    const XLSX = (await import('xlsx')).default
+    const xlsxModule = await import('xlsx')
+    const XLSX = xlsxModule.default || xlsxModule
     const rows = [
       ['Branch', 'Date', 'Window', 'Gross Sales', 'Net Sales', 'GC', 'ATV', 'HD Gross', 'HD Net', 'HD Orders', 'Deliveroo Gross', 'Deliveroo Net', 'Cool Mood Gross', 'Cash Sales'],
       ...currentSales.map(s => [
