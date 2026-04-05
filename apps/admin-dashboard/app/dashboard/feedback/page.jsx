@@ -9,7 +9,7 @@ import {
 } from 'lucide-react'
 import api from '@/services/api'
 
-const FLAVOR_EXPERT_URL = process.env.NEXT_PUBLIC_FLAVOR_EXPERT_URL || 'https://d3o9sr9mmvhxa.cloudfront.net'
+const FLAVOR_EXPERT_URL = process.env.NEXT_PUBLIC_FLAVOR_EXPERT_URL || 'https://d38dkajjvnnmib.cloudfront.net'
 
 const TYPE_CONFIG = {
   complaint:  { label: 'Complaint',  dot: '🔴', bg: 'bg-red-500/20',    text: 'text-red-400',    border: 'border-red-500/30'    },
@@ -29,7 +29,7 @@ function StarRating({ rating }) {
 
 function QRCard({ branch }) {
   const [copied, setCopied] = useState(false)
-  const feedbackUrl = `${FLAVOR_EXPERT_URL}/feedback?branch=${branch.id}`
+  const feedbackUrl = `${FLAVOR_EXPERT_URL}/feedback/?branch=${branch.id}`
   const qrSrc = `https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(feedbackUrl)}`
 
   const copyLink = () => {
