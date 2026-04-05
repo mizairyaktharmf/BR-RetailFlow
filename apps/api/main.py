@@ -183,6 +183,20 @@ def run_migrations():
             # Table will be created by create_all, just log
             logger.info("customer_feedback table will be created by create_all")
 
+        # Add customer_email and customer_phone to customer_feedback if missing
+        if 'customer_feedback' in inspector.get_table_names():
+            cf_cols = [c['name'] for c in inspector.get_columns('customer_feedback')]
+            if 'customer_email' not in cf_cols:
+                logger.info("Migration: Adding customer_email to customer_feedback")
+                conn.execute(text("ALTER TABLE customer_feedback ADD COLUMN customer_email VARCHAR(200)"))
+                conn.commit()
+                logger.info("Migration: customer_email added successfully")
+            if 'customer_phone' not in cf_cols:
+                logger.info("Migration: Adding customer_phone to customer_feedback")
+                conn.execute(text("ALTER TABLE customer_feedback ADD COLUMN customer_phone VARCHAR(30)"))
+                conn.commit()
+                logger.info("Migration: customer_phone added successfully")
+
         # Migrate expiry_responses quantity from INTEGER to FLOAT (support decimal like 1.25)
         if 'expiry_responses' in inspector.get_table_names():
             er_columns = {c['name']: c for c in inspector.get_columns('expiry_responses')}

@@ -22,6 +22,8 @@ class CustomerFeedback(Base):
     feedback_type = Column(String(20), nullable=False)  # compliment, complaint, suggestion
     message = Column(Text, nullable=True)
     customer_name = Column(String(100), nullable=True)
+    customer_email = Column(String(200), nullable=True)
+    customer_phone = Column(String(30), nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
     # Relationships

@@ -34,6 +34,8 @@ async def submit_feedback(
     feedback_type = data.get("feedback_type")
     message = data.get("message")
     customer_name = data.get("customer_name")
+    customer_email = data.get("customer_email")
+    customer_phone = data.get("customer_phone")
 
     # Validate required fields
     if not branch_id:
@@ -52,12 +54,20 @@ async def submit_feedback(
     if not branch:
         raise HTTPException(status_code=404, detail="Branch not found")
 
+    # Validate email format if provided
+    if customer_email:
+        import re
+        if not re.match(r'^[^\s@]+@[^\s@]+\.[^\s@]+$', customer_email):
+            raise HTTPException(status_code=400, detail="Invalid email format")
+
     feedback = CustomerFeedback(
         branch_id=branch_id,
         rating=rating,
         feedback_type=feedback_type,
         message=message,
         customer_name=customer_name,
+        customer_email=customer_email.strip().lower() if customer_email else None,
+        customer_phone=customer_phone.strip() if customer_phone else None,
     )
     db.add(feedback)
     db.commit()
@@ -127,6 +137,8 @@ async def list_feedback(
             "feedback_type": f.feedback_type,
             "message": f.message,
             "customer_name": f.customer_name,
+            "customer_email": f.customer_email,
+            "customer_phone": f.customer_phone,
             "created_at": f.created_at.isoformat() if f.created_at else None,
         }
         for f in feedbacks

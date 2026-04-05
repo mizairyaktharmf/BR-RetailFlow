@@ -43,6 +43,8 @@ function FeedbackContent() {
   const [feedbackType, setFeedbackType] = useState('')
   const [message, setMessage]         = useState('')
   const [customerName, setCustomerName] = useState('')
+  const [customerEmail, setCustomerEmail] = useState('')
+  const [customerPhone, setCustomerPhone] = useState('')
 
   // Submission state
   const [submitting, setSubmitting]   = useState(false)
@@ -88,11 +90,13 @@ function FeedbackContent() {
     setSubmitting(true)
     try {
       await api.submitFeedback({
-        branch_id:     parseInt(branchId, 10),
+        branch_id:      parseInt(branchId, 10),
         rating,
-        feedback_type: feedbackType,
-        message:       message.trim(),
-        customer_name: customerName.trim(),
+        feedback_type:  feedbackType,
+        message:        message.trim(),
+        customer_name:  customerName.trim(),
+        customer_email: customerEmail.trim() || null,
+        customer_phone: customerPhone.trim() || null,
       })
       setSubmitted(true)
     } catch (err) {
@@ -266,20 +270,56 @@ function FeedbackContent() {
             <p className="text-right text-xs text-gray-400 mt-1">{message.length}/1000</p>
           </section>
 
-          {/* ── Name ─────────────────────────────────────────────────────── */}
-          <section className="bg-white rounded-2xl shadow-sm p-6">
-            <h2 className="text-base font-semibold text-gray-700 mb-3">
-              Your name{' '}
-              <span className="text-gray-400 font-normal text-sm">(optional)</span>
-            </h2>
-            <input
-              type="text"
-              value={customerName}
-              onChange={(e) => setCustomerName(e.target.value)}
-              placeholder="Your name (optional)"
-              maxLength={100}
-              className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-800 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-400 focus:border-transparent transition"
-            />
+          {/* ── Contact Details ───────────────────────────────────────────── */}
+          <section className="bg-white rounded-2xl shadow-sm p-6 space-y-4">
+            <div>
+              <h2 className="text-base font-semibold text-gray-700 mb-1">
+                Your name{' '}
+                <span className="text-gray-400 font-normal text-sm">(optional)</span>
+              </h2>
+              <input
+                type="text"
+                value={customerName}
+                onChange={(e) => setCustomerName(e.target.value)}
+                placeholder="Your name"
+                maxLength={100}
+                className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-800 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-400 focus:border-transparent transition"
+              />
+            </div>
+
+            <div>
+              <h2 className="text-base font-semibold text-gray-700 mb-1">
+                Email address{' '}
+                <span className="text-gray-400 font-normal text-sm">(optional)</span>
+              </h2>
+              <input
+                type="email"
+                value={customerEmail}
+                onChange={(e) => setCustomerEmail(e.target.value)}
+                placeholder="your@email.com"
+                maxLength={200}
+                className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-800 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-400 focus:border-transparent transition"
+              />
+            </div>
+
+            <div>
+              <h2 className="text-base font-semibold text-gray-700 mb-1">
+                Phone number{' '}
+                <span className="text-gray-400 font-normal text-sm">(optional)</span>
+              </h2>
+              <input
+                type="tel"
+                value={customerPhone}
+                onChange={(e) => setCustomerPhone(e.target.value)}
+                placeholder="+971 50 000 0000"
+                maxLength={30}
+                className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-800 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-400 focus:border-transparent transition"
+              />
+            </div>
+
+            <p className="text-xs text-gray-400 pt-1">
+              Share your contact details to receive exclusive offers and promotions from BR Baskin-Robbins.
+            </p>
           </section>
 
           {/* ── Error message ─────────────────────────────────────────────── */}
@@ -306,7 +346,7 @@ function FeedbackContent() {
           </button>
 
           <p className="text-center text-xs text-gray-400 pb-2">
-            Your feedback is anonymous and helps us serve you better.
+            Your contact details are optional and only used to send you exclusive offers.
           </p>
         </form>
       </div>
