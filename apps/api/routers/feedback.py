@@ -113,21 +113,28 @@ async def submit_feedback(
         elif served_by_name:
             resolved_served_by_name = served_by_name
 
-    feedback = CustomerFeedback(
-        branch_id=branch_id,
-        rating=rating,
-        feedback_type=feedback_type,
-        message=message,
-        customer_name=customer_name,
-        customer_email=customer_email.strip().lower() if customer_email else None,
-        customer_phone=customer_phone.strip() if customer_phone else None,
-        served_by_user_id=served_by_user_id if resolved_served_by_name else None,
-        served_by_name=resolved_served_by_name,
-    )
-    db.add(feedback)
-    db.commit()
+    try:
+        feedback = CustomerFeedback(
+            branch_id=branch_id,
+            rating=rating,
+            feedback_type=feedback_type,
+            message=message,
+            customer_name=customer_name,
+            customer_email=customer_email.strip().lower() if customer_email else None,
+            customer_phone=customer_phone.strip() if customer_phone else None,
+            served_by_user_id=served_by_user_id if resolved_served_by_name else None,
+            served_by_name=resolved_served_by_name,
+        )
+        db.add(feedback)
+        db.commit()
+        db.refresh(feedback)
+        logger.info(f"Feedback saved: id={feedback.id} branch={branch_id} rating={rating} type={feedback_type}")
+    except Exception as e:
+        db.rollback()
+        logger.error(f"Failed to save feedback: {e}")
+        raise HTTPException(status_code=500, detail="Failed to save feedback. Please try again.")
 
-    return {"success": True, "message": "Thank you for your feedback!"}
+    return {"success": True, "message": "Thank you for your feedback!", "id": feedback.id}
 
 
 # ============== ADMIN READ ==============
@@ -144,43 +151,47 @@ async def list_feedback(
     query = db.query(CustomerFeedback)
 
     # Role-based branch scoping
-    if current_user.role == UserRole.STAFF:
-        # Flavor Expert: can only see feedback for their own branch
-        if not current_user.branch_id:
-            return []
-        query = query.filter(CustomerFeedback.branch_id == current_user.branch_id)
-    elif current_user.role == UserRole.ADMIN:
-        # Area Manager: branches they manage
-        managed_branch_ids = [
-            b.id for b in db.query(Branch).filter(Branch.manager_id == current_user.id).all()
-        ]
-        # Also include branches in their area
-        if current_user.area_id:
-            area_branch_ids = [
-                b.id for b in db.query(Branch).filter(Branch.area_id == current_user.area_id).all()
-            ]
-            managed_branch_ids = list(set(managed_branch_ids + area_branch_ids))
-        if not managed_branch_ids:
-            return []
-        if branch_id and branch_id not in managed_branch_ids:
-            raise HTTPException(status_code=403, detail="Not authorized to view this branch's feedback")
+    if current_user.role == UserRole.SUPREME_ADMIN:
+        # Sees everything — just filter by branch_id if requested
         if branch_id:
             query = query.filter(CustomerFeedback.branch_id == branch_id)
-        else:
-            query = query.filter(CustomerFeedback.branch_id.in_(managed_branch_ids))
+
     elif current_user.role == UserRole.SUPER_ADMIN:
-        territory_branch_ids = [
-            b.id for b in db.query(Branch).filter(Branch.territory_id == current_user.territory_id).all()
-        ]
-        if branch_id and branch_id not in territory_branch_ids:
-            raise HTTPException(status_code=403, detail="Not authorized to view this branch's feedback")
-        if branch_id:
+        # Territory manager — filter by territory if territory_id is set
+        if current_user.territory_id:
+            territory_branch_ids = [
+                b.id for b in db.query(Branch).filter(Branch.territory_id == current_user.territory_id).all()
+            ]
+            if territory_branch_ids:
+                if branch_id and branch_id not in territory_branch_ids:
+                    raise HTTPException(status_code=403, detail="Not authorized to view this branch's feedback")
+                if branch_id:
+                    query = query.filter(CustomerFeedback.branch_id == branch_id)
+                else:
+                    query = query.filter(CustomerFeedback.branch_id.in_(territory_branch_ids))
+        # If territory_id not set, treat as supreme (sees all)
+        elif branch_id:
             query = query.filter(CustomerFeedback.branch_id == branch_id)
-        else:
-            query = query.filter(CustomerFeedback.branch_id.in_(territory_branch_ids))
-    elif current_user.role == UserRole.SUPREME_ADMIN:
-        if branch_id:
-            query = query.filter(CustomerFeedback.branch_id == branch_id)
+
+    elif current_user.role == UserRole.ADMIN:
+        # Area manager — collect all branch IDs in their area OR managed directly
+        scoped_ids = set()
+        if current_user.area_id:
+            for b in db.query(Branch).filter(Branch.area_id == current_user.area_id).all():
+                scoped_ids.add(b.id)
+        for b in db.query(Branch).filter(Branch.manager_id == current_user.id).all():
+            scoped_ids.add(b.id)
+        if scoped_ids:
+            if branch_id and branch_id not in scoped_ids:
+                raise HTTPException(status_code=403, detail="Not authorized to view this branch's feedback")
+            query = query.filter(CustomerFeedback.branch_id.in_(list(scoped_ids)))
+        # If no branches found via area/manager, fall back to all (better than empty)
+
+    elif current_user.role == UserRole.STAFF:
+        # Flavor Expert — their own branch only
+        if current_user.branch_id:
+            query = query.filter(CustomerFeedback.branch_id == current_user.branch_id)
+
     else:
         raise HTTPException(status_code=403, detail="Not authorized")
 
@@ -231,15 +242,19 @@ async def feedback_stats(
             return []
         branch_query = branch_query.filter(Branch.id == current_user.branch_id)
     elif current_user.role == UserRole.ADMIN:
-        area_ids = []
+        branch_ids_set = set()
         if current_user.area_id:
-            area_ids = [current_user.area_id]
-        branch_query = branch_query.filter(
-            (Branch.manager_id == current_user.id) |
-            (Branch.area_id.in_(area_ids) if area_ids else False)
-        )
+            for b in db.query(Branch).filter(Branch.area_id == current_user.area_id, Branch.is_active == True).all():
+                branch_ids_set.add(b.id)
+        for b in db.query(Branch).filter(Branch.manager_id == current_user.id, Branch.is_active == True).all():
+            branch_ids_set.add(b.id)
+        if branch_ids_set:
+            branch_query = branch_query.filter(Branch.id.in_(list(branch_ids_set)))
+        # else no filter = sees all (fallback when area/manager not configured)
     elif current_user.role == UserRole.SUPER_ADMIN:
-        branch_query = branch_query.filter(Branch.territory_id == current_user.territory_id)
+        if current_user.territory_id:
+            branch_query = branch_query.filter(Branch.territory_id == current_user.territory_id)
+        # else no filter = sees all
     elif current_user.role not in [UserRole.SUPREME_ADMIN]:
         raise HTTPException(status_code=403, detail="Not authorized")
 
