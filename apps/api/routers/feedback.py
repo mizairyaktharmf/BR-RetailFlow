@@ -139,7 +139,7 @@ async def submit_feedback(
 
 # ============== ADMIN READ ==============
 
-@router.get("/")
+@router.get("")
 async def list_feedback(
     branch_id: Optional[int] = Query(None),
     feedback_type: Optional[str] = Query(None),
