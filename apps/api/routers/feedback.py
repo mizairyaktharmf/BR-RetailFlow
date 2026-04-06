@@ -37,13 +37,22 @@ async def get_branch_info(
     if not branch:
         raise HTTPException(status_code=404, detail="Branch not found")
 
+    # Get area manager name if set
+    area_manager_name = None
+    if branch.manager_id:
+        manager = db.query(User).filter(User.id == branch.manager_id, User.is_active == True).first()
+        if manager:
+            area_manager_name = manager.full_name
+
     # Get Flavor Expert staff (STAFF role) assigned to this branch
+    # Only show active + approved users to avoid test/dummy accounts
     staff = (
         db.query(User)
         .filter(
             User.branch_id == branch_id,
             User.role == UserRole.STAFF,
             User.is_active == True,
+            User.is_approved == True,
         )
         .order_by(User.full_name)
         .all()
@@ -52,6 +61,7 @@ async def get_branch_info(
     return {
         "branch_id": branch.id,
         "branch_name": branch.name,
+        "area_manager_name": area_manager_name,
         "staff": [
             {"id": s.id, "full_name": s.full_name}
             for s in staff

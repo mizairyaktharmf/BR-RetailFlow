@@ -32,10 +32,11 @@ function FeedbackContent() {
   const branchId = searchParams.get('branch')
 
   // Branch + staff state
-  const [branchName, setBranchName]     = useState('')
-  const [staffList, setStaffList]       = useState([])
-  const [branchLoading, setBranchLoading] = useState(true)
-  const [branchError, setBranchError]   = useState(false)
+  const [branchName, setBranchName]         = useState('')
+  const [areaManagerName, setAreaManagerName] = useState('')
+  const [staffList, setStaffList]           = useState([])
+  const [branchLoading, setBranchLoading]   = useState(true)
+  const [branchError, setBranchError]       = useState(false)
 
   // Form state
   const [rating, setRating]             = useState(0)
@@ -64,6 +65,7 @@ function FeedbackContent() {
       try {
         const data = await api.getFeedbackBranchInfo(branchId)
         setBranchName(data.branch_name || '')
+        setAreaManagerName(data.area_manager_name || '')
         setStaffList(data.staff || [])
       } catch (err) {
         console.error('branch-info error:', err)
@@ -169,6 +171,19 @@ function FeedbackContent() {
 
       <div className="flex-1 overflow-y-auto">
         <form onSubmit={handleSubmit} className="max-w-lg mx-auto p-5 space-y-5 pb-10">
+
+          {/* ── Branch Info Card ─────────────────────────────────────────── */}
+          {areaManagerName && (
+            <section className="bg-purple-50 rounded-2xl border border-purple-100 p-4 flex items-center gap-3">
+              <div className="w-9 h-9 rounded-full bg-purple-100 flex items-center justify-center shrink-0">
+                <span className="text-base">👤</span>
+              </div>
+              <div>
+                <p className="text-xs text-purple-400 font-medium">Area Manager</p>
+                <p className="text-sm font-semibold text-purple-800">{areaManagerName}</p>
+              </div>
+            </section>
+          )}
 
           {/* ── Who served you? ─────────────────────────────────────────── */}
           {staffList.length > 0 && (
