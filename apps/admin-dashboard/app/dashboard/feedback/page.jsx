@@ -157,6 +157,7 @@ async function exportContactsExcel(contacts) {
 export default function FeedbackPage() {
   const router = useRouter()
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState('')
   const [feedback, setFeedback] = useState([])
   const [stats, setStats] = useState(null)
   const [branches, setBranches] = useState([])
@@ -172,17 +173,30 @@ export default function FeedbackPage() {
 
   const loadAll = async () => {
     setLoading(true)
+    setLoadError('')
     try {
       const [feedbackData, statsData, branchesData] = await Promise.all([
-        api.getFeedback({ limit: 500 }).catch(() => []),
+        api.getFeedback({ limit: 500 }).catch(err => { console.error('getFeedback error:', err); return [] }),
         api.getFeedbackStats().catch(() => null),
         api.getBranches().catch(() => []),
       ])
-      setFeedback(Array.isArray(feedbackData) ? feedbackData : [])
+      const fb = Array.isArray(feedbackData) ? feedbackData : []
+      setFeedback(fb)
       setStats(statsData)
       setBranches(Array.isArray(branchesData) ? branchesData : [])
+      if (fb.length === 0) {
+        // Try to detect if it's a permission issue by checking raw response
+        try {
+          await api.getFeedback({ limit: 1 })
+        } catch (err) {
+          if (err.message?.includes('403') || err.message?.toLowerCase().includes('not authorized')) {
+            setLoadError('Your account does not have permission to view feedback. Contact your administrator.')
+          }
+        }
+      }
     } catch (err) {
       console.error('Failed to load feedback:', err)
+      setLoadError(err.message || 'Failed to load feedback.')
     } finally {
       setLoading(false)
     }
@@ -286,6 +300,14 @@ export default function FeedbackPage() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Permission / load error banner */}
+      {loadError && (
+        <div className="rounded-xl bg-red-500/15 border border-red-500/40 px-4 py-3 flex items-center gap-3">
+          <AlertCircle className="h-5 w-5 text-red-400 shrink-0" />
+          <p className="text-sm text-red-300">{loadError}</p>
+        </div>
+      )}
 
       {/* Tab Switch */}
       <div className="flex gap-2 border-b border-gray-700">

@@ -144,10 +144,24 @@ async def list_feedback(
     query = db.query(CustomerFeedback)
 
     # Role-based branch scoping
-    if current_user.role == UserRole.ADMIN:
+    if current_user.role == UserRole.STAFF:
+        # Flavor Expert: can only see feedback for their own branch
+        if not current_user.branch_id:
+            return []
+        query = query.filter(CustomerFeedback.branch_id == current_user.branch_id)
+    elif current_user.role == UserRole.ADMIN:
+        # Area Manager: branches they manage
         managed_branch_ids = [
             b.id for b in db.query(Branch).filter(Branch.manager_id == current_user.id).all()
         ]
+        # Also include branches in their area
+        if current_user.area_id:
+            area_branch_ids = [
+                b.id for b in db.query(Branch).filter(Branch.area_id == current_user.area_id).all()
+            ]
+            managed_branch_ids = list(set(managed_branch_ids + area_branch_ids))
+        if not managed_branch_ids:
+            return []
         if branch_id and branch_id not in managed_branch_ids:
             raise HTTPException(status_code=403, detail="Not authorized to view this branch's feedback")
         if branch_id:
@@ -212,8 +226,18 @@ async def feedback_stats(
 
     # Scope branches by role
     branch_query = db.query(Branch).filter(Branch.is_active == True)
-    if current_user.role == UserRole.ADMIN:
-        branch_query = branch_query.filter(Branch.manager_id == current_user.id)
+    if current_user.role == UserRole.STAFF:
+        if not current_user.branch_id:
+            return []
+        branch_query = branch_query.filter(Branch.id == current_user.branch_id)
+    elif current_user.role == UserRole.ADMIN:
+        area_ids = []
+        if current_user.area_id:
+            area_ids = [current_user.area_id]
+        branch_query = branch_query.filter(
+            (Branch.manager_id == current_user.id) |
+            (Branch.area_id.in_(area_ids) if area_ids else False)
+        )
     elif current_user.role == UserRole.SUPER_ADMIN:
         branch_query = branch_query.filter(Branch.territory_id == current_user.territory_id)
     elif current_user.role not in [UserRole.SUPREME_ADMIN]:
