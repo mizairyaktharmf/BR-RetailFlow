@@ -155,16 +155,26 @@ export default function BudgetPage() {
     }
   }
 
-  // Parse date string like "2/1/2026" to "2026-02-01"
+  // Parse date string to "YYYY-MM-DD"
   const parseDateString = (dateStr, monthCode) => {
     if (!dateStr) return null
     try {
+      // ISO format YYYY-MM-DD — returned by backend parser
+      if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) return dateStr
+
       const parts = dateStr.split('/')
       if (parts.length === 3) {
-        const m = parts[0].padStart(2, '0')
-        const d = parts[1].padStart(2, '0')
-        const y = parts[2]
-        return `${y}-${m}-${d}`
+        // Detect DD/MM/YYYY vs MM/DD/YYYY: if first part > 12, it must be day
+        const a = parseInt(parts[0], 10)
+        const b = parseInt(parts[1], 10)
+        const y = parts[2].length === 4 ? parts[2] : `20${parts[2]}`
+        if (a > 12) {
+          // DD/MM/YYYY
+          return `${y}-${String(b).padStart(2, '0')}-${String(a).padStart(2, '0')}`
+        } else {
+          // MM/DD/YYYY
+          return `${y}-${String(a).padStart(2, '0')}-${String(b).padStart(2, '0')}`
+        }
       }
       // Fallback: use monthCode + day
       if (monthCode && parts.length >= 1) {

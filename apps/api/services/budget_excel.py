@@ -34,15 +34,15 @@ def _safe_int(val, default=0):
 
 
 def _parse_date(val):
+    """Return date as ISO YYYY-MM-DD string (unambiguous)."""
     if val is None:
         return None
     if isinstance(val, datetime):
-        return val.strftime("%d/%m/%Y")
+        return val.strftime("%Y-%m-%d")
     try:
-        # Try parsing common date strings
-        for fmt in ("%m/%d/%Y", "%d/%m/%Y", "%Y-%m-%d", "%d-%m-%Y"):
+        for fmt in ("%Y-%m-%d", "%m/%d/%Y", "%d/%m/%Y", "%d-%m-%Y"):
             try:
-                return datetime.strptime(str(val).strip(), fmt).strftime("%d/%m/%Y")
+                return datetime.strptime(str(val).strip(), fmt).strftime("%Y-%m-%d")
             except ValueError:
                 continue
     except Exception:
