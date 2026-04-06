@@ -33,7 +33,8 @@ async def get_branch_info(
     Returns branch name and list of Flavor Expert staff at that branch.
     Used by the QR feedback form to populate branch name and staff dropdown.
     """
-    branch = db.query(Branch).filter(Branch.id == branch_id, Branch.is_active == True).first()
+    # Allow any branch (active or not) so QR codes always work
+    branch = db.query(Branch).filter(Branch.id == branch_id).first()
     if not branch:
         raise HTTPException(status_code=404, detail="Branch not found")
 
@@ -45,14 +46,15 @@ async def get_branch_info(
             area_manager_name = manager.full_name
 
     # Get Flavor Expert staff (STAFF role) assigned to this branch
-    # Only show active + approved users to avoid test/dummy accounts
+    # Filter: active users only, exclude obviously fake/test names
     staff = (
         db.query(User)
         .filter(
             User.branch_id == branch_id,
             User.role == UserRole.STAFF,
             User.is_active == True,
-            User.is_approved == True,
+            ~User.full_name.ilike('Flavor Expert -%'),
+            ~User.full_name.ilike('Testing%'),
         )
         .order_by(User.full_name)
         .all()
