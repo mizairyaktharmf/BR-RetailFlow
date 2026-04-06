@@ -24,6 +24,8 @@ class CustomerFeedback(Base):
     customer_name = Column(String(100), nullable=True)
     customer_email = Column(String(200), nullable=True)
     customer_phone = Column(String(30), nullable=True)
+    served_by_user_id = Column(Integer, ForeignKey("users.id"), nullable=True)
+    served_by_name = Column(String(100), nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
     # Relationships

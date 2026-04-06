@@ -196,6 +196,16 @@ def run_migrations():
                 conn.execute(text("ALTER TABLE customer_feedback ADD COLUMN customer_phone VARCHAR(30)"))
                 conn.commit()
                 logger.info("Migration: customer_phone added successfully")
+            if 'served_by_user_id' not in cf_cols:
+                logger.info("Migration: Adding served_by_user_id to customer_feedback")
+                conn.execute(text("ALTER TABLE customer_feedback ADD COLUMN served_by_user_id INTEGER REFERENCES users(id)"))
+                conn.commit()
+                logger.info("Migration: served_by_user_id added successfully")
+            if 'served_by_name' not in cf_cols:
+                logger.info("Migration: Adding served_by_name to customer_feedback")
+                conn.execute(text("ALTER TABLE customer_feedback ADD COLUMN served_by_name VARCHAR(100)"))
+                conn.commit()
+                logger.info("Migration: served_by_name added successfully")
 
         # Migrate expiry_responses quantity from INTEGER to FLOAT (support decimal like 1.25)
         if 'expiry_responses' in inspector.get_table_names():

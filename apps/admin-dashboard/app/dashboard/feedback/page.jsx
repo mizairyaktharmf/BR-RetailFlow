@@ -74,6 +74,7 @@ async function exportAllFeedbackExcel(feedback) {
   const allRows = feedback.map(f => ({
     'Date': f.created_at ? new Date(f.created_at).toLocaleDateString('en-GB') : '',
     'Branch': f.branch_name || f.branch_id,
+    'Served By': f.served_by_name || '',
     'Rating': f.rating,
     'Type': f.feedback_type,
     'Message': f.message || '',
@@ -111,6 +112,7 @@ async function exportAllFeedbackExcel(feedback) {
   Object.entries(byBranch).forEach(([branchName, rows]) => {
     const sheetRows = rows.map(f => ({
       'Date': f.created_at ? new Date(f.created_at).toLocaleDateString('en-GB') : '',
+      'Served By': f.served_by_name || '',
       'Rating': f.rating,
       'Type': f.feedback_type,
       'Message': f.message || '',
@@ -422,6 +424,7 @@ export default function FeedbackPage() {
                 <thead>
                   <tr className="border-b border-gray-700">
                     <th className="text-left p-3 text-xs font-medium text-gray-400">Branch</th>
+                    <th className="text-left p-3 text-xs font-medium text-gray-400">Served By</th>
                     <th className="text-left p-3 text-xs font-medium text-gray-400">Rating</th>
                     <th className="text-left p-3 text-xs font-medium text-gray-400">Type</th>
                     <th className="text-left p-3 text-xs font-medium text-gray-400">Message</th>
@@ -436,6 +439,7 @@ export default function FeedbackPage() {
                     return (
                       <tr key={item.id || idx} className={`border-b border-gray-700/50 ${idx % 2 === 0 ? 'bg-gray-800/20' : ''} hover:bg-gray-700/30`}>
                         <td className="p-3 text-sm text-white font-medium">{item.branch_name || item.branch_id || '—'}</td>
+                        <td className="p-3 text-xs text-purple-300">{item.served_by_name || <span className="text-gray-600">—</span>}</td>
                         <td className="p-3"><StarRating rating={item.rating || 0} /></td>
                         <td className="p-3">
                           <span className={`text-xs px-2 py-0.5 rounded-full border ${typeConf.bg} ${typeConf.text} ${typeConf.border}`}>

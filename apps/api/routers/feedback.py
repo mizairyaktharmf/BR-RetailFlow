@@ -23,19 +23,57 @@ VALID_FEEDBACK_TYPES = {"compliment", "complaint", "suggestion"}
 
 # ============== PUBLIC ==============
 
+@router.get("/branch-info")
+async def get_branch_info(
+    branch_id: int = Query(..., description="Branch ID from QR code"),
+    db: Session = Depends(get_db),
+):
+    """
+    Public endpoint — no auth required.
+    Returns branch name and list of Flavor Expert staff at that branch.
+    Used by the QR feedback form to populate branch name and staff dropdown.
+    """
+    branch = db.query(Branch).filter(Branch.id == branch_id, Branch.is_active == True).first()
+    if not branch:
+        raise HTTPException(status_code=404, detail="Branch not found")
+
+    # Get Flavor Expert staff (STAFF role) assigned to this branch
+    staff = (
+        db.query(User)
+        .filter(
+            User.branch_id == branch_id,
+            User.role == UserRole.STAFF,
+            User.is_active == True,
+        )
+        .order_by(User.full_name)
+        .all()
+    )
+
+    return {
+        "branch_id": branch.id,
+        "branch_name": branch.name,
+        "staff": [
+            {"id": s.id, "full_name": s.full_name}
+            for s in staff
+        ],
+    }
+
+
 @router.post("/submit")
 async def submit_feedback(
     data: dict,
     db: Session = Depends(get_db),
 ):
     """Public endpoint — no auth required. Accepts customer feedback for a branch."""
-    branch_id = data.get("branch_id")
-    rating = data.get("rating")
-    feedback_type = data.get("feedback_type")
-    message = data.get("message")
-    customer_name = data.get("customer_name")
-    customer_email = data.get("customer_email")
-    customer_phone = data.get("customer_phone")
+    branch_id         = data.get("branch_id")
+    rating            = data.get("rating")
+    feedback_type     = data.get("feedback_type")
+    message           = data.get("message")
+    customer_name     = data.get("customer_name")
+    customer_email    = data.get("customer_email")
+    customer_phone    = data.get("customer_phone")
+    served_by_user_id = data.get("served_by_user_id")
+    served_by_name    = data.get("served_by_name")
 
     # Validate required fields
     if not branch_id:
@@ -60,6 +98,21 @@ async def submit_feedback(
         if not re.match(r'^[^\s@]+@[^\s@]+\.[^\s@]+$', customer_email):
             raise HTTPException(status_code=400, detail="Invalid email format")
 
+    # If served_by_user_id is given, resolve the name from DB to avoid spoofing
+    resolved_served_by_name = None
+    if served_by_user_id:
+        staff_user = db.query(User).filter(
+            User.id == served_by_user_id,
+            User.branch_id == branch_id,
+            User.role == UserRole.STAFF,
+            User.is_active == True,
+        ).first()
+        if staff_user:
+            resolved_served_by_name = staff_user.full_name
+        # If not found, fall back to the name the client sent (graceful)
+        elif served_by_name:
+            resolved_served_by_name = served_by_name
+
     feedback = CustomerFeedback(
         branch_id=branch_id,
         rating=rating,
@@ -68,6 +121,8 @@ async def submit_feedback(
         customer_name=customer_name,
         customer_email=customer_email.strip().lower() if customer_email else None,
         customer_phone=customer_phone.strip() if customer_phone else None,
+        served_by_user_id=served_by_user_id if resolved_served_by_name else None,
+        served_by_name=resolved_served_by_name,
     )
     db.add(feedback)
     db.commit()
@@ -81,7 +136,7 @@ async def submit_feedback(
 async def list_feedback(
     branch_id: Optional[int] = Query(None),
     feedback_type: Optional[str] = Query(None),
-    limit: int = Query(50, ge=1, le=500),
+    limit: int = Query(500, ge=1, le=1000),
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
@@ -90,7 +145,6 @@ async def list_feedback(
 
     # Role-based branch scoping
     if current_user.role == UserRole.ADMIN:
-        # Area managers see only their own branches
         managed_branch_ids = [
             b.id for b in db.query(Branch).filter(Branch.manager_id == current_user.id).all()
         ]
@@ -139,6 +193,7 @@ async def list_feedback(
             "customer_name": f.customer_name,
             "customer_email": f.customer_email,
             "customer_phone": f.customer_phone,
+            "served_by_name": f.served_by_name,
             "created_at": f.created_at.isoformat() if f.created_at else None,
         }
         for f in feedbacks
@@ -171,7 +226,6 @@ async def feedback_stats(
     if not branch_ids:
         return []
 
-    # Aggregate stats per branch using case() for conditional counts
     rows = (
         db.query(
             CustomerFeedback.branch_id,
@@ -192,7 +246,6 @@ async def feedback_stats(
         .all()
     )
 
-    # Recent 7 days counts per branch
     recent_rows = (
         db.query(
             CustomerFeedback.branch_id,
@@ -206,7 +259,6 @@ async def feedback_stats(
         .all()
     )
     recent_map = {r.branch_id: r.recent_count for r in recent_rows}
-
     stats_map = {r.branch_id: r for r in rows}
 
     result = []
