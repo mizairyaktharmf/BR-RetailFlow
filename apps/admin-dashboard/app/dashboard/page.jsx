@@ -20,6 +20,7 @@ import {
 } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import api from '@/services/api'
+import { initAdminPush } from '@/lib/push'
 
 const roleLabels = {
   supreme_admin: 'HQ',
@@ -41,6 +42,11 @@ export default function DashboardPage() {
   const [emailMsg, setEmailMsg] = useState('')
 
   useEffect(() => {
+    // Re-register push on every dashboard load (catches users already logged in)
+    if (Notification?.permission === 'granted') {
+      initAdminPush().catch(() => {})
+    }
+
     const storedUser = localStorage.getItem('br_admin_user')
 
     if (storedUser) {

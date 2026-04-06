@@ -18,7 +18,7 @@ class PushSubscription(Base):
     __tablename__ = "push_subscriptions"
 
     id = Column(Integer, primary_key=True, index=True)
-    branch_id = Column(Integer, ForeignKey("branches.id"), nullable=False, index=True)
+    branch_id = Column(Integer, ForeignKey("branches.id"), nullable=True, index=True)  # null for managers/admins
     user_id = Column(Integer, ForeignKey("users.id"), nullable=True)
 
     # Web Push subscription fields (from browser PushSubscription JSON)

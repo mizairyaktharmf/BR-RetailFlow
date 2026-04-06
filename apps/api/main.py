@@ -207,6 +207,15 @@ def run_migrations():
                 conn.commit()
                 logger.info("Migration: served_by_name added successfully")
 
+        # Make push_subscriptions.branch_id nullable so admin/managers can subscribe
+        if 'push_subscriptions' in inspector.get_table_names():
+            try:
+                conn.execute(text("ALTER TABLE push_subscriptions ALTER COLUMN branch_id DROP NOT NULL"))
+                conn.commit()
+                logger.info("Migration: push_subscriptions.branch_id is now nullable")
+            except Exception:
+                conn.rollback()  # Already nullable
+
         # Migrate expiry_responses quantity from INTEGER to FLOAT (support decimal like 1.25)
         if 'expiry_responses' in inspector.get_table_names():
             er_columns = {c['name']: c for c in inspector.get_columns('expiry_responses')}

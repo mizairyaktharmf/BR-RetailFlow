@@ -525,16 +525,26 @@ async def get_low_stock_alerts(
     """Get all low-stock cake alerts based on user's role scope"""
     # Determine branch scope based on role
     if current_user.role == UserRole.STAFF:
-        branch_ids = [current_user.branch_id]
+        branch_ids = [current_user.branch_id] if current_user.branch_id else []
     elif current_user.role == UserRole.ADMIN:
-        branches = db.query(Branch).filter(Branch.area_id == current_user.area_id).all()
-        branch_ids = [b.id for b in branches]
+        id_set = set()
+        if current_user.area_id:
+            for b in db.query(Branch).filter(Branch.area_id == current_user.area_id).all():
+                id_set.add(b.id)
+        for b in db.query(Branch).filter(Branch.manager_id == current_user.id).all():
+            id_set.add(b.id)
+        # fallback: all branches if no scope configured
+        branch_ids = list(id_set) if id_set else [b.id for b in db.query(Branch).filter(Branch.is_active == True).all()]
     elif current_user.role == UserRole.SUPER_ADMIN:
-        areas = db.query(Area).filter(Area.territory_id == current_user.territory_id).all()
-        area_ids = [a.id for a in areas]
-        branches = db.query(Branch).filter(Branch.area_id.in_(area_ids)).all()
-        branch_ids = [b.id for b in branches]
+        if current_user.territory_id:
+            areas = db.query(Area).filter(Area.territory_id == current_user.territory_id).all()
+            area_ids = [a.id for a in areas]
+            branches = db.query(Branch).filter(Branch.area_id.in_(area_ids)).all()
+            branch_ids = [b.id for b in branches]
+        else:
+            branch_ids = [b.id for b in db.query(Branch).filter(Branch.is_active == True).all()]
     else:
+        # SUPREME_ADMIN — see all
         branches = db.query(Branch).filter(Branch.is_active == True).all()
         branch_ids = [b.id for b in branches]
 
