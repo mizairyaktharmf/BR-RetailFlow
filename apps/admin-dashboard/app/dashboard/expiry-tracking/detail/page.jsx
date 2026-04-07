@@ -1,6 +1,6 @@
 "use client"
 
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -11,6 +11,14 @@ import {
 import api from '@/services/api'
 
 export default function ExpiryRequestDetailPage() {
+  return (
+    <Suspense fallback={<div className="p-6 text-white">Loading...</div>}>
+      <ExpiryDetailContent />
+    </Suspense>
+  )
+}
+
+function ExpiryDetailContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const requestId = searchParams.get('id')
