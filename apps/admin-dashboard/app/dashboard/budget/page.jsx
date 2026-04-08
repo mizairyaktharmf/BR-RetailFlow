@@ -33,10 +33,7 @@ export default function BudgetPage() {
 
   // Upload state
   const [selectedBranch, setSelectedBranch] = useState(null)
-  const [selectedMonth, setSelectedMonth] = useState(() => {
-    const now = new Date()
-    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
-  })
+  const [selectedMonth, setSelectedMonth] = useState('')
   const [extracting, setExtracting] = useState(false)
   const [extractedData, setExtractedData] = useState(null)
   const [saving, setSaving] = useState(false)
@@ -49,15 +46,25 @@ export default function BudgetPage() {
   const [advisorData, setAdvisorData] = useState(null)
   const [advisorLoading, setAdvisorLoading] = useState(false)
 
-  const [advisorDate, setAdvisorDate] = useState(() => new Date().toISOString().split('T')[0])
+  const [advisorDate, setAdvisorDate] = useState('')
 
   // Tracker overview
   const [trackerData, setTrackerData] = useState(null)
   const [trackerLoading, setTrackerLoading] = useState(false)
-  const [trackerDate, setTrackerDate] = useState(() => new Date().toISOString().split('T')[0])
+  const [trackerDate, setTrackerDate] = useState('')
+
+  // Set date-based state client-side only (avoids hydration mismatch)
+  useEffect(() => {
+    const now = new Date()
+    const month = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
+    const today = now.toISOString().split('T')[0]
+    if (!selectedMonth) setSelectedMonth(month)
+    if (!advisorDate) setAdvisorDate(today)
+    if (!trackerDate) setTrackerDate(today)
+  }, [])
 
   useEffect(() => {
-    loadData()
+    if (selectedMonth) loadData()
   }, [selectedMonth])
 
   const loadData = async (monthOverride) => {

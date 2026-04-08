@@ -292,7 +292,7 @@ export default function SalesReportsPage() {
   const [branchSales, setBranchSales] = useState({})
   const [loading, setLoading] = useState(true)
   const [loadingSales, setLoadingSales] = useState({})
-  const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0])
+  const [selectedDate, setSelectedDate] = useState('')
   const [activeWindowId, setActiveWindowId] = useState(null)
   const [trackedItems, setTrackedItems] = useState([])
   const [budgetChart, setBudgetChart] = useState(null)
@@ -303,11 +303,12 @@ export default function SalesReportsPage() {
     const userData = localStorage.getItem('br_admin_user')
     if (!userData) { router.push('/login'); return }
     setUser(JSON.parse(userData))
+    setSelectedDate(new Date().toISOString().split('T')[0])
     loadBranches()
   }, [router])
 
   useEffect(() => {
-    if (branches.length > 0) loadAllSales()
+    if (branches.length > 0 && selectedDate) loadAllSales()
   }, [branches, selectedDate])
 
   useEffect(() => {

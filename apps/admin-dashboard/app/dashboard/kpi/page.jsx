@@ -113,13 +113,17 @@ export default function KpiScorecardsPage() {
   const [loading, setLoading] = useState(true)
   const [cards, setCards] = useState([])
   const [error, setError] = useState(null)
-  const [date, setDate] = useState(new Date().toISOString().split('T')[0])
+  const [date, setDate] = useState('')
   const [exporting, setExporting] = useState(false)
 
   useEffect(() => {
     const userData = localStorage.getItem('br_admin_user')
     if (!userData) { router.push('/login'); return }
-    loadScorecards()
+    setDate(new Date().toISOString().split('T')[0])
+  }, [router])
+
+  useEffect(() => {
+    if (date) loadScorecards()
   }, [date])
 
   const loadScorecards = async () => {
