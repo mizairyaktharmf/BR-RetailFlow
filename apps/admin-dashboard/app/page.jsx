@@ -8,11 +8,11 @@ export default function Home() {
   const router = useRouter()
 
   useEffect(() => {
-    const token = localStorage.getItem('admin_token')
+    const token = localStorage.getItem('br_admin_token')
     if (token) {
-      router.push('/dashboard')
+      router.push('/dashboard/')
     } else {
-      router.push('/login')
+      router.push('/login/')
     }
   }, [router])
 

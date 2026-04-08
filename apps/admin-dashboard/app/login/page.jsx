@@ -50,7 +50,7 @@ export default function AdminLoginPage() {
       initAdminPush().catch(() => {})
 
       await new Promise(resolve => setTimeout(resolve, 100))
-      window.location.href = '/dashboard'
+      window.location.href = '/dashboard/'
     } catch (err) {
       // Check if this is a 403 "pending approval" response
       if (err.status === 403) {
