@@ -3,7 +3,6 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import { Loader2, Eye, EyeOff, Shield, Lock, User } from 'lucide-react'
-import { initAdminPush } from '@/lib/push'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -45,9 +44,6 @@ export default function AdminLoginPage() {
       // Store admin user data
       localStorage.setItem('br_admin_user', JSON.stringify(response.user))
       localStorage.setItem('admin_user', JSON.stringify(response.user))
-
-      // Register push notifications so managers get cake alerts even when page is closed
-      initAdminPush().catch(() => {})
 
       await new Promise(resolve => setTimeout(resolve, 100))
       window.location.href = '/dashboard/'

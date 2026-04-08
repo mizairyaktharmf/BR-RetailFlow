@@ -17,7 +17,6 @@ import {
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import api from '@/services/api'
-import { initAdminPush } from '@/lib/push'
 
 export default function CakeAlertsPage() {
   const router = useRouter()
@@ -30,8 +29,6 @@ export default function CakeAlertsPage() {
   const [warningCount, setWarningCount] = useState(0)
   const [notifying, setNotifying] = useState(false)
   const [notifyResult, setNotifyResult] = useState(null)
-  const [pushStatus, setPushStatus] = useState('unknown')
-  const [pushLoading, setPushLoading] = useState(false)
 
   useEffect(() => {
     const storedUser = localStorage.getItem('br_admin_user')
@@ -40,21 +37,7 @@ export default function CakeAlertsPage() {
       setUser(userData)
       loadAlerts()
     }
-    // Check push status
-    if (typeof Notification !== 'undefined') {
-      setPushStatus(Notification.permission)
-      if (Notification.permission === 'granted') {
-        initAdminPush().catch(() => {})
-      }
-    }
   }, [router])
-
-  const handleEnablePush = async () => {
-    setPushLoading(true)
-    const ok = await initAdminPush()
-    setPushStatus(ok ? 'granted' : 'denied')
-    setPushLoading(false)
-  }
 
   const loadAlerts = async () => {
     setLoading(true)
@@ -131,26 +114,6 @@ export default function CakeAlertsPage() {
           )}
         </div>
       </div>
-      {/* Push permission banner */}
-      {pushStatus !== 'granted' && pushStatus !== 'unknown' && (
-        <div className="flex items-center justify-between px-4 py-3 rounded-lg bg-purple-500/15 border border-purple-500/30">
-          <div className="flex items-center gap-2">
-            <Bell className="w-4 h-4 text-purple-400" />
-            <span className="text-sm text-purple-300">
-              {pushStatus === 'denied'
-                ? 'Notifications are blocked. Enable them in browser settings to receive instant cake alerts.'
-                : 'Enable push notifications to get instant alerts when cake stock runs low — even when this page is closed.'}
-            </span>
-          </div>
-          {pushStatus !== 'denied' && (
-            <Button size="sm" onClick={handleEnablePush} disabled={pushLoading}
-              className="ml-4 bg-purple-600 hover:bg-purple-700 text-white shrink-0">
-              {pushLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : 'Enable Alerts'}
-            </Button>
-          )}
-        </div>
-      )}
-
       {notifyResult && (
         <div className={`px-4 py-2 rounded-lg text-sm ${notifyResult.success ? 'bg-green-500/20 text-green-400 border border-green-500/30' : 'bg-red-500/20 text-red-400 border border-red-500/30'}`}>
           {notifyResult.message}
