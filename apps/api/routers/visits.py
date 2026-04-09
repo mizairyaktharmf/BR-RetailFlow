@@ -227,7 +227,23 @@ async def extract_visit_times_from_photo(
     """Extract swipe in/out times from a POS photo using Gemini Vision"""
     try:
         from services.gemini_vision import extract_visit_times
+        import io
+        from PIL import Image
+
         image_bytes = await file.read()
+
+        # Convert any format (HEIC, WebP, etc.) to JPEG so Gemini can read it
+        try:
+            img = Image.open(io.BytesIO(image_bytes))
+            if img.mode in ("RGBA", "P"):
+                img = img.convert("RGB")
+            buf = io.BytesIO()
+            img.save(buf, format="JPEG", quality=90)
+            image_bytes = buf.getvalue()
+        except Exception as conv_err:
+            # If PIL can't open it, pass raw bytes and let Gemini try
+            pass
+
         result = await extract_visit_times(image_bytes)
         return result
     except Exception as e:

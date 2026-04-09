@@ -162,7 +162,8 @@ export default function BranchVisitsPage() {
         }
       }
     } catch (err) {
-      console.log('Time extraction failed, manual entry needed:', err.message)
+      console.error('Time extraction failed:', err.message)
+      alert(`Auto-extraction failed: ${err.message}\n\nPlease enter the times manually.`)
     } finally {
       setExtracting(false)
     }

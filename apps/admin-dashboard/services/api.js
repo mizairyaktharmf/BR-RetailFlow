@@ -564,7 +564,10 @@ class ApiService {
       headers: { 'Authorization': `Bearer ${token}` },
       body: formData,
     })
-    if (!res.ok) throw new Error('Extraction failed')
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}))
+      throw new Error(err.detail || `Extraction failed (${res.status})`)
+    }
     return res.json()
   }
 

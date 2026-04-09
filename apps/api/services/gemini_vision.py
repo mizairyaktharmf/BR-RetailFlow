@@ -535,8 +535,9 @@ If no times found, return both as null.
 
 async def extract_visit_times(image_bytes: bytes) -> dict:
     """Extract swipe in/out times from a POS or clock photo."""
-    img = _image_from_bytes(image_bytes)
     from google.genai import types
+    # Send as raw bytes part (works with JPEG, PNG, WebP)
+    image_part = types.Part.from_bytes(data=image_bytes, mime_type="image/jpeg")
     config = types.GenerateContentConfig(temperature=0)
-    text = await _call_gemini_with_retry("gemini-2.5-flash", [img, VISIT_TIME_PROMPT], config)
+    text = await _call_gemini_with_retry("gemini-2.5-flash", [image_part, VISIT_TIME_PROMPT], config)
     return _parse_json_response(text)
