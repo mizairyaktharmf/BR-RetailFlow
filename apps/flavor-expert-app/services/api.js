@@ -208,7 +208,10 @@ class ApiService {
         }
       )
 
-      if (!response.ok) throw new Error('Extraction failed')
+      if (!response.ok) {
+        const err = await response.json().catch(() => ({}))
+        throw new Error(err.detail || `Extraction failed (${response.status})`)
+      }
       return response.json()
     } finally {
       clearTimeout(timeoutId)

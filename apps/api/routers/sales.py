@@ -278,9 +278,17 @@ async def extract_receipt(
         # Read and resize all images
         image_bytes_list = []
         for f in files:
-            if f.content_type not in allowed_types:
-                raise HTTPException(status_code=400, detail=f"Invalid file type: {f.content_type}. Use JPEG, PNG, or WebP.")
             raw = await f.read()
+            # Convert any format to JPEG (handles HEIC, HEIF, WebP, etc.)
+            try:
+                img = Image.open(io.BytesIO(raw))
+                if img.mode in ("RGBA", "P", "LA"):
+                    img = img.convert("RGB")
+                buf = io.BytesIO()
+                img.save(buf, format="JPEG", quality=90)
+                raw = buf.getvalue()
+            except Exception as conv_err:
+                logger.warning(f"Image conversion skipped ({f.content_type}): {conv_err}")
             image_bytes_list.append(_resize_image(raw))
 
         logger.info(f"Extraction request: type={receipt_type}, images={len(image_bytes_list)}")
