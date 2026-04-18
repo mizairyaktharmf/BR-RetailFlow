@@ -296,13 +296,15 @@ export default function SalesPage() {
   }
 
   const handleCapture = (e) => {
-    const file = e.target.files?.[0]
-    if (!file) return
+    const files = Array.from(e.target.files || [])
+    if (!files.length) return
     if (posFileRef.current) posFileRef.current.value = ''
-    if (posPhotos.length >= MAX_PHOTOS) return
 
-    setPosPhotos(prev => [...prev, file])
-    setPosPreviews(prev => [...prev, URL.createObjectURL(file)])
+    const remaining = MAX_PHOTOS - posPhotos.length
+    const toAdd = files.slice(0, remaining)
+
+    setPosPhotos(prev => [...prev, ...toAdd])
+    setPosPreviews(prev => [...prev, ...toAdd.map(f => URL.createObjectURL(f))])
   }
 
   const removePhoto = (index) => {
@@ -627,7 +629,7 @@ export default function SalesPage() {
                   ref={posFileRef}
                   type="file"
                   accept="image/*"
-                  capture="environment"
+                  multiple
                   className="hidden"
                   onChange={handleCapture}
                 />
