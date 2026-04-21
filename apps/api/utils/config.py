@@ -26,6 +26,9 @@ class Settings(BaseSettings):
     # Gemini Vision API
     GEMINI_API_KEY: str = ""
 
+    # Anthropic Claude API (for POS extraction)
+    ANTHROPIC_API_KEY: str = ""
+
     # Web Push VAPID keys (generate with: vapid --gen)
     VAPID_PUBLIC_KEY: str = ""
     VAPID_PRIVATE_KEY: str = ""

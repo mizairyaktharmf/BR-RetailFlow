@@ -17,7 +17,14 @@ logger = logging.getLogger(__name__)
 
 # Max retries on failure
 MAX_RETRIES = 3
-RETRY_DELAY = 2  # seconds
+RETRY_DELAY = 3  # seconds
+
+# Models to try in order — start with least loaded
+GEMINI_MODELS = [
+    "gemini-2.0-flash",
+    "gemini-1.5-flash",
+    "gemini-2.5-flash",
+]
 
 # ============== PROMPTS ==============
 
@@ -397,24 +404,34 @@ def _validate_pos_combined(data: dict) -> dict:
 
 
 async def _call_gemini_with_retry(model: str, contents: list, config=None) -> str:
-    """Call Gemini API with automatic retry on failure."""
+    """Call Gemini API — tries multiple models if the primary is overloaded."""
     client = _get_client()
     last_error = None
 
-    for attempt in range(MAX_RETRIES):
-        try:
-            kwargs = {"model": model, "contents": contents}
-            if config:
-                kwargs["config"] = config
-            response = client.models.generate_content(**kwargs)
-            if response.text:
-                return response.text
-            raise ValueError("Empty response from Gemini")
-        except Exception as e:
-            last_error = e
-            logger.warning(f"Gemini attempt {attempt + 1}/{MAX_RETRIES} failed: {e}")
-            if attempt < MAX_RETRIES - 1:
-                await asyncio.sleep(RETRY_DELAY * (attempt + 1))
+    # Build model list: requested model first, then fallbacks
+    models_to_try = [model] + [m for m in GEMINI_MODELS if m != model]
+
+    for m in models_to_try:
+        for attempt in range(MAX_RETRIES):
+            try:
+                kwargs = {"model": m, "contents": contents}
+                if config:
+                    kwargs["config"] = config
+                response = client.models.generate_content(**kwargs)
+                if response.text:
+                    if m != model:
+                        logger.info(f"Used fallback model {m} (primary {model} unavailable)")
+                    return response.text
+                raise ValueError("Empty response from Gemini")
+            except Exception as e:
+                last_error = e
+                err_str = str(e)
+                logger.warning(f"Gemini {m} attempt {attempt + 1}/{MAX_RETRIES} failed: {err_str[:100]}")
+                # If 503 overloaded, skip remaining retries on this model and try next
+                if "503" in err_str or "UNAVAILABLE" in err_str:
+                    break
+                if attempt < MAX_RETRIES - 1:
+                    await asyncio.sleep(RETRY_DELAY * (attempt + 1))
 
     raise last_error
 
