@@ -19,10 +19,10 @@ logger = logging.getLogger(__name__)
 MAX_RETRIES = 3
 RETRY_DELAY = 3  # seconds
 
-# Models to try in order — start with least loaded
+# Models to try in order
 GEMINI_MODELS = [
-    "gemini-2.0-flash",
     "gemini-2.5-flash",
+    "gemini-2.5-flash-preview-04-17",
 ]
 
 # ============== PROMPTS ==============
