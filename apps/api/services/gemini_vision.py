@@ -22,7 +22,6 @@ RETRY_DELAY = 3  # seconds
 # Models to try in order — start with least loaded
 GEMINI_MODELS = [
     "gemini-2.0-flash",
-    "gemini-1.5-flash",
     "gemini-2.5-flash",
 ]
 
