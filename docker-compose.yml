@@ -29,9 +29,23 @@ services:
     networks:
       - br-network
 
+  whatsapp:
+    build:
+      context: ./apps/whatsapp-service
+      dockerfile: Dockerfile
+    container_name: br-whatsapp
+    restart: unless-stopped
+    ports:
+      - "3005:3005"
+    volumes:
+      - whatsapp_session:/app/session
+    networks:
+      - br-network
+
 networks:
   br-network:
     driver: bridge
 
 volumes:
   pgdata:
+  whatsapp_session:

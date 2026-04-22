@@ -175,6 +175,24 @@ async def submit_daily_sales(
     db.commit()
     db.refresh(sales_entry)
 
+    # Send WhatsApp alert (non-blocking)
+    try:
+        from models.whatsapp_config import WhatsAppConfig
+        from services.whatsapp import send_sales_summary
+        import asyncio
+        wa_config = db.query(WhatsAppConfig).filter(WhatsAppConfig.branch_id == data.branch_id).first()
+        if wa_config and wa_config.phone_numbers and "sales" in (wa_config.alert_types or ""):
+            branch = db.query(Branch).filter(Branch.id == data.branch_id).first()
+            branch_name = branch.name if branch else f"Branch {data.branch_id}"
+            phones = [p.strip() for p in wa_config.phone_numbers.split(",") if p.strip()]
+            asyncio.create_task(send_sales_summary(
+                branch_name, data.sales_window,
+                {"total_sales": data.total_sales, "transaction_count": data.transaction_count, "atv": data.atv or 0},
+                phones
+            ))
+    except Exception as wa_err:
+        logger.warning(f"WhatsApp alert failed (non-critical): {wa_err}")
+
     return _build_sales_response(sales_entry)
 
 

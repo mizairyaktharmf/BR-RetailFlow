@@ -8,7 +8,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 import logging
 
-from routers import auth, users, territories, areas, branches, flavors, inventory, analytics, cake, sales, budget, notification, expiry, visits, daily_brief, feedback, kpi
+from routers import auth, users, territories, areas, branches, flavors, inventory, analytics, cake, sales, budget, notification, expiry, visits, daily_brief, feedback, kpi, whatsapp
 from utils.database import engine, Base
 from utils.config import settings
 
@@ -283,6 +283,7 @@ app.include_router(visits.router, prefix="/api/v1/visits", tags=["Branch Visits"
 app.include_router(daily_brief.router, prefix="/api/v1/reports", tags=["Daily Brief"])
 app.include_router(feedback.router, prefix="/api/v1/feedback", tags=["Feedback"])
 app.include_router(kpi.router, prefix="/api/v1/reports", tags=["KPI"])
+app.include_router(whatsapp.router, prefix="/api/v1/whatsapp", tags=["WhatsApp"])
 
 
 @app.get("/")

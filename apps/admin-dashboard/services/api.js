@@ -616,6 +616,33 @@ class ApiService {
   async sendDailyEmailReport(targetDate) {
     return this.request(`/reports/send-email-report?target_date=${targetDate}`, { method: 'POST' })
   }
+
+  // ============ WHATSAPP ============
+  async getWhatsAppStatus() {
+    return this.request('/whatsapp/status')
+  }
+
+  async logoutWhatsApp() {
+    return this.request('/whatsapp/logout', { method: 'POST' })
+  }
+
+  async sendWhatsAppTest(phone, message) {
+    return this.request('/whatsapp/test', {
+      method: 'POST',
+      body: JSON.stringify({ phone, message }),
+    })
+  }
+
+  async getWhatsAppRecipients() {
+    return this.request('/whatsapp/recipients')
+  }
+
+  async saveWhatsAppRecipients(data) {
+    return this.request('/whatsapp/recipients', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    })
+  }
 }
 
 const api = new ApiService()

@@ -24,7 +24,8 @@ import {
   CalendarClock,
   ClipboardCheck,
   TrendingUp,
-  MessageSquare
+  MessageSquare,
+  MessageCircle
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 
@@ -44,6 +45,7 @@ const navigation = [
   { name: 'Branch Visits', href: '/dashboard/visits', icon: ClipboardCheck, roles: ['supreme_admin', 'super_admin', 'admin'] },
   { name: 'KPI Scorecards', href: '/dashboard/kpi', icon: TrendingUp, roles: ['supreme_admin', 'super_admin', 'admin'] },
   { name: 'Customer Feedback', href: '/dashboard/feedback', icon: MessageSquare, roles: ['supreme_admin', 'super_admin', 'admin'] },
+  { name: 'WhatsApp Alerts', href: '/dashboard/whatsapp', icon: MessageCircle, roles: ['supreme_admin', 'super_admin'] },
 ]
 
 const roleLabels = {
