@@ -45,7 +45,9 @@ export default function WhatsAppPage() {
         api.getWhatsAppRecipients(),
       ])
       setStatus(st)
-      setBranches(Array.isArray(br) ? br : [])
+      // getBranches returns {branches: [...]} or an array
+      const branchList = Array.isArray(br) ? br : (br?.branches || br?.items || [])
+      setBranches(branchList)
       setConfigs(Array.isArray(cfg) ? cfg : [])
 
       // Poll QR until connected
