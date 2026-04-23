@@ -98,16 +98,9 @@ The POS receipt has these sections IN ORDER:
 
 1. **Sales Summary** — at the very top: Gross Sales, Returns, Net Sales, Discount, Tax, GC (Guest Count), ATV
 2. **Cash Sales** — below sales summary: Grs CashSls, Net CashSls, GC
-3. **Category Sales Summary** — a summary table showing category totals:
-   Cups & Cones  250  4,222.76  17.0
-   Sundaes       687  13,095.85 52.6
-   Beverages      53  1,388.52   5.6
-   Take Home      39  2,154.28   8.7
-   Desserts       31  3,052.41  12.3
-   Toppings      344    420.84   1.7
-   Others         65    537.99   2.2
-   Soft Drink      1     14.29   0.1
-   TOTAL SALES  1470 24,886.94 100.0
+3. **Category Sales Summary** — a summary table showing category totals with columns: NAME, QTY, SALES, %CONT
+   Each row has a category name, quantity sold, total sales amount, and contribution percentage.
+   The last row is TOTAL SALES showing the grand total.
 
 4. **Item Sales Summary** — ALL individual items listed sequentially with T> category headers:
    Items listed ABOVE a T> line belong to that category:
