@@ -256,13 +256,13 @@ async def extract_receipt(
     receipt_type: str = Query(..., description="pos, pos_categories, pos_combined, hd, or deliveroo"),
     current_user: User = Depends(get_current_user),
 ):
-    """Extract sales data from receipt photos using Gemini Vision.
-    Accepts 1-5 images. For pos_combined, all images are sent to Gemini together.
-    Photos are NOT saved — only used for extraction."""
+    """Extract sales data from receipt photos.
+    POS uses Claude (fast, reliable). HD/Deliveroo use Gemini.
+    Accepts 1-5 images. Photos are NOT saved — only used for extraction."""
+    from services.claude_vision import extract_pos_combined
     from services.gemini_vision import (
         extract_pos_sales,
         extract_pos_categories,
-        extract_pos_combined,
         extract_hd_sales,
         extract_deliveroo_sales,
     )

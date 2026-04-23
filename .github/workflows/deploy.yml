@@ -53,6 +53,7 @@ jobs:
           HOST: ${{ secrets.EC2_HOST }}
           USER: ${{ secrets.EC2_USERNAME }}
           GEMINI_KEY: ${{ secrets.GEMINI_API_KEY }}
+          ANTHROPIC_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
           VAPID_PUBLIC_KEY: ${{ secrets.VAPID_PUBLIC_KEY }}
           VAPID_PRIVATE_KEY: ${{ secrets.VAPID_PRIVATE_KEY }}
@@ -69,6 +70,9 @@ jobs:
             # Ensure GEMINI_API_KEY is in .env
             grep -q "GEMINI_API_KEY" .env 2>/dev/null || echo "GEMINI_API_KEY=${GEMINI_KEY}" >> .env
             sed -i "s|^GEMINI_API_KEY=.*|GEMINI_API_KEY=${GEMINI_KEY}|" .env
+            # Ensure ANTHROPIC_API_KEY is in .env
+            grep -q "ANTHROPIC_API_KEY" .env 2>/dev/null || echo "ANTHROPIC_API_KEY=${ANTHROPIC_KEY}" >> .env
+            sed -i "s|^ANTHROPIC_API_KEY=.*|ANTHROPIC_API_KEY=${ANTHROPIC_KEY}|" .env
             # Ensure VAPID_PUBLIC_KEY is in .env
             grep -q "VAPID_PUBLIC_KEY" .env 2>/dev/null || echo "VAPID_PUBLIC_KEY=${VAPID_PUBLIC_KEY}" >> .env
             sed -i "s|^VAPID_PUBLIC_KEY=.*|VAPID_PUBLIC_KEY=${VAPID_PUBLIC_KEY}|" .env
