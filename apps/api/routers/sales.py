@@ -5,10 +5,11 @@ Handles daily sales submissions and Gemini Vision extraction
 
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Query
 from sqlalchemy.orm import Session
-from sqlalchemy import and_, func
+from sqlalchemy import and_, func, desc
 from typing import List, Optional
-from datetime import date
+from datetime import date, timedelta
 import logging
+import json
 
 from utils.database import get_db
 from utils.security import get_current_user
@@ -497,4 +498,238 @@ async def monthly_year_over_year(
             "previous": total_previous,
             "growth_pct": growth_pct,
         },
+    }
+
+
+# ============== PROMOTION ROI ==============
+
+def _get_accessible_branch_ids(current_user: User, db: Session) -> List[int]:
+    """Get branch IDs accessible to the current user."""
+    branch_query = db.query(Branch).filter(Branch.is_active == True)
+    if current_user.role == UserRole.SUPER_ADMIN:
+        branch_query = branch_query.filter(Branch.territory_id == current_user.territory_id)
+    elif current_user.role == UserRole.ADMIN:
+        branch_query = branch_query.filter(Branch.manager_id == current_user.id)
+    elif current_user.role == UserRole.STAFF:
+        if current_user.branch_id:
+            branch_query = branch_query.filter(Branch.id == current_user.branch_id)
+        else:
+            branch_query = branch_query.filter(Branch.id == -1)
+    return [b.id for b in branch_query.all()]
+
+
+@router.get("/promotion-roi")
+async def get_promotion_roi(
+    date_from: date = Query(...),
+    date_to: date = Query(...),
+    branch_id: Optional[int] = Query(None),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Get promotion ROI for tracked items over a date range."""
+    accessible_branch_ids = _get_accessible_branch_ids(current_user, db)
+
+    if branch_id:
+        if branch_id not in accessible_branch_ids:
+            raise HTTPException(status_code=403, detail="Not authorized to view this branch")
+        filter_ids = [branch_id]
+    else:
+        filter_ids = accessible_branch_ids
+
+    # Calculate baseline date range (prior period of same length)
+    period_length = (date_to - date_from).days
+    baseline_to = date_from - timedelta(days=1)
+    baseline_from = baseline_to - timedelta(days=period_length)
+
+    # Get all tracked items for the accessible branches
+    tracked_items = db.query(TrackedItem).filter(
+        TrackedItem.branch_id.in_(filter_ids),
+        TrackedItem.is_active == True,
+    ).all()
+
+    def _query_period(start: date, end: date):
+        """Query sales data for tracked items in a date range."""
+        sales_records = db.query(DailySales).filter(
+            DailySales.branch_id.in_(filter_ids),
+            DailySales.date >= start,
+            DailySales.date <= end,
+        ).all()
+
+        item_stats = {}
+        for tracked in tracked_items:
+            item_key = f"{tracked.id}"
+            item_stats[item_key] = {"qty": 0, "sales": 0.0}
+
+            for sales in sales_records:
+                if not sales.items_data:
+                    continue
+
+                try:
+                    items_list = json.loads(sales.items_data)
+                except:
+                    continue
+
+                for item in items_list:
+                    match = False
+                    if tracked.item_code.startswith("NAME:"):
+                        tracked_name = tracked.item_code[5:].lower()
+                        match = tracked_name in (item.get("name") or "").lower()
+                    elif tracked.item_code.startswith("CAT:"):
+                        tracked_cat = tracked.item_code[4:].lower()
+                        match = tracked_cat == (item.get("category") or "").lower()
+                    else:
+                        match = tracked.item_code == item.get("code")
+
+                    if match:
+                        item_stats[item_key]["qty"] += item.get("quantity", 0)
+                        item_stats[item_key]["sales"] += item.get("sales", 0.0)
+
+        return item_stats
+
+    period_data = _query_period(date_from, date_to)
+    baseline_data = _query_period(baseline_from, baseline_to)
+
+    # Build response
+    result_items = []
+    for tracked in tracked_items:
+        item_key = f"{tracked.id}"
+        period = period_data.get(item_key, {"qty": 0, "sales": 0.0})
+        baseline = baseline_data.get(item_key, {"qty": 0, "sales": 0.0})
+
+        qty_change_pct = 0.0
+        if baseline["qty"] > 0:
+            qty_change_pct = round((period["qty"] - baseline["qty"]) / baseline["qty"] * 100, 1)
+
+        sales_change_pct = 0.0
+        if baseline["sales"] > 0:
+            sales_change_pct = round((period["sales"] - baseline["sales"]) / baseline["sales"] * 100, 1)
+
+        branch = db.query(Branch).filter(Branch.id == tracked.branch_id).first()
+        item_type = "name" if tracked.item_code.startswith("NAME:") else \
+                    "category" if tracked.item_code.startswith("CAT:") else "code"
+
+        result_items.append({
+            "tracked_item_id": tracked.id,
+            "name": tracked.item_name,
+            "type": item_type,
+            "branch_id": tracked.branch_id,
+            "branch_name": branch.name if branch else "Unknown",
+            "qty": period["qty"],
+            "sales": round(period["sales"], 2),
+            "baseline_qty": baseline["qty"],
+            "baseline_sales": round(baseline["sales"], 2),
+            "qty_change_pct": qty_change_pct,
+            "sales_change_pct": sales_change_pct,
+        })
+
+    return {
+        "period": {"from": str(date_from), "to": str(date_to)},
+        "baseline": {"from": str(baseline_from), "to": str(baseline_to)},
+        "items": sorted(result_items, key=lambda x: x["sales_change_pct"], reverse=True),
+    }
+
+
+# ============== BRANCH RANKING ==============
+
+@router.get("/branch-ranking")
+async def get_branch_ranking(
+    date_from: date = Query(...),
+    date_to: date = Query(...),
+    metric: str = Query("sales", regex="^(sales|gc|atv|budget_ach)$"),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Get branch ranking leaderboard."""
+    accessible_branch_ids = _get_accessible_branch_ids(current_user, db)
+
+    # Get sales data grouped by branch
+    sales_by_branch = {}
+    for branch_id in accessible_branch_ids:
+        sales_rows = db.query(DailySales).filter(
+            DailySales.branch_id == branch_id,
+            DailySales.date >= date_from,
+            DailySales.date <= date_to,
+        ).all()
+
+        total_sales = sum(s.total_sales or 0 for s in sales_rows)
+        total_gc = sum(s.transaction_count or 0 for s in sales_rows)
+        total_atv_sum = sum((s.atv or 0) * (s.transaction_count or 1) for s in sales_rows)
+        avg_atv = total_atv_sum / total_gc if total_gc > 0 else 0
+
+        budget_rows = db.query(func.sum(func.coalesce(DailySales.total_sales, 0)).label("total")).filter(
+            DailySales.branch_id == branch_id,
+            DailySales.date >= date_from,
+            DailySales.date <= date_to,
+        ).first()
+
+        from models.sales import DailyBudget
+        budget_total = db.query(func.sum(DailyBudget.budget_amount)).filter(
+            DailyBudget.branch_id == branch_id,
+            DailyBudget.budget_date >= date_from,
+            DailyBudget.budget_date <= date_to,
+        ).scalar() or 0
+
+        budget_ach_pct = round((total_sales / budget_total * 100), 1) if budget_total > 0 else 0
+
+        sales_by_branch[branch_id] = {
+            "total_sales": total_sales,
+            "total_gc": total_gc,
+            "avg_atv": round(avg_atv, 2),
+            "budget_total": budget_total,
+            "budget_ach_pct": budget_ach_pct,
+        }
+
+    # Calculate prior period for change_vs_prev
+    period_length = (date_to - date_from).days
+    prev_date_to = date_from - timedelta(days=1)
+    prev_date_from = prev_date_to - timedelta(days=period_length)
+
+    prev_sales_by_branch = {}
+    for branch_id in accessible_branch_ids:
+        prev_sales = db.query(func.sum(func.coalesce(DailySales.total_sales, 0))).filter(
+            DailySales.branch_id == branch_id,
+            DailySales.date >= prev_date_from,
+            DailySales.date <= prev_date_to,
+        ).scalar() or 0
+        prev_sales_by_branch[branch_id] = prev_sales
+
+    # Determine sort key based on metric
+    metric_key = {"sales": "total_sales", "gc": "total_gc", "atv": "avg_atv", "budget_ach": "budget_ach_pct"}[metric]
+
+    # Build ranking
+    ranking_list = []
+    for branch_id in accessible_branch_ids:
+        branch = db.query(Branch).filter(Branch.id == branch_id).first()
+        if not branch:
+            continue
+
+        stats = sales_by_branch[branch_id]
+        prev_sales = prev_sales_by_branch[branch_id]
+
+        change_vs_prev = 0.0
+        if prev_sales > 0:
+            change_vs_prev = round((stats["total_sales"] - prev_sales) / prev_sales * 100, 1)
+
+        ranking_list.append({
+            "branch_id": branch_id,
+            "branch_name": branch.name,
+            "total_sales": stats["total_sales"],
+            "total_gc": stats["total_gc"],
+            "avg_atv": stats["avg_atv"],
+            "budget_total": stats["budget_total"],
+            "budget_ach_pct": stats["budget_ach_pct"],
+            "change_vs_prev": change_vs_prev if metric == "sales" else None,
+        })
+
+    # Sort by metric
+    ranking_list.sort(key=lambda x: x[metric_key], reverse=True)
+
+    # Add rank numbers
+    for idx, item in enumerate(ranking_list, 1):
+        item["rank"] = idx
+
+    return {
+        "metric": metric,
+        "period": {"from": str(date_from), "to": str(date_to)},
+        "ranking": ranking_list,
     }

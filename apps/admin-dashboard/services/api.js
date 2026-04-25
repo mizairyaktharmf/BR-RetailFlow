@@ -617,6 +617,24 @@ class ApiService {
     return this.request(`/reports/send-email-report?target_date=${targetDate}`, { method: 'POST' })
   }
 
+  // ============ PROMOTIONS ROI ============
+  async getPromotionROI(dateFrom, dateTo, branchId) {
+    const params = new URLSearchParams()
+    params.append('date_from', dateFrom)
+    params.append('date_to', dateTo)
+    if (branchId) params.append('branch_id', branchId)
+    return this.request(`/sales/promotion-roi?${params.toString()}`)
+  }
+
+  // ============ BRANCH RANKING ============
+  async getBranchRanking(dateFrom, dateTo, metric = 'sales') {
+    const params = new URLSearchParams()
+    params.append('date_from', dateFrom)
+    params.append('date_to', dateTo)
+    params.append('metric', metric)
+    return this.request(`/sales/branch-ranking?${params.toString()}`)
+  }
+
   // ============ WHATSAPP ============
   async getWhatsAppStatus() {
     return this.request('/whatsapp/status')

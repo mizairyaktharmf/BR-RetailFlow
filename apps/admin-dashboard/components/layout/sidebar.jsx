@@ -25,7 +25,8 @@ import {
   ClipboardCheck,
   TrendingUp,
   MessageSquare,
-  MessageCircle
+  MessageCircle,
+  Trophy
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 
@@ -38,6 +39,7 @@ const navigation = [
   { name: 'Sales Reports', href: '/dashboard/sales', icon: BarChart3, roles: ['supreme_admin', 'super_admin', 'admin'] },
   { name: 'Budget & Advisor', href: '/dashboard/budget', icon: Target, roles: ['supreme_admin', 'super_admin', 'admin'] },
   { name: 'Promotions', href: '/dashboard/promotions', icon: Tag, roles: ['supreme_admin', 'super_admin', 'admin'] },
+  { name: 'Branch Ranking', href: '/dashboard/branch-ranking', icon: Trophy, roles: ['supreme_admin', 'super_admin', 'admin'] },
   { name: 'Ice Cream Flavors', href: '/dashboard/flavors', icon: IceCream, roles: ['supreme_admin'] },
   { name: 'Cake Products', href: '/dashboard/cake-products', icon: Cake, roles: ['supreme_admin'] },
   { name: 'Cake Alerts', href: '/dashboard/cake-alerts', icon: Bell, roles: ['supreme_admin', 'super_admin', 'admin'] },

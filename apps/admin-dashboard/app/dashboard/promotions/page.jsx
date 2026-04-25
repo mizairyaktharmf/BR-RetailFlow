@@ -14,6 +14,9 @@ import {
   Package,
   Layers,
   Type,
+  TrendingUp,
+  TrendingDown,
+  BarChart3,
 } from 'lucide-react'
 import api from '@/services/api'
 
@@ -24,6 +27,9 @@ export default function PromotionsPage() {
   const [trackedItems, setTrackedItems] = useState([])
   const [loading, setLoading] = useState(false)
   const [adding, setAdding] = useState(false)
+  const [activeTab, setActiveTab] = useState('items') // 'items' or 'roi'
+  const [roiData, setRoiData] = useState([])
+  const [roiLoading, setRoiLoading] = useState(false)
 
   // Form fields
   const [trackMode, setTrackMode] = useState('name') // 'name', 'item', or 'category'
@@ -33,6 +39,9 @@ export default function PromotionsPage() {
   const [categoryName, setCategoryName] = useState('')
   const [trackName, setTrackName] = useState('')
   const [addingAll, setAddingAll] = useState(false)
+
+  // ROI filters
+  const [roiPeriod, setRoiPeriod] = useState('this-month')
 
   useEffect(() => {
     const userData = localStorage.getItem('admin_user')
@@ -44,8 +53,11 @@ export default function PromotionsPage() {
   }, [])
 
   useEffect(() => {
-    if (selectedBranch) loadTrackedItems()
-  }, [selectedBranch])
+    if (selectedBranch) {
+      loadTrackedItems()
+      if (activeTab === 'roi') loadROI()
+    }
+  }, [selectedBranch, activeTab, roiPeriod])
 
   const loadBranches = async () => {
     try {
@@ -68,6 +80,42 @@ export default function PromotionsPage() {
       setTrackedItems([])
     } finally {
       setLoading(false)
+    }
+  }
+
+  const getROIDateRange = () => {
+    const today = new Date()
+    const firstDay = new Date(today.getFullYear(), today.getMonth(), 1)
+    const formatDate = (d) => d.toISOString().split('T')[0]
+
+    switch (roiPeriod) {
+      case 'this-month':
+        return { from: formatDate(firstDay), to: formatDate(today) }
+      case 'last-month':
+        const prevMonthFirst = new Date(today.getFullYear(), today.getMonth() - 1, 1)
+        const prevMonthLast = new Date(today.getFullYear(), today.getMonth(), 0)
+        return { from: formatDate(prevMonthFirst), to: formatDate(prevMonthLast) }
+      case 'last-7':
+        const sevenDaysAgo = new Date(today)
+        sevenDaysAgo.setDate(today.getDate() - 7)
+        return { from: formatDate(sevenDaysAgo), to: formatDate(today) }
+      default:
+        return { from: formatDate(firstDay), to: formatDate(today) }
+    }
+  }
+
+  const loadROI = async () => {
+    if (!selectedBranch) return
+    setRoiLoading(true)
+    try {
+      const { from, to } = getROIDateRange()
+      const data = await api.getPromotionROI(from, to, selectedBranch.id)
+      setRoiData(data.items || [])
+    } catch (err) {
+      console.error('Failed to load ROI data:', err)
+      setRoiData([])
+    } finally {
+      setRoiLoading(false)
     }
   }
 
@@ -196,7 +244,35 @@ export default function PromotionsPage() {
         </CardContent>
       </Card>
 
+      {/* Tabs */}
       {selectedBranch && (
+        <div className="flex gap-4 border-b border-gray-700">
+          <button
+            onClick={() => setActiveTab('items')}
+            className={`px-4 py-3 font-medium border-b-2 transition-colors ${
+              activeTab === 'items'
+                ? 'border-purple-500 text-purple-300'
+                : 'border-transparent text-gray-400 hover:text-gray-300'
+            }`}
+          >
+            <Tag className="w-4 h-4 inline mr-2" />
+            Tracked Items
+          </button>
+          <button
+            onClick={() => setActiveTab('roi')}
+            className={`px-4 py-3 font-medium border-b-2 transition-colors ${
+              activeTab === 'roi'
+                ? 'border-purple-500 text-purple-300'
+                : 'border-transparent text-gray-400 hover:text-gray-300'
+            }`}
+          >
+            <BarChart3 className="w-4 h-4 inline mr-2" />
+            ROI Analytics
+          </button>
+        </div>
+      )}
+
+      {selectedBranch && activeTab === 'items' && (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Add Form */}
           <Card className="bg-gray-800/50 border-gray-700">
@@ -408,6 +484,115 @@ export default function PromotionsPage() {
                       </div>
                     )
                   })}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {/* ROI Analytics Tab */}
+      {selectedBranch && activeTab === 'roi' && (
+        <div className="space-y-4">
+          {/* Period Filter */}
+          <div className="flex gap-2">
+            <select
+              value={roiPeriod}
+              onChange={(e) => setRoiPeriod(e.target.value)}
+              className="px-3 py-2 bg-gray-700 border border-gray-600 text-white rounded-lg text-sm"
+            >
+              <option value="this-month">This Month</option>
+              <option value="last-month">Last Month</option>
+              <option value="last-7">Last 7 Days</option>
+            </select>
+          </div>
+
+          {/* ROI Table */}
+          <Card className="bg-gray-800/50 border-gray-700">
+            <CardHeader>
+              <CardTitle className="text-base text-white flex items-center gap-2">
+                <BarChart3 className="w-4 h-4 text-cyan-400" />
+                Performance Comparison
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {roiLoading ? (
+                <div className="flex items-center justify-center py-12">
+                  <Loader2 className="w-6 h-6 animate-spin text-purple-400" />
+                </div>
+              ) : roiData.length === 0 ? (
+                <div className="text-center py-8 text-gray-500">
+                  <BarChart3 className="w-8 h-8 mx-auto mb-2 opacity-50" />
+                  <p className="text-sm">No promotion data available</p>
+                  <p className="text-xs mt-1">Add tracked items to see ROI analytics</p>
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b border-gray-700">
+                        <th className="text-left py-3 px-4 text-gray-400 font-medium">Item / Category</th>
+                        <th className="text-right py-3 px-4 text-gray-400 font-medium">Period QTY</th>
+                        <th className="text-right py-3 px-4 text-gray-400 font-medium">Baseline QTY</th>
+                        <th className="text-right py-3 px-4 text-gray-400 font-medium">Change</th>
+                        <th className="text-right py-3 px-4 text-gray-400 font-medium">Period Sales</th>
+                        <th className="text-right py-3 px-4 text-gray-400 font-medium">ROI %</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {roiData.map((item) => (
+                        <tr key={item.tracked_item_id} className="border-b border-gray-700/50 hover:bg-gray-700/20 transition-colors">
+                          <td className="py-3 px-4">
+                            <div className="flex items-center gap-2">
+                              {item.type === 'name' && (
+                                <span className="text-xs bg-green-900/30 text-green-400 px-2 py-1 rounded flex items-center gap-1">
+                                  <Type className="w-3 h-3" />
+                                  Name
+                                </span>
+                              )}
+                              {item.type === 'category' && (
+                                <span className="text-xs bg-orange-900/30 text-orange-400 px-2 py-1 rounded flex items-center gap-1">
+                                  <Layers className="w-3 h-3" />
+                                  Category
+                                </span>
+                              )}
+                              {item.type === 'code' && (
+                                <span className="text-xs bg-purple-900/30 text-purple-400 px-2 py-1 rounded font-mono">
+                                  {item.name}
+                                </span>
+                              )}
+                              {(item.type === 'name' || item.type === 'category') && (
+                                <span className="text-white">{item.name}</span>
+                              )}
+                            </div>
+                          </td>
+                          <td className="text-right py-3 px-4 text-white font-medium">{item.qty}</td>
+                          <td className="text-right py-3 px-4 text-gray-400">{item.baseline_qty}</td>
+                          <td className={`text-right py-3 px-4 font-medium flex items-center justify-end gap-1 ${
+                            item.qty_change_pct > 0 ? 'text-green-400' : item.qty_change_pct < 0 ? 'text-red-400' : 'text-gray-400'
+                          }`}>
+                            {item.qty_change_pct > 0 ? (
+                              <TrendingUp className="w-3 h-3" />
+                            ) : item.qty_change_pct < 0 ? (
+                              <TrendingDown className="w-3 h-3" />
+                            ) : null}
+                            {Math.abs(item.qty_change_pct).toFixed(1)}%
+                          </td>
+                          <td className="text-right py-3 px-4 text-white font-medium">{item.sales.toLocaleString()} AED</td>
+                          <td className={`text-right py-3 px-4 font-bold flex items-center justify-end gap-1 ${
+                            item.sales_change_pct > 0 ? 'text-green-400' : item.sales_change_pct < 0 ? 'text-red-400' : 'text-gray-400'
+                          }`}>
+                            {item.sales_change_pct > 0 ? (
+                              <TrendingUp className="w-3 h-3" />
+                            ) : item.sales_change_pct < 0 ? (
+                              <TrendingDown className="w-3 h-3" />
+                            ) : null}
+                            {Math.abs(item.sales_change_pct).toFixed(1)}%
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
                 </div>
               )}
             </CardContent>
