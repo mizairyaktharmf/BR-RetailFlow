@@ -16,48 +16,64 @@ logger = logging.getLogger(__name__)
 
 # ============== POS PROMPTS ==============
 
-POS_COMBINED_PROMPT = """You are an expert OCR system for Baskin Robbins POS receipts. Analyze these POS sales receipt images with EXTREME PRECISION. You may receive 1-5 images showing different parts of the SAME receipt. Extract ALL data from ALL images combined.
+POS_COMBINED_PROMPT = """You are an EXPERT OCR SYSTEM for Baskin Robbins POS receipts. Analyze these POS sales receipt images with EXTREME PRECISION and PERFECT ACCURACY. You may receive 1-5 images showing different parts of the SAME receipt. Extract ALL data from ALL images combined.
 
-The POS receipt has these sections IN ORDER:
+The POS receipt has these sections IN EXACT ORDER:
 
-1. **Sales Summary** — at the very top: Gross Sales, Returns, Net Sales, Discount, Tax, GC (Guest Count), ATV
-2. **Cash Sales** — below sales summary: Grs CashSls, Net CashSls, GC
+1. **Sales Summary** — at the very top of the receipt: Gross Sales, Returns, Net Sales, Discount, Tax, GC (Guest Count), ATV
+2. **Cash Sales** — below sales summary section: Grs CashSls, Net CashSls, GC
 3. **Category Sales Summary** — a summary table showing category totals with columns: NAME, QTY, SALES, %CONT
    Each row has a category name, quantity sold, total sales amount, and contribution percentage.
-   The last row is TOTAL SALES showing the grand total.
+   The last row is TOTAL SALES showing the grand total quantity and total sales.
 
-4. **Item Sales Summary** — ALL individual items listed sequentially with T> category headers:
-   Items listed ABOVE a T> line belong to that category:
-   - Items under T>Cups & Cones = Cups & Cones items
-   - Items under T>Sundaes = Sundaes items
-   - Items under T>Beverages = Beverages items
-   - Items under T>Take Home = Take Home items
-   - Items under T>Desserts = Desserts items
-   - Items under T>Toppings = Toppings items
-   - Items under T>Others = Others items
-   - Items under T>Soft Drink = Soft Drink items
+4. **Item Sales Summary** — ALL individual items listed sequentially with T> category headers (CRITICAL!):
+   Items listed ABOVE a T> line belong to that category.
+   Categories in order:
+   - First items up to "T>Cups & Cones" = Cups & Cones items
+   - Items after T>Cups & Cones up to "T>Sundaes" = Sundaes items
+   - Items after T>Sundaes up to "T>Beverages" = Beverages items (Thick Shakes, etc.)
+   - Items after T>Beverages up to "T>Take Home" = Take Home items (Fun Pack, Value Pack, etc.)
+   - Items after T>Take Home up to "T>Desserts" = Desserts items (CPU cakes, ATC cakes, INV cakes, etc.)
+   - Items after T>Desserts up to "T>Toppings" = Toppings items
+   - Items after T>Toppings up to "T>Others" = Others items
+   - Items after T>Others up to "T>Soft Drink" = Soft Drink items
 
-CRITICAL ACCURACY RULES:
-- READ EACH LINE CHARACTER BY CHARACTER. Do not guess or estimate numbers.
-- Each item row has EXACTLY this format: CODE  NAME  QUANTITY  SALES  PCT
-- The QUANTITY column is a whole number (integer).
-- The SALES column is a decimal number (e.g., 579.60).
-- DOUBLE CHECK: For each item, verify the quantity makes sense (usually 1-50 range).
-- Extract EVERY SINGLE item visible across ALL images. Do NOT skip any.
+5. **TOTAL SALES** — final total row (sum of all items)
+6. **Non Sales Item Summary** — ignore these items
+7. **Discount / Promo Summary** — ignore these
+
+⚠️ CRITICAL ACCURACY RULES (READ CAREFULLY):
+- READ EACH LINE CHARACTER BY CHARACTER. Do NOT guess or estimate numbers.
+- Each item row has EXACTLY this format: CODE  NAME  QUANTITY  SALES  PCT (5 columns)
+- The QUANTITY column is a WHOLE NUMBER (integer). Read it VERY carefully for each item.
+- The SALES column is a decimal number (e.g., 579.60 or 36.20). Do NOT confuse it with quantity.
+- DOUBLE CHECK: For each item, verify the quantity makes sense (usually 1-50 range for individual items).
+- If an item shows quantity like 32, verify it's really 32 and not misread from the sales column.
+- The sum of all item QUANTITIES within a category MUST EQUAL the T> category total QUANTITY.
+- Extract EVERY SINGLE item visible across ALL images. Do NOT skip any item. Do NOT truncate.
+- Each item has: 4-digit code, name, quantity (integer), sales amount (decimal), contribution %
+- Items belong to the category whose T> header appears BELOW them in the list.
 - If multiple images show the same section, do NOT duplicate items.
-- The sum of all item quantities within a category MUST equal the T> category total quantity.
+- If images show different sections, COMBINE all data into one result.
+- Extract numbers exactly as shown — do not round or calculate.
 - guest_count = GC from Sales Summary (NOT from Cash Sales section)
 - cash_sales = "Net CashSls" amount
 - cash_gc = GC from the Cash Sales section
+- categories: from Category Sales Summary table OR from T> total lines
+- If a section is not visible in any image, use empty array [] or 0
 
-VALIDATION: For each category, sum item quantities → must equal category total. If they don't match, re-read carefully.
+⚠️ VALIDATION STEP (MANDATORY — do this before returning):
+1. For EACH category, sum up ALL item quantities → must equal category total quantity
+2. If they don't match, RE-READ the items more carefully. Don't return mismatches.
+3. Check that no single item has a suspiciously high quantity compared to others
+4. Verify quantity > 0 for all items (0 quantity items should not be extracted)
 
-Return ONLY a valid JSON object:
+Return ONLY valid JSON object, no markdown, no code fences, no extra text:
 
 {
   "sales_summary": {
     "branch_code": "string",
-    "date": "string (YYYY-MM-DD)",
+    "date": "string (YYYY-MM-DD format)",
     "gross_sales": 0.00,
     "returns": 0.00,
     "net_sales": 0.00,
@@ -70,14 +86,12 @@ Return ONLY a valid JSON object:
     "cash_gc": 0
   },
   "categories": [
-    {"name": "Cups & Cones", "quantity": 0, "sales": 0.00, "contribution_pct": 0.0}
+    {"name": "Cups & Cones", "quantity": 66, "sales": 1096.11, "contribution_pct": 34.8}
   ],
   "items": [
     {"code": "1142", "name": "Chc Pnt Bliss S", "category": "Cups & Cones", "quantity": 2, "sales": 36.20, "contribution_pct": 1.1}
   ]
-}
-
-Return ONLY the JSON object, no other text."""
+}"""
 
 HOME_DELIVERY_PROMPT = """Analyze this Home Delivery sales report image. Extract the following information and return ONLY a valid JSON object:
 
