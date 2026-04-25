@@ -224,9 +224,9 @@ async def extract_visit_times_from_photo(
     file: UploadFile = File(...),
     current_user: User = Depends(get_current_user),
 ):
-    """Extract swipe in/out times from a POS photo using Gemini Vision"""
+    """Extract swipe in/out times from a POS photo using Claude Vision"""
     try:
-        from services.gemini_vision import extract_visit_times
+        from services.claude_vision import extract_visit_times
         import io
         from PIL import Image
 

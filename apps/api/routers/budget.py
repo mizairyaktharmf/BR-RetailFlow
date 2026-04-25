@@ -134,9 +134,9 @@ async def upload_budget_sheet(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    """Upload a budget sheet photo and extract data using Gemini Vision.
+    """Upload a budget sheet photo and extract data using Claude Vision.
     Photo is NOT saved — only used for extraction."""
-    from services.gemini_vision import extract_budget_sheet
+    from services.claude_vision import extract_budget_sheet
 
     branch = db.query(Branch).filter(Branch.id == branch_id).first()
     if not branch:

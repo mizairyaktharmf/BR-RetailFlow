@@ -257,14 +257,14 @@ async def extract_receipt(
     current_user: User = Depends(get_current_user),
 ):
     """Extract sales data from receipt photos.
-    POS uses Claude (fast, reliable). HD/Deliveroo use Gemini.
+    Claude extracts ALL: POS, HD, Deliveroo, budget sheets, visit times (fast, reliable).
     Accepts 1-5 images. Photos are NOT saved — only used for extraction."""
-    from services.claude_vision import extract_pos_combined
-    from services.gemini_vision import (
-        extract_pos_sales,
-        extract_pos_categories,
+    from services.claude_vision import (
+        extract_pos_combined,
         extract_hd_sales,
         extract_deliveroo_sales,
+        extract_budget_sheet,
+        extract_visit_times,
     )
 
     if len(files) > 5:
