@@ -103,15 +103,20 @@ The POS receipt has these sections IN ORDER:
    The last row is TOTAL SALES showing the grand total.
 
 4. **Item Sales Summary** — ALL individual items listed sequentially with T> category headers:
-   Items listed ABOVE a T> line belong to that category:
+   Items listed BETWEEN two T> lines belong to the FIRST (upper) category.
+   Example: Items between "T>Take Home" and "T>Desserts" are TAKE HOME items.
+           Items between "T>Desserts" and "T>Toppings" are DESSERTS items.
+
+   Categories in exact order on receipt:
    - First items up to "T>Cups & Cones" = Cups & Cones items
-   - Items after T>Cups & Cones up to "T>Sundaes" = Sundaes items
-   - Items after T>Sundaes up to "T>Beverages" = Beverages items (Thick Shakes, etc.)
-   - Items after T>Beverages up to "T>Take Home" = Take Home items (Fun Pack, Value Pack, etc.)
-   - Items after T>Take Home up to "T>Desserts" = Desserts items (CPU cakes, ATC cakes, INV cakes, etc.)
-   - Items after T>Desserts up to "T>Toppings" = Toppings items
-   - Items after T>Toppings up to "T>Others" = Others items
-   - Items after T>Others up to "T>Soft Drink" = Soft Drink items
+   - Items between T>Cups & Cones and T>Sundaes = Sundaes items
+   - Items between T>Sundaes and T>Beverages = Beverages items (Thick Shakes, etc.)
+   - Items between T>Beverages and T>Take Home = Take Home items (Fun Pack, Value Pack, etc.)
+   - Items between T>Take Home and T>Desserts = Desserts items (CPU cakes, ATC cakes, INV cakes, etc.) ← IMPORTANT: CAKES ARE HERE
+   - Items between T>Desserts and T>Toppings = Toppings items
+   - Items between T>Toppings and T>Others = Others items
+   - Items between T>Others and T>Soft Drink = Soft Drink items
+   - Items after T>Soft Drink = Soft Drink items (last category)
 
 5. **TOTAL SALES** — final total row
 6. **Non Sales Item Summary** — non-sales items (ignore these)
