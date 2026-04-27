@@ -27,19 +27,17 @@ The POS receipt has these sections IN EXACT ORDER:
    The last row is TOTAL SALES showing the grand total quantity and total sales.
 
 4. **Item Sales Summary** — ALL individual items listed sequentially with T> category headers (CRITICAL!):
-   Items listed BETWEEN two T> lines belong to the FIRST (upper) category.
-   Example: Items between "T>Take Home" and "T>Desserts" are TAKE HOME items.
-           Items between "T>Desserts" and "T>Toppings" are DESSERTS items.
+   Items listed BETWEEN two T> headers belong to the SECOND (lower) category header — NOT the first.
 
-   Categories in exact order on receipt:
+   EXACT MAPPING (from receipt):
    - First items up to "T>Cups & Cones" = Cups & Cones items
-   - Items between T>Cups & Cones and T>Sundaes = Sundaes items
-   - Items between T>Sundaes and T>Beverages = Beverages items (Thick Shakes, etc.)
-   - Items between T>Beverages and T>Take Home = Take Home items (Fun Pack, Value Pack, etc.)
-   - Items between T>Take Home and T>Desserts = Desserts items (CPU cakes, ATC cakes, INV cakes, etc.) ← IMPORTANT: CAKES ARE HERE
-   - Items between T>Desserts and T>Toppings = Toppings items
-   - Items between T>Toppings and T>Others = Others items
-   - Items between T>Others and T>Soft Drink = Soft Drink items
+   - Items between T>Cups & Cones and T>Sundaes = Sundaes items ← items belong to the BOTTOM header
+   - Items between T>Sundaes and T>Beverages = Beverages items ← items belong to the BOTTOM header
+   - Items between T>Beverages and T>Take Home = Take Home items ← items belong to the BOTTOM header
+   - Items between T>Take Home and T>Desserts = Desserts items ← CAKES ARE HERE, items belong to T>Desserts (BOTTOM header)
+   - Items between T>Desserts and T>Toppings = Toppings items ← TOPPINGS ARE HERE, items belong to T>Toppings (BOTTOM header)
+   - Items between T>Toppings and T>Others = Others items ← items belong to the BOTTOM header
+   - Items between T>Others and T>Soft Drink = Soft Drink items ← items belong to the BOTTOM header
    - Items after T>Soft Drink = Soft Drink items (last category)
 
 5. **TOTAL SALES** — final total row (sum of all items)
@@ -56,7 +54,6 @@ The POS receipt has these sections IN EXACT ORDER:
 - The sum of all item QUANTITIES within a category MUST EQUAL the T> category total QUANTITY.
 - Extract EVERY SINGLE item visible across ALL images. Do NOT skip any item. Do NOT truncate.
 - Each item has: 4-digit code, name, quantity (integer), sales amount (decimal), contribution %
-- Items belong to the category whose T> header appears BELOW them in the list.
 - If multiple images show the same section, do NOT duplicate items.
 - If images show different sections, COMBINE all data into one result.
 - Extract numbers exactly as shown — do not round or calculate.
