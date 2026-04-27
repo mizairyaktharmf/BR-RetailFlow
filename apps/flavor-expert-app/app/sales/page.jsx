@@ -222,7 +222,7 @@ export default function SalesPage() {
         if (data && data.fixed_windows && data.custom_windows !== undefined) {
           // Build windows array with both fixed and custom
           const fixed = data.fixed_windows.map(w => ({ id: w, label: w.toUpperCase() }))
-          const custom = data.custom_windows.map(w => ({ id: w.window_name, label: w.window_name.toUpperCase() }))
+          const custom = data.custom_windows.map(w => ({ id: w.id, label: w.window_name.toUpperCase() }))
           setAvailableWindows([...fixed, ...custom])
         }
       }).catch(err => {
