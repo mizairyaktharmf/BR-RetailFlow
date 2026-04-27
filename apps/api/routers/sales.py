@@ -3,7 +3,7 @@ Sales router
 Handles daily sales submissions and Gemini Vision extraction
 """
 
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Query
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Query, Body
 from sqlalchemy.orm import Session
 from sqlalchemy import and_, func, desc
 from typing import List, Optional, Any
@@ -780,7 +780,7 @@ async def get_available_windows(
 
 @router.post("/windows", response_model=dict)
 async def create_custom_window(
-    data: Any,  # Use dict to avoid schema errors
+    data: dict = Body(...),
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
