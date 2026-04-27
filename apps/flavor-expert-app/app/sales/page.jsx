@@ -181,6 +181,8 @@ export default function SalesPage() {
   const [saving, setSaving] = useState(false)
   const [submittedWindows, setSubmittedWindows] = useState([])
   const [loadingWindows, setLoadingWindows] = useState(true)
+  const [availableWindows, setAvailableWindows] = useState([]) // Fixed + custom windows
+  const [availableWindowsLoading, setAvailableWindowsLoading] = useState(true)
 
   // POS photos
   const [posPhotos, setPosPhotos] = useState([])
@@ -214,6 +216,22 @@ export default function SalesPage() {
     if (branchData) {
       const b = JSON.parse(branchData)
       setBranch(b)
+      // Load available windows (fixed + custom) for this branch
+      setAvailableWindowsLoading(true)
+      api.getAvailableWindows(b.id).then(data => {
+        if (data && data.fixed_windows && data.custom_windows !== undefined) {
+          // Build windows array with both fixed and custom
+          const fixed = data.fixed_windows.map(w => ({ id: w, label: w.toUpperCase() }))
+          const custom = data.custom_windows.map(w => ({ id: w.window_name, label: w.window_name.toUpperCase() }))
+          setAvailableWindows([...fixed, ...custom])
+        }
+      }).catch(err => {
+        console.error('Failed to load available windows:', err)
+        // Fallback to fixed windows
+        const defaultWindows = ['3pm', '7pm', '9pm', 'closing'].map(w => ({ id: w, label: w.toUpperCase() }))
+        setAvailableWindows(defaultWindows)
+      }).finally(() => setAvailableWindowsLoading(false))
+
       // Load tracked promotion items for this branch
       api.getTrackedItems(b.id).then(items => {
         if (Array.isArray(items)) {
@@ -239,13 +257,14 @@ export default function SalesPage() {
         const sales = await api.getDailySales(branchInfo.id, date)
         const submitted = Array.isArray(sales) ? sales.map(s => s.sales_window) : []
         setSubmittedWindows(submitted)
-        const firstOpen = SALES_WINDOWS.find(w => !submitted.includes(w.id))
-        setSelectedWindow(firstOpen?.id || SALES_WINDOWS[0]?.id || '3pm')
+        // Select first unsubmitted window from available windows
+        const firstOpen = availableWindows.find(w => !submitted.includes(w.id))
+        setSelectedWindow(firstOpen?.id || availableWindows[0]?.id || '3pm')
       } else {
-        setSelectedWindow(SALES_WINDOWS[0]?.id || '3pm')
+        setSelectedWindow(availableWindows[0]?.id || '3pm')
       }
     } catch {
-      setSelectedWindow(SALES_WINDOWS[0]?.id || '3pm')
+      setSelectedWindow(availableWindows[0]?.id || '3pm')
     } finally {
       setLoadingWindows(false)
     }
@@ -513,10 +532,10 @@ export default function SalesPage() {
       const updated = [...submittedWindows, selectedWindow]
       setSubmittedWindows(updated)
       resetAll()
-      const next = SALES_WINDOWS.find(w => !updated.includes(w.id))
+      const next = availableWindows.find(w => !updated.includes(w.id))
       if (next) {
         setSelectedWindow(next.id)
-        alert(`${SALES_WINDOWS.find(w => w.id === selectedWindow)?.label} submitted!`)
+        alert(`${availableWindows.find(w => w.id === selectedWindow)?.label} submitted!`)
       } else {
         alert('All windows submitted for today!')
       }
@@ -572,11 +591,11 @@ export default function SalesPage() {
 
       <div className="px-4 pt-3 space-y-3">
         {/* Window Selector */}
-        {loadingWindows ? (
+        {loadingWindows || availableWindowsLoading ? (
           <div className="flex justify-center py-4"><Loader2 className="w-5 h-5 animate-spin text-orange-400" /></div>
         ) : (
           <div className="grid grid-cols-4 gap-2">
-            {SALES_WINDOWS.map((w) => {
+            {availableWindows.map((w) => {
               const sel = selectedWindow === w.id
               const done = submittedWindows.includes(w.id)
               return (
@@ -1001,7 +1020,7 @@ export default function SalesPage() {
                 {saving ? (
                   <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Saving...</>
                 ) : (
-                  <><Save className="w-4 h-4 mr-2" />Submit {SALES_WINDOWS.find(w => w.id === selectedWindow)?.label}{!isToday ? ` (${formatDisplayDate(selectedDate)})` : ''}</>
+                  <><Save className="w-4 h-4 mr-2" />Submit {availableWindows.find(w => w.id === selectedWindow)?.label}{!isToday ? ` (${formatDisplayDate(selectedDate)})` : ''}</>
                 )}
               </Button>
 
