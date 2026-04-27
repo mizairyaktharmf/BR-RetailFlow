@@ -612,9 +612,7 @@ export default function SalesPage() {
                   <p className={`text-xs font-bold ${done ? 'text-green-600' : sel ? 'text-orange-600' : 'text-gray-600'}`}>
                     {w.label.split(' ')[0]}
                   </p>
-                  {done ? <CheckCircle2 className="w-4 h-4 mx-auto mt-0.5 text-green-600" /> : (
-                    <p className={`text-[10px] ${sel ? 'text-orange-500' : 'text-gray-400'}`}>{w.time.split('-')[0].trim()}</p>
-                  )}
+                  {done && <CheckCircle2 className="w-4 h-4 mx-auto mt-0.5 text-green-600" />}
                 </button>
               )
             })}
