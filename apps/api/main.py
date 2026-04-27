@@ -216,6 +216,25 @@ def run_migrations():
             except Exception:
                 conn.rollback()  # Already nullable
 
+        # Create custom_sales_windows table if it doesn't exist
+        if 'custom_sales_windows' not in inspector.get_table_names() and 'branches' in inspector.get_table_names():
+            logger.info("Migration: Creating custom_sales_windows table")
+            conn.execute(text("""
+                CREATE TABLE custom_sales_windows (
+                    id SERIAL PRIMARY KEY,
+                    branch_id INTEGER NOT NULL REFERENCES branches(id),
+                    window_name VARCHAR(50) NOT NULL,
+                    window_time TIME,
+                    is_active BOOLEAN DEFAULT true,
+                    created_by_id INTEGER NOT NULL REFERENCES users(id),
+                    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+                )
+            """))
+            conn.execute(text("CREATE INDEX idx_custom_windows_branch ON custom_sales_windows(branch_id)"))
+            conn.commit()
+            logger.info("Migration: custom_sales_windows table created successfully")
+
         # Migrate expiry_responses quantity from INTEGER to FLOAT (support decimal like 1.25)
         if 'expiry_responses' in inspector.get_table_names():
             er_columns = {c['name']: c for c in inspector.get_columns('expiry_responses')}

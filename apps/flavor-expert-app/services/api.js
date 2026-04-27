@@ -353,6 +353,27 @@ class ApiService {
   async getFeedbackBranchInfo(branchId) {
     return this.request(`/feedback/branch-info?branch_id=${branchId}`)
   }
+
+  // ============ CUSTOM SALES WINDOWS ============
+  async getAvailableWindows(branchId) {
+    return this.request(`/sales/windows?branch_id=${branchId}`)
+  }
+
+  async createCustomWindow(branchId, windowName) {
+    return this.request('/sales/windows', {
+      method: 'POST',
+      body: JSON.stringify({
+        branch_id: branchId,
+        window_name: windowName,
+      }),
+    })
+  }
+
+  async deleteCustomWindow(windowId) {
+    return this.request(`/sales/windows/${windowId}`, {
+      method: 'DELETE',
+    })
+  }
 }
 
 export const api = new ApiService()

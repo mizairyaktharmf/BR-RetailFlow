@@ -340,3 +340,29 @@ class TrackedItem(Base):
 
     def __repr__(self):
         return f"<TrackedItem {self.branch_id} {self.item_code} {self.item_name}>"
+
+
+class CustomSalesWindow(Base):
+    """
+    Custom Sales Window
+    Managers can create custom sales windows for their branch (e.g., 5pm, 6pm, 10pm)
+    Fixed windows (3pm, 7pm, 9pm, closing) are always available and don't need entries here.
+    """
+    __tablename__ = "custom_sales_windows"
+
+    id = Column(Integer, primary_key=True, index=True)
+    branch_id = Column(Integer, ForeignKey("branches.id"), nullable=False, index=True)
+    window_name = Column(String(50), nullable=False)  # e.g., "5pm", "6pm", "10pm"
+    window_time = Column(Time, nullable=True)  # Actual time if needed for validation
+    is_active = Column(Boolean, default=True)
+
+    created_by_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+
+    # Relationships
+    branch = relationship("Branch")
+    created_by = relationship("User")
+
+    def __repr__(self):
+        return f"<CustomSalesWindow {self.branch_id} {self.window_name}>"

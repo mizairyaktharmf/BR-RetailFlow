@@ -6,7 +6,7 @@ Handles daily sales submissions and Gemini Vision extraction
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Query
 from sqlalchemy.orm import Session
 from sqlalchemy import and_, func, desc
-from typing import List, Optional
+from typing import List, Optional, Any
 from datetime import date, timedelta
 import logging
 import json
@@ -15,10 +15,11 @@ from utils.database import get_db
 from utils.security import get_current_user
 from models.user import User, UserRole
 from models.location import Branch
-from models.sales import DailySales, SalesWindowType, BranchBudget, TrackedItem
+from models.sales import DailySales, SalesWindowType, BranchBudget, TrackedItem, CustomSalesWindow
 from schemas.sales import (
     DailySalesCreate, DailySalesResponse, ReceiptExtractionResponse,
     TrackedItemCreate, TrackedItemResponse,
+    CustomSalesWindowCreate, CustomSalesWindowResponse, SalesWindowListResponse,
 )
 
 logger = logging.getLogger(__name__)
@@ -733,3 +734,122 @@ async def get_branch_ranking(
         "period": {"from": str(date_from), "to": str(date_to)},
         "ranking": ranking_list,
     }
+
+
+# ============== CUSTOM SALES WINDOWS ==============
+
+@router.get("/windows", response_model=dict)
+async def get_available_windows(
+    branch_id: int = Query(...),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Get all available sales windows for a branch (fixed + custom)."""
+    from models.sales import CustomSalesWindow
+
+    # Check user has access to this branch
+    branch = db.query(Branch).filter(Branch.id == branch_id).first()
+    if not branch:
+        raise HTTPException(status_code=404, detail="Branch not found")
+
+    # Fixed windows always available
+    fixed_windows = ["3pm", "7pm", "9pm", "closing"]
+
+    # Get custom windows for this branch
+    custom_windows = db.query(CustomSalesWindow).filter(
+        CustomSalesWindow.branch_id == branch_id,
+        CustomSalesWindow.is_active == True,
+    ).order_by(CustomSalesWindow.created_at).all()
+
+    custom_list = [
+        {
+            "id": w.id,
+            "window_name": w.window_name,
+            "is_active": w.is_active,
+            "created_at": w.created_at.isoformat(),
+        }
+        for w in custom_windows
+    ]
+
+    return {
+        "branch_id": branch_id,
+        "fixed_windows": fixed_windows,
+        "custom_windows": custom_list,
+    }
+
+
+@router.post("/windows", response_model=dict)
+async def create_custom_window(
+    data: Any,  # Use dict to avoid schema errors
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Create a custom sales window. Branch managers can only create for their branch."""
+    from models.sales import CustomSalesWindow
+
+    branch_id = data.get("branch_id")
+    window_name = data.get("window_name", "").strip()
+
+    if not branch_id or not window_name:
+        raise HTTPException(status_code=400, detail="branch_id and window_name are required")
+
+    # Check user has access to this branch
+    branch = db.query(Branch).filter(Branch.id == branch_id).first()
+    if not branch:
+        raise HTTPException(status_code=404, detail="Branch not found")
+
+    # Permission check: managers can only create for their assigned branch
+    if current_user.role == UserRole.ADMIN and current_user.branch_id != branch_id:
+        raise HTTPException(status_code=403, detail="Managers can only create windows for their assigned branch")
+
+    # Check window doesn't already exist
+    existing = db.query(CustomSalesWindow).filter(
+        CustomSalesWindow.branch_id == branch_id,
+        CustomSalesWindow.window_name == window_name,
+    ).first()
+
+    if existing:
+        raise HTTPException(status_code=400, detail=f"Window '{window_name}' already exists for this branch")
+
+    # Create new window
+    new_window = CustomSalesWindow(
+        branch_id=branch_id,
+        window_name=window_name,
+        created_by_id=current_user.id,
+    )
+
+    db.add(new_window)
+    db.commit()
+    db.refresh(new_window)
+
+    return {
+        "id": new_window.id,
+        "branch_id": new_window.branch_id,
+        "window_name": new_window.window_name,
+        "is_active": new_window.is_active,
+        "created_at": new_window.created_at.isoformat(),
+    }
+
+
+@router.delete("/windows/{window_id}")
+async def delete_custom_window(
+    window_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Delete a custom sales window (soft delete - set inactive)."""
+    from models.sales import CustomSalesWindow
+
+    window = db.query(CustomSalesWindow).filter(CustomSalesWindow.id == window_id).first()
+    if not window:
+        raise HTTPException(status_code=404, detail="Window not found")
+
+    # Permission check
+    if current_user.role == UserRole.ADMIN and current_user.branch_id != window.branch_id:
+        raise HTTPException(status_code=403, detail="Can only delete windows for your assigned branch")
+
+    # Soft delete
+    window.is_active = False
+    db.commit()
+
+    return {"success": True, "message": f"Window '{window.window_name}' deleted"}

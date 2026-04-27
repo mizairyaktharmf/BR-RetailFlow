@@ -111,3 +111,30 @@ class TrackedItemResponse(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+class CustomSalesWindowCreate(BaseModel):
+    """Schema for creating a custom sales window"""
+    branch_id: int
+    window_name: str  # e.g., "5pm", "6pm", "10pm"
+    window_time: Optional[str] = None
+
+
+class CustomSalesWindowResponse(BaseModel):
+    """Schema for custom sales window response"""
+    id: int
+    branch_id: int
+    window_name: str
+    is_active: bool
+    created_by_id: int
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class SalesWindowListResponse(BaseModel):
+    """Schema for list of available sales windows (fixed + custom)"""
+    branch_id: int
+    fixed_windows: list[str]  # ["3pm", "7pm", "9pm", "closing"]
+    custom_windows: list[dict]  # [{"id": 1, "window_name": "5pm", "is_active": true}, ...]
