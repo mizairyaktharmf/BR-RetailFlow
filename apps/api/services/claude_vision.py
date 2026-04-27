@@ -54,6 +54,7 @@ The POS receipt has these sections IN EXACT ORDER:
 - The sum of all item QUANTITIES within a category MUST EQUAL the T> category total QUANTITY.
 - Extract EVERY SINGLE item visible across ALL images. Do NOT skip any item. Do NOT truncate.
 - Each item has: 4-digit code, name, quantity (integer), sales amount (decimal), contribution %
+- TOPPING KEYWORD RULE: If an item name contains "topping" or "nutella" (case-insensitive), it belongs to Toppings category, NOT the previous category. This applies even if no T>Toppings header is visible.
 - If multiple images show the same section, do NOT duplicate items.
 - If images show different sections, COMBINE all data into one result.
 - Extract numbers exactly as shown — do not round or calculate.
