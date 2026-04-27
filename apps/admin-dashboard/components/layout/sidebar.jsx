@@ -26,7 +26,8 @@ import {
   TrendingUp,
   MessageSquare,
   MessageCircle,
-  Trophy
+  Trophy,
+  Clock
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 
@@ -37,6 +38,7 @@ const navigation = [
   { name: 'Branches', href: '/dashboard/branches', icon: Building2, roles: ['supreme_admin', 'super_admin', 'admin'] },
   { name: 'Users', href: '/dashboard/users', icon: Users, roles: ['supreme_admin', 'super_admin', 'admin'] },
   { name: 'Sales Reports', href: '/dashboard/sales', icon: BarChart3, roles: ['supreme_admin', 'super_admin', 'admin'] },
+  { name: 'Sales Windows', href: '/dashboard/sales-windows', icon: Clock, roles: ['supreme_admin', 'super_admin', 'admin'] },
   { name: 'Budget & Advisor', href: '/dashboard/budget', icon: Target, roles: ['supreme_admin', 'super_admin', 'admin'] },
   { name: 'Promotions', href: '/dashboard/promotions', icon: Tag, roles: ['supreme_admin', 'super_admin', 'admin'] },
   { name: 'Branch Ranking', href: '/dashboard/branch-ranking', icon: Trophy, roles: ['supreme_admin', 'super_admin', 'admin'] },
