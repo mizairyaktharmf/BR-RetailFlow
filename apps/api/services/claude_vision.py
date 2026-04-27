@@ -34,7 +34,7 @@ The POS receipt has these sections IN EXACT ORDER:
    - Items between T>Cups & Cones and T>Sundaes = Sundaes items ← items belong to the BOTTOM header
    - Items between T>Sundaes and T>Beverages = Beverages items ← items belong to the BOTTOM header
    - Items between T>Beverages and T>Take Home = Take Home items ← items belong to the BOTTOM header
-   - Items between T>Take Home and T>Desserts = Desserts items ← CAKES ARE HERE, items belong to T>Desserts (BOTTOM header)
+   - Items between T>Take Home and T>Desserts = Desserts items ← CAKES ARE HERE: CPU cakes, ATC cakes, INV cakes, etc. Items belong to T>Desserts (BOTTOM header)
    - Items between T>Desserts and T>Toppings = Toppings items ← TOPPINGS ARE HERE, items belong to T>Toppings (BOTTOM header)
    - Items between T>Toppings and T>Others = Others items ← items belong to the BOTTOM header
    - Items between T>Others and T>Soft Drink = Soft Drink items ← items belong to the BOTTOM header
