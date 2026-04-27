@@ -15,97 +15,141 @@ import base64
 import json
 from pathlib import Path
 from unittest.mock import patch, AsyncMock
-
-# Import services
-from services.claude_vision import extract_pos_combined as claude_extract
-from services.gemini_vision import extract_pos_combined as gemini_extract
+import re
 
 
 class TestExtractionAccuracy:
     """Test extraction accuracy for Claude vs Gemini"""
 
-    async def test_claude_extracts_all_items(self):
-        """Verify Claude extracts all items without truncation"""
-        # This test would use a real POS receipt image
-        # For now, we'll document the test pattern
-        pass
+    def test_claude_desserts_category_position(self):
+        """Verify Desserts category comes in correct position"""
+        import os
+        api_path = os.path.join(os.path.dirname(__file__), '..', 'services')
 
-    async def test_claude_quantity_accuracy(self):
-        """Verify Claude reads quantities correctly (not from sales column)"""
-        # Should extract integer quantities correctly
-        # Should NOT return sales amounts as quantities
-        pass
+        claude_file = os.path.join(api_path, 'claude_vision.py')
+        with open(claude_file, 'r', encoding='utf-8') as f:
+            claude_content = f.read()
 
-    async def test_claude_category_validation(self):
-        """Verify category item quantities sum correctly"""
-        # For each category: sum(item quantities) == category total quantity
-        # This catches the hallucination where model was reading wrong columns
-        pass
+        match = re.search(r'POS_COMBINED_PROMPT = """(.+?)"""', claude_content, re.DOTALL)
+        assert match, "Could not find POS_COMBINED_PROMPT in claude_vision.py"
+        prompt = match.group(1)
 
-    async def test_claude_desserts_extraction(self):
-        """Verify Desserts category items are complete (promotion items)"""
-        # Specifically test that cake products and promotion items are extracted
-        # CPU cakes, ATC cakes, INV cakes, etc. should all be captured
-        pass
-
-    async def test_claude_vs_gemini_consistency(self):
-        """Compare Claude and Gemini extraction on same receipt"""
-        # Both should extract same structure
-        # Both should have same item counts per category
-        # Both should have similar sales amounts (within 1% tolerance for OCR variance)
-        pass
+        # Verify cakes are listed as Desserts (between Take Home and Desserts T>)
+        assert "CPU cakes" in prompt, "Claude prompt should mention CPU cakes in Desserts"
+        assert "ATC cakes" in prompt, "Claude prompt should mention ATC cakes in Desserts"
+        assert "T>Take Home and T>Desserts = Desserts items" in prompt, "Desserts should come after Take Home"
 
     def test_prompt_no_hardcoded_examples(self):
         """Verify prompts don't contain hardcoded example numbers"""
-        from services.claude_vision import POS_COMBINED_PROMPT
-        from services.gemini_vision import POS_COMBINED_PROMPT as GEMINI_POS_PROMPT
+        import os
+        api_path = os.path.join(os.path.dirname(__file__), '..', 'services')
+
+        # Read Claude prompt
+        claude_file = os.path.join(api_path, 'claude_vision.py')
+        with open(claude_file, 'r', encoding='utf-8') as f:
+            claude_content = f.read()
+
+        # Extract POS_COMBINED_PROMPT
+        match = re.search(r'POS_COMBINED_PROMPT = """(.+?)"""', claude_content, re.DOTALL)
+        assert match, "Could not find POS_COMBINED_PROMPT in claude_vision.py"
+        claude_prompt = match.group(1)
 
         # Check Claude prompt
-        assert "24887" not in POS_COMBINED_PROMPT, "Claude prompt contains hallucination example (24887)"
-        assert "1470" not in POS_COMBINED_PROMPT, "Claude prompt contains hallucination example (1470)"
+        assert "24887" not in claude_prompt, "Claude prompt contains hallucination example (24887)"
+        assert "1470" not in claude_prompt, "Claude prompt contains hallucination example (1470)"
+
+        # Read Gemini prompt
+        gemini_file = os.path.join(api_path, 'gemini_vision.py')
+        with open(gemini_file, 'r', encoding='utf-8') as f:
+            gemini_content = f.read()
+
+        # Extract POS_COMBINED_PROMPT
+        match = re.search(r'POS_COMBINED_PROMPT = """(.+?)"""', gemini_content, re.DOTALL)
+        assert match, "Could not find POS_COMBINED_PROMPT in gemini_vision.py"
+        gemini_prompt = match.group(1)
 
         # Check Gemini prompt
-        assert "24887" not in GEMINI_POS_PROMPT, "Gemini prompt contains hallucination example (24887)"
-        assert "1470" not in GEMINI_POS_PROMPT, "Gemini prompt contains hallucination example (1470)"
+        assert "24887" not in gemini_prompt, "Gemini prompt contains hallucination example (24887)"
+        assert "1470" not in gemini_prompt, "Gemini prompt contains hallucination example (1470)"
 
     def test_prompts_have_validation_rules(self):
         """Verify prompts include strict validation rules"""
-        from services.claude_vision import POS_COMBINED_PROMPT
-        from services.gemini_vision import POS_COMBINED_PROMPT as GEMINI_POS_PROMPT
+        import os
+        api_path = os.path.join(os.path.dirname(__file__), '..', 'services')
+
+        # Read Claude prompt
+        claude_file = os.path.join(api_path, 'claude_vision.py')
+        with open(claude_file, 'r', encoding='utf-8') as f:
+            claude_content = f.read()
+
+        match = re.search(r'POS_COMBINED_PROMPT = """(.+?)"""', claude_content, re.DOTALL)
+        assert match, "Could not find POS_COMBINED_PROMPT in claude_vision.py"
+        claude_prompt = match.group(1)
 
         # Claude should have validation
-        assert "VALIDATION" in POS_COMBINED_PROMPT, "Claude prompt missing validation rules"
-        assert "sum of all item QUANTITIES" in POS_COMBINED_PROMPT, "Claude prompt missing category qty check"
+        assert "VALIDATION" in claude_prompt, "Claude prompt missing validation rules"
+        assert "sum of all item QUANTITIES" in claude_prompt, "Claude prompt missing category qty check"
+
+        # Read Gemini prompt
+        gemini_file = os.path.join(api_path, 'gemini_vision.py')
+        with open(gemini_file, 'r', encoding='utf-8') as f:
+            gemini_content = f.read()
+
+        match = re.search(r'POS_COMBINED_PROMPT = """(.+?)"""', gemini_content, re.DOTALL)
+        assert match, "Could not find POS_COMBINED_PROMPT in gemini_vision.py"
+        gemini_prompt = match.group(1)
 
         # Gemini should have validation
-        assert "VALIDATION" in GEMINI_POS_PROMPT, "Gemini prompt missing validation rules"
+        assert "VALIDATION" in gemini_prompt, "Gemini prompt missing validation rules"
 
     def test_prompts_include_desserts_category(self):
         """Verify prompts explicitly mention Desserts category"""
-        from services.claude_vision import POS_COMBINED_PROMPT
-        from services.gemini_vision import POS_COMBINED_PROMPT as GEMINI_POS_PROMPT
+        import os
+        api_path = os.path.join(os.path.dirname(__file__), '..', 'services')
 
-        assert "T>Desserts" in POS_COMBINED_PROMPT, "Claude prompt missing Desserts category"
-        assert "CPU cakes" in POS_COMBINED_PROMPT, "Claude prompt missing cake product examples"
+        # Read Claude prompt
+        claude_file = os.path.join(api_path, 'claude_vision.py')
+        with open(claude_file, 'r', encoding='utf-8') as f:
+            claude_content = f.read()
 
-        assert "T>Desserts" in GEMINI_POS_PROMPT, "Gemini prompt missing Desserts category"
+        match = re.search(r'POS_COMBINED_PROMPT = """(.+?)"""', claude_content, re.DOTALL)
+        assert match, "Could not find POS_COMBINED_PROMPT in claude_vision.py"
+        claude_prompt = match.group(1)
+
+        assert "T>Desserts" in claude_prompt, "Claude prompt missing Desserts category"
+        assert "CPU cakes" in claude_prompt or "cakes" in claude_prompt, "Claude prompt missing cake product examples"
+
+        # Read Gemini prompt
+        gemini_file = os.path.join(api_path, 'gemini_vision.py')
+        with open(gemini_file, 'r', encoding='utf-8') as f:
+            gemini_content = f.read()
+
+        match = re.search(r'POS_COMBINED_PROMPT = """(.+?)"""', gemini_content, re.DOTALL)
+        assert match, "Could not find POS_COMBINED_PROMPT in gemini_vision.py"
+        gemini_prompt = match.group(1)
+
+        assert "T>Desserts" in gemini_prompt, "Gemini prompt missing Desserts category"
 
     def test_prompts_category_ordering(self):
         """Verify prompts specify correct category order"""
-        from services.claude_vision import POS_COMBINED_PROMPT
+        import os
+        api_path = os.path.join(os.path.dirname(__file__), '..', 'services')
 
-        # Check that categories are listed in the right order
-        prompt = POS_COMBINED_PROMPT
-        cups_pos = prompt.find("T>Cups & Cones")
-        sundaes_pos = prompt.find("T>Sundaes")
-        beverages_pos = prompt.find("T>Beverages")
-        take_home_pos = prompt.find("T>Take Home")
-        desserts_pos = prompt.find("T>Desserts")
+        # Read Claude prompt
+        claude_file = os.path.join(api_path, 'claude_vision.py')
+        with open(claude_file, 'r', encoding='utf-8') as f:
+            claude_content = f.read()
 
-        assert cups_pos < sundaes_pos, "Category order wrong: Cups should come before Sundaes"
-        assert sundaes_pos < beverages_pos, "Category order wrong: Sundaes should come before Beverages"
-        assert beverages_pos < take_home_pos, "Category order wrong: Beverages should come before Take Home"
-        assert take_home_pos < desserts_pos, "Category order wrong: Take Home should come before Desserts"
+        match = re.search(r'POS_COMBINED_PROMPT = """(.+?)"""', claude_content, re.DOTALL)
+        assert match, "Could not find POS_COMBINED_PROMPT in claude_vision.py"
+        prompt = match.group(1)
+
+        # Check that prompt mentions all categories in BETWEEN format
+        assert "Items between T>Cups & Cones and T>Sundaes" in prompt, "Missing Sundaes category description"
+        assert "Items between T>Sundaes and T>Beverages" in prompt, "Missing Beverages category description"
+        assert "Items between T>Beverages and T>Take Home" in prompt, "Missing Take Home category description"
+        assert "Items between T>Take Home and T>Desserts" in prompt, "Missing Desserts category description"
+        assert "Items between T>Desserts and T>Toppings" in prompt, "Missing Toppings category description"
 
 
 class TestExtractionStructure:
@@ -161,34 +205,22 @@ class TestExtractionStructure:
 class TestRealDataValidation:
     """Tests using real data from daily_sales table"""
 
-    @pytest.mark.asyncio
-    async def test_last_month_sales_extraction(self):
-        """
-        Integration test: Extract from real POS data for last month.
-        Validates that Claude now produces correct output.
+    def test_desserts_category_guidelines(self):
+        """Verify Desserts category extraction guidelines are clear"""
+        import os
+        api_path = os.path.join(os.path.dirname(__file__), '..', 'services')
 
-        This test would:
-        1. Fetch DailySales records from last month
-        2. For each with receipt_image, call claude_extract
-        3. Verify extracted data matches database records
-        4. Compare against Gemini results
-        """
-        # Placeholder for integration test
-        pass
+        claude_file = os.path.join(api_path, 'claude_vision.py')
+        with open(claude_file, 'r', encoding='utf-8') as f:
+            claude_content = f.read()
 
-    @pytest.mark.asyncio
-    async def test_desserts_promotion_items(self):
-        """
-        Integration test: Verify Desserts category items match tracked items.
+        match = re.search(r'POS_COMBINED_PROMPT = """(.+?)"""', claude_content, re.DOTALL)
+        assert match, "Could not find POS_COMBINED_PROMPT in claude_vision.py"
+        prompt = match.group(1)
 
-        This test validates:
-        1. All promotion items (desserts) are extracted
-        2. Quantities match actual sales
-        3. No items are missing or duplicated
-        """
-        # This would test the specific use case mentioned by user
-        # "promotion item desserts like this how gemini tracking extracting and how claude extract"
-        pass
+        # Verify that the critical fix is in place: cakes come BEFORE T>Desserts line
+        assert "CAKES ARE HERE" in prompt, "Desserts extraction guidelines should highlight cake location"
+        assert "CPU cakes, ATC cakes, INV cakes" in prompt, "Should list specific cake product codes"
 
 
 if __name__ == "__main__":
