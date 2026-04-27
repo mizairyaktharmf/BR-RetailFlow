@@ -17,7 +17,6 @@ import {
 } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { SALES_WINDOWS } from '@/lib/utils'
 import api from '@/services/api'
 
 // Pie chart colors
@@ -294,6 +293,8 @@ export default function SalesReportsPage() {
   const [loadingSales, setLoadingSales] = useState({})
   const [selectedDate, setSelectedDate] = useState('')
   const [activeWindowId, setActiveWindowId] = useState(null)
+  const [availableWindows, setAvailableWindows] = useState([]) // Fixed + custom windows
+  const [availableWindowsLoading, setAvailableWindowsLoading] = useState(false)
   const [trackedItems, setTrackedItems] = useState([])
   const [budgetChart, setBudgetChart] = useState(null)
   const [yoyData, setYoyData] = useState(null)
@@ -316,6 +317,25 @@ export default function SalesReportsPage() {
     api.getTrackedItems(selectedBranch.id)
       .then(items => setTrackedItems(Array.isArray(items) ? items : []))
       .catch(() => setTrackedItems([]))
+  }, [selectedBranch])
+
+  useEffect(() => {
+    if (!selectedBranch) return
+    setAvailableWindowsLoading(true)
+    api.getAvailableWindows(selectedBranch.id)
+      .then(data => {
+        if (data && data.fixed_windows && data.custom_windows !== undefined) {
+          const fixed = data.fixed_windows.map(w => ({ id: w, label: w.toUpperCase() }))
+          const custom = data.custom_windows.map(w => ({ id: w.window_name, label: w.window_name.toUpperCase() }))
+          setAvailableWindows([...fixed, ...custom])
+        }
+      })
+      .catch(err => {
+        console.error('Failed to load available windows:', err)
+        const defaultWindows = ['3pm', '7pm', '9pm', 'closing'].map(w => ({ id: w, label: w.toUpperCase() }))
+        setAvailableWindows(defaultWindows)
+      })
+      .finally(() => setAvailableWindowsLoading(false))
   }, [selectedBranch])
 
   useEffect(() => {
@@ -476,13 +496,14 @@ export default function SalesReportsPage() {
     doc.save(`sales-${selectedBranch.name.replace(/\s+/g, '-')}-${selectedDate}.pdf`)
   }
 
-  const windowOrder = SALES_WINDOWS.map(w => w.id)
+  const windowOrder = availableWindows.map(w => w.id)
   const latestWindowId = useMemo(() => {
+    if (windowOrder.length === 0) return currentSales[0]?.sales_window || null
     for (let i = windowOrder.length - 1; i >= 0; i--) {
       if (currentSales.find(s => s.sales_window === windowOrder[i])) return windowOrder[i]
     }
     return currentSales[0]?.sales_window || null
-  }, [currentSales])
+  }, [currentSales, windowOrder])
 
   useEffect(() => {
     setActiveWindowId(latestWindowId)
@@ -832,7 +853,7 @@ export default function SalesReportsPage() {
                     </>
                   )}
 
-                  {SALES_WINDOWS.map(w => (
+                  {availableWindows.map(w => (
                     <div
                       key={w.id}
                       className={`w-3 h-3 rounded-full ${
@@ -841,7 +862,7 @@ export default function SalesReportsPage() {
                       title={`${w.label}: ${submittedWindows.includes(w.id) ? 'Submitted' : 'Pending'}`}
                     />
                   ))}
-                  <span className="text-[10px] text-gray-500 ml-1">{submittedWindows.length}/{SALES_WINDOWS.length}</span>
+                  <span className="text-[10px] text-gray-500 ml-1">{submittedWindows.length}/{availableWindows.length}</span>
                 </div>
               </div>
 
@@ -861,7 +882,7 @@ export default function SalesReportsPage() {
                   <div>
                     <p className="text-[10px] text-gray-500 uppercase tracking-wider mb-2">Window Status</p>
                     <div className="grid grid-cols-4 gap-2">
-                      {SALES_WINDOWS.map((w) => {
+                      {availableWindows.map((w) => {
                         const done = submittedWindows.includes(w.id)
                         const isActive = activeWindowId === w.id
                         const rec = currentSales.find(s => s.sales_window === w.id)
@@ -903,7 +924,7 @@ export default function SalesReportsPage() {
                   {/* Window label */}
                   {activeRecord && (
                     <p className="text-[10px] text-gray-500 uppercase tracking-wider">
-                      Showing: <span className="text-purple-400 font-semibold">{SALES_WINDOWS.find(w => w.id === activeRecord.sales_window)?.label || activeRecord.sales_window}</span> report
+                      Showing: <span className="text-purple-400 font-semibold">{availableWindows.find(w => w.id === activeRecord.sales_window)?.label || activeRecord.sales_window}</span> report
                     </p>
                   )}
 
