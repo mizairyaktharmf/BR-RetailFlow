@@ -324,12 +324,24 @@ export default function SalesPage() {
 
     setPosPhotos(prev => [...prev, ...toAdd])
     setPosPreviews(prev => [...prev, ...toAdd.map(f => URL.createObjectURL(f))])
+    // If photos change after extraction, force re-extract
+    if (posStatus === 'review') {
+      setPosStatus('idle')
+      setExtractedSales(null)
+      setExtractedCategories(null)
+    }
   }
 
   const removePhoto = (index) => {
     URL.revokeObjectURL(posPreviews[index])
     setPosPhotos(prev => prev.filter((_, i) => i !== index))
     setPosPreviews(prev => prev.filter((_, i) => i !== index))
+    // If photos change after extraction, force re-extract
+    if (posStatus === 'review') {
+      setPosStatus('idle')
+      setExtractedSales(null)
+      setExtractedCategories(null)
+    }
   }
 
   // Extract POS data from photos (step 1)
@@ -365,6 +377,8 @@ export default function SalesPage() {
     } catch (err) {
       console.error(err)
       setPosStatus('idle')
+      setExtractedSales(null)
+      setExtractedCategories(null)
       alert('Extraction failed: ' + err.message)
     }
   }
