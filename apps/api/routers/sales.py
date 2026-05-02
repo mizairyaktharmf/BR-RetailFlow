@@ -261,7 +261,7 @@ async def extract_receipt(
     """Extract sales data from receipt photos.
     Claude extracts ALL: POS, HD, Deliveroo, budget sheets, visit times (fast, reliable).
     Accepts 1-5 images. Photos are NOT saved — only used for extraction."""
-    from services.claude_vision import (
+    from services.gemini_vision import (
         extract_pos_combined,
         extract_hd_sales,
         extract_deliveroo_sales,
