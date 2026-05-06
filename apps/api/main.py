@@ -8,7 +8,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 import logging
 
-from routers import auth, users, territories, areas, branches, flavors, inventory, analytics, cake, sales, budget, notification, expiry, visits, daily_brief, feedback, kpi, whatsapp
+from routers import auth, users, territories, areas, branches, flavors, inventory, analytics, cake, sales, budget, notification, expiry, visits, daily_brief, feedback, kpi, whatsapp, local_logs
 from utils.database import engine, Base
 from utils.config import settings
 
@@ -246,6 +246,28 @@ def run_migrations():
                     conn.commit()
                     logger.info("Migration: expiry_responses.quantity is now FLOAT")
 
+        # Create login_logs table if it doesn't exist
+        if 'login_logs' not in inspector.get_table_names():
+            logger.info("Migration: Creating login_logs table")
+            conn.execute(text("""
+                CREATE TABLE login_logs (
+                    id SERIAL PRIMARY KEY,
+                    app VARCHAR(50) NOT NULL,
+                    login_name VARCHAR(255) NOT NULL,
+                    display_name VARCHAR(255),
+                    user_id INTEGER,
+                    branch_id INTEGER,
+                    ip_address VARCHAR(100),
+                    user_agent TEXT,
+                    success BOOLEAN DEFAULT TRUE,
+                    failure_reason VARCHAR(500),
+                    timestamp TIMESTAMPTZ DEFAULT NOW()
+                )
+            """))
+            conn.execute(text("CREATE INDEX ix_login_logs_timestamp ON login_logs(timestamp DESC)"))
+            conn.commit()
+            logger.info("Migration: login_logs table created")
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -303,6 +325,7 @@ app.include_router(daily_brief.router, prefix="/api/v1/reports", tags=["Daily Br
 app.include_router(feedback.router, prefix="/api/v1/feedback", tags=["Feedback"])
 app.include_router(kpi.router, prefix="/api/v1/reports", tags=["KPI"])
 app.include_router(whatsapp.router, prefix="/api/v1/whatsapp", tags=["WhatsApp"])
+app.include_router(local_logs.router, prefix="/local", tags=["Local Audit"])
 
 
 @app.get("/")

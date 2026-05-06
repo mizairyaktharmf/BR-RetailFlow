@@ -3,7 +3,7 @@ Authentication router
 Handles login, logout, token refresh
 """
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy.orm import Session
 from datetime import datetime, timedelta, timezone
 import random
@@ -20,59 +20,72 @@ from utils.security import (
 )
 from models.user import User, UserRole
 from models.location import Branch
+from models.login_log import LoginLog
 from schemas.user import UserLogin, TokenResponse, UserResponse, UserCreate, VerifyAccount, PasswordChange
 from pydantic import BaseModel as PydanticBaseModel
 
 router = APIRouter()
 
 
+def _get_ip(request: Request) -> str:
+    forwarded = request.headers.get("x-forwarded-for")
+    if forwarded:
+        return forwarded.split(",")[0].strip()
+    cf = request.headers.get("cf-connecting-ip")
+    if cf:
+        return cf
+    return request.client.host if request.client else "unknown"
+
+
+def _log(db: Session, app: str, login_name: str, display_name: str,
+         ip: str, ua: str, success: bool, reason: str = None,
+         user_id: int = None, branch_id: int = None):
+    try:
+        db.add(LoginLog(
+            app=app, login_name=login_name, display_name=display_name,
+            ip_address=ip, user_agent=ua, success=success,
+            failure_reason=reason, user_id=user_id, branch_id=branch_id,
+        ))
+        db.commit()
+    except Exception:
+        db.rollback()
+
+
 @router.post("/login", response_model=TokenResponse)
-async def login(credentials: UserLogin, db: Session = Depends(get_db)):
-    """
-    Authenticate user and return access/refresh tokens
-    """
-    # Find user by username or email
+async def login(request: Request, credentials: UserLogin, db: Session = Depends(get_db)):
+    """Authenticate user and return access/refresh tokens"""
+    ip = _get_ip(request)
+    ua = request.headers.get("user-agent", "")
+
     user = db.query(User).filter(
         (User.username == credentials.username) | (User.email == credentials.username)
     ).first()
 
     if not user:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid username or password"
-        )
+        _log(db, "admin_dashboard", credentials.username, credentials.username, ip, ua, False, "Invalid username or password")
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid username or password")
 
     if not verify_password(credentials.password, user.hashed_password):
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid username or password"
-        )
+        _log(db, "admin_dashboard", credentials.username, user.full_name, ip, ua, False, "Wrong password", user_id=user.id)
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid username or password")
 
     if not user.is_active:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="User account is disabled"
-        )
+        _log(db, "admin_dashboard", credentials.username, user.full_name, ip, ua, False, "Account disabled", user_id=user.id)
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="User account is disabled")
 
-    # Check if user is verified
     if not user.is_verified:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Please verify your account first. Check your email for verification code."
-        )
+        _log(db, "admin_dashboard", credentials.username, user.full_name, ip, ua, False, "Not verified", user_id=user.id)
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Please verify your account first. Check your email for verification code.")
 
-    # Check if user is approved by HQ
     if not user.is_approved:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Your account is under review. Please wait for HQ approval."
-        )
+        _log(db, "admin_dashboard", credentials.username, user.full_name, ip, ua, False, "Pending HQ approval", user_id=user.id)
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Your account is under review. Please wait for HQ approval.")
 
-    # Update last login
+    # Success
+    _log(db, "admin_dashboard", credentials.username, user.full_name, ip, ua, True, user_id=user.id)
     user.last_login = datetime.now(timezone.utc)
     db.commit()
 
-    # Create tokens
     access_token = create_access_token(data={"sub": str(user.id)})
     refresh_token = create_refresh_token(data={"sub": str(user.id)})
 
@@ -89,35 +102,27 @@ class BranchLoginRequest(PydanticBaseModel):
 
 
 @router.post("/branch-login")
-async def branch_login(credentials: BranchLoginRequest, db: Session = Depends(get_db)):
-    """
-    Authenticate a branch (Flavor Expert app) using Branch ID and password.
-    Returns JWT tokens for the linked staff user.
-    """
-    # Find branch by login_id (case-insensitive, since branch code may be entered in any case)
+async def branch_login(request: Request, credentials: BranchLoginRequest, db: Session = Depends(get_db)):
+    """Authenticate a branch (Flavor Expert app) using Branch ID and password."""
+    ip = _get_ip(request)
+    ua = request.headers.get("user-agent", "")
+
     branch = db.query(Branch).filter(
         Branch.login_id.ilike(credentials.branch_id)
     ).first()
 
     if not branch:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid Branch ID or password"
-        )
+        _log(db, "flavor_expert", credentials.branch_id, credentials.branch_id, ip, ua, False, "Invalid Branch ID")
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid Branch ID or password")
 
     if not branch.hashed_password or not verify_password(credentials.password, branch.hashed_password):
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid Branch ID or password"
-        )
+        _log(db, "flavor_expert", credentials.branch_id, branch.name, ip, ua, False, "Wrong password", branch_id=branch.id)
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid Branch ID or password")
 
     if not branch.is_active:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="This branch is currently inactive"
-        )
+        _log(db, "flavor_expert", credentials.branch_id, branch.name, ip, ua, False, "Branch inactive", branch_id=branch.id)
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="This branch is currently inactive")
 
-    # Find the linked system staff user for this branch (not a real FE user)
     staff_user = db.query(User).filter(
         User.branch_id == branch.id,
         User.role == UserRole.STAFF,
@@ -126,16 +131,13 @@ async def branch_login(credentials: BranchLoginRequest, db: Session = Depends(ge
     ).first()
 
     if not staff_user:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Branch account not properly configured. Contact HQ."
-        )
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Branch account not properly configured. Contact HQ.")
 
-    # Update last login
+    # Success
+    _log(db, "flavor_expert", credentials.branch_id, branch.name, ip, ua, True, branch_id=branch.id)
     staff_user.last_login = datetime.now(timezone.utc)
     db.commit()
 
-    # Create tokens for the staff user
     access_token = create_access_token(data={"sub": str(staff_user.id)})
     refresh_token = create_refresh_token(data={"sub": str(staff_user.id)})
 
