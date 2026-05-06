@@ -1,34 +1,40 @@
 """
-Login Audit Log Viewer — LOCAL ACCESS ONLY
-Accessible only from 127.0.0.1 / localhost.
-Never expose this router to the public internet.
+Login Audit Log Viewer — SECRET TOKEN PROTECTED
+Access: https://your-api.com/local/logs?secret=YOUR_LOG_SECRET
+Set LOG_SECRET in your .env file.
 """
 
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Depends, Request, Query
 from fastapi.responses import HTMLResponse, JSONResponse
 from sqlalchemy.orm import Session
 from sqlalchemy import desc
 
 from utils.database import get_db
+from utils.config import settings
 from models.login_log import LoginLog
 
 router = APIRouter()
 
-LOCALHOST_IPS = {"127.0.0.1", "::1", "localhost"}
 
-
-def _is_localhost(request: Request) -> bool:
-    host = request.client.host if request.client else ""
-    return host in LOCALHOST_IPS
+def _check_secret(secret: str) -> bool:
+    s = settings.LOG_SECRET.strip()
+    if not s:
+        return False  # No secret configured — deny all
+    return secret == s
 
 
 def _deny():
-    return HTMLResponse("<h1>403 Forbidden</h1><p>This page is only accessible from localhost.</p>", status_code=403)
+    return HTMLResponse("<h1>403 Forbidden</h1><p>Invalid or missing secret.</p>", status_code=403)
 
 
 @router.get("/logs", response_class=HTMLResponse)
-async def view_logs(request: Request, db: Session = Depends(get_db), limit: int = 200):
-    if not _is_localhost(request):
+async def view_logs(
+    request: Request,
+    secret: str = Query(default=""),
+    db: Session = Depends(get_db),
+    limit: int = 200,
+):
+    if not _check_secret(secret):
         return _deny()
 
     logs = db.query(LoginLog).order_by(desc(LoginLog.timestamp)).limit(limit).all()
@@ -76,8 +82,8 @@ async def view_logs(request: Request, db: Session = Depends(get_db), limit: int 
     .header{{background:#1e1b4b;color:#fff;padding:20px 32px;display:flex;align-items:center;gap:12px}}
     .header h1{{font-size:20px;font-weight:700}}
     .header p{{font-size:12px;color:#a5b4fc;margin-top:2px}}
-    .badge-local{{background:#fbbf24;color:#78350f;padding:2px 10px;border-radius:20px;font-size:11px;font-weight:600;margin-left:auto}}
-    .stats{{display:flex;gap:16px;padding:20px 32px}}
+    .badge-secret{{background:#fbbf24;color:#78350f;padding:2px 10px;border-radius:20px;font-size:11px;font-weight:600;margin-left:auto}}
+    .stats{{display:flex;gap:16px;padding:20px 32px;flex-wrap:wrap}}
     .stat{{background:#fff;border:1px solid #e5e7eb;border-radius:10px;padding:14px 20px;min-width:130px}}
     .stat .num{{font-size:28px;font-weight:700;line-height:1}}
     .stat .lbl{{font-size:11px;color:#6b7280;margin-top:4px}}
@@ -98,9 +104,9 @@ async def view_logs(request: Request, db: Session = Depends(get_db), limit: int 
   <div class="header">
     <div>
       <h1>🔒 BR-RetailFlow — Login Audit Logs</h1>
-      <p>Tracks all login attempts across Admin Dashboard and Flavor Expert app</p>
+      <p>All login attempts across Admin Dashboard and Flavor Expert app</p>
     </div>
-    <span class="badge-local">🏠 LOCALHOST ONLY</span>
+    <span class="badge-secret">🔑 SECRET PROTECTED</span>
   </div>
 
   <div class="stats">
@@ -115,7 +121,7 @@ async def view_logs(request: Request, db: Session = Depends(get_db), limit: int 
     <div class="card">
       <div class="card-header">
         <h2>Login History (latest {limit})</h2>
-        <a href="/local/logs" class="refresh">↻ Refresh</a>
+        <a href="/local/logs?secret={secret}" class="refresh">↻ Refresh</a>
       </div>
       <div style="overflow-x:auto">
         <table>
@@ -143,9 +149,13 @@ async def view_logs(request: Request, db: Session = Depends(get_db), limit: int 
 
 
 @router.get("/logs/json")
-async def logs_json(request: Request, db: Session = Depends(get_db), limit: int = 500):
-    """Raw JSON endpoint for the logs — localhost only."""
-    if not _is_localhost(request):
+async def logs_json(
+    request: Request,
+    secret: str = Query(default=""),
+    db: Session = Depends(get_db),
+    limit: int = 500,
+):
+    if not _check_secret(secret):
         return JSONResponse({"error": "Forbidden"}, status_code=403)
 
     logs = db.query(LoginLog).order_by(desc(LoginLog.timestamp)).limit(limit).all()

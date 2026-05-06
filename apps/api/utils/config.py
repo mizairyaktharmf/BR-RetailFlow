@@ -42,6 +42,9 @@ class Settings(BaseSettings):
     SMTP_FROM: str = "noreply@br-retailflow.com"
     REPORT_EMAIL_TO: str = ""  # comma-separated list of recipient emails
 
+    # Audit log viewer secret (set a strong random string in .env)
+    LOG_SECRET: str = ""
+
     # CORS - comma-separated origins string
     CORS_ORIGINS: str = "http://localhost:3000,http://localhost:3001,http://localhost:3002"
 
