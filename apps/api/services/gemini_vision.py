@@ -400,20 +400,23 @@ def _validate_pos_combined(data: dict) -> dict:
 
 
 async def _call_gemini_with_retry(model: str, contents: list, config=None) -> str:
-    """Call Gemini API — tries multiple models if the primary is overloaded."""
+    """Call Gemini API in a thread executor (blocking SDK) with model fallback."""
     client = _get_client()
     last_error = None
 
-    # Build model list: requested model first, then fallbacks
     models_to_try = [model] + [m for m in GEMINI_MODELS if m != model]
+
+    def _sync_call(m):
+        kwargs = {"model": m, "contents": contents}
+        if config:
+            kwargs["config"] = config
+        return client.models.generate_content(**kwargs)
 
     for m in models_to_try:
         for attempt in range(MAX_RETRIES):
             try:
-                kwargs = {"model": m, "contents": contents}
-                if config:
-                    kwargs["config"] = config
-                response = client.models.generate_content(**kwargs)
+                # Run blocking SDK call in thread pool — never blocks event loop
+                response = await asyncio.to_thread(_sync_call, m)
                 if response.text:
                     if m != model:
                         logger.info(f"Used fallback model {m} (primary {model} unavailable)")
@@ -423,11 +426,10 @@ async def _call_gemini_with_retry(model: str, contents: list, config=None) -> st
                 last_error = e
                 err_str = str(e)
                 logger.warning(f"Gemini {m} attempt {attempt + 1}/{MAX_RETRIES} failed: {err_str[:100]}")
-                # If 503 overloaded, skip remaining retries on this model and try next
-                if "503" in err_str or "UNAVAILABLE" in err_str:
-                    break
+                if "503" in err_str or "UNAVAILABLE" in err_str or "404" in err_str or "NOT_FOUND" in err_str:
+                    break  # Skip remaining retries on this model, try next
                 if attempt < MAX_RETRIES - 1:
-                    await asyncio.sleep(RETRY_DELAY * (attempt + 1))
+                    await asyncio.sleep(RETRY_DELAY)
 
     raise last_error
 
