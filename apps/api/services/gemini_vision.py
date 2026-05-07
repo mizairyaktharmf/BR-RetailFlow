@@ -21,7 +21,6 @@ RETRY_DELAY = 3  # seconds
 
 # Models to try in order
 GEMINI_MODELS = [
-    "gemini-2.5-flash",
     "gemini-2.0-flash",
     "gemini-1.5-flash",
 ]
@@ -437,14 +436,14 @@ async def _call_gemini_with_retry(model: str, contents: list, config=None) -> st
 async def extract_pos_sales(image_bytes: bytes) -> dict:
     """Extract POS sales summary from receipt photo."""
     img = _image_from_bytes(image_bytes)
-    text = await _call_gemini_with_retry("gemini-2.5-flash", [img, POS_SALES_PROMPT])
+    text = await _call_gemini_with_retry("gemini-2.0-flash", [img, POS_SALES_PROMPT])
     return _parse_json_response(text)
 
 
 async def extract_pos_categories(image_bytes: bytes) -> dict:
     """Extract category and item breakdown from POS receipt photo."""
     img = _image_from_bytes(image_bytes)
-    text = await _call_gemini_with_retry("gemini-2.5-flash", [img, CATEGORY_ITEMS_PROMPT])
+    text = await _call_gemini_with_retry("gemini-2.0-flash", [img, CATEGORY_ITEMS_PROMPT])
     return _parse_json_response(text)
 
 
@@ -464,7 +463,7 @@ async def extract_pos_combined(image_bytes_list) -> dict:
     contents.append(POS_COMBINED_PROMPT)
 
     config = types.GenerateContentConfig(temperature=0, max_output_tokens=65536)
-    text = await _call_gemini_with_retry("gemini-2.5-flash", contents, config)
+    text = await _call_gemini_with_retry("gemini-2.0-flash", contents, config)
     data = _parse_json_response(text)
 
     # Validate extraction
@@ -477,14 +476,14 @@ async def extract_pos_combined(image_bytes_list) -> dict:
 async def extract_hd_sales(image_bytes: bytes) -> dict:
     """Extract Home Delivery data from report photo."""
     img = _image_from_bytes(image_bytes)
-    text = await _call_gemini_with_retry("gemini-2.5-flash", [img, HOME_DELIVERY_PROMPT])
+    text = await _call_gemini_with_retry("gemini-2.0-flash", [img, HOME_DELIVERY_PROMPT])
     return _parse_json_response(text)
 
 
 async def extract_deliveroo_sales(image_bytes: bytes) -> dict:
     """Extract Deliveroo data from dashboard photo."""
     img = _image_from_bytes(image_bytes)
-    text = await _call_gemini_with_retry("gemini-2.5-flash", [img, DELIVEROO_PROMPT])
+    text = await _call_gemini_with_retry("gemini-2.0-flash", [img, DELIVEROO_PROMPT])
     return _parse_json_response(text)
 
 
@@ -493,7 +492,7 @@ async def extract_budget_sheet(image_bytes: bytes) -> dict:
     from google.genai import types
     img = _image_from_bytes(image_bytes)
     config = types.GenerateContentConfig(temperature=0, max_output_tokens=65536)
-    text = await _call_gemini_with_retry("gemini-2.5-flash", [img, BUDGET_SHEET_PROMPT], config)
+    text = await _call_gemini_with_retry("gemini-2.0-flash", [img, BUDGET_SHEET_PROMPT], config)
     budget_data = _parse_json_response(text)
 
     # Get overall LY ATV from KPIs footer
@@ -554,5 +553,5 @@ async def extract_visit_times(image_bytes: bytes) -> dict:
     # Send as raw bytes part (works with JPEG, PNG, WebP)
     image_part = types.Part.from_bytes(data=image_bytes, mime_type="image/jpeg")
     config = types.GenerateContentConfig(temperature=0)
-    text = await _call_gemini_with_retry("gemini-2.5-flash", [image_part, VISIT_TIME_PROMPT], config)
+    text = await _call_gemini_with_retry("gemini-2.0-flash", [image_part, VISIT_TIME_PROMPT], config)
     return _parse_json_response(text)
