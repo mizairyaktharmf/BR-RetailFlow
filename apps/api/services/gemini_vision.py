@@ -15,7 +15,7 @@ from utils.config import settings
 
 logger = logging.getLogger(__name__)
 
-GEMINI_MODEL = "gemini-2.5-flash-preview-05-20"
+GEMINI_MODEL = "gemini-2.5-flash"
 MAX_RETRIES = 2
 RETRY_DELAY = 3
 
