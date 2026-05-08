@@ -344,11 +344,11 @@ Return ONLY valid JSON, no markdown code blocks:
 
 
 def _get_client() -> genai.Client:
-    """Return a configured Gemini client."""
+    """Return a configured Gemini client using stable v1 API."""
     api_key = settings.GEMINI_API_KEY
     if not api_key:
         raise ValueError("GEMINI_API_KEY not configured")
-    return genai.Client(api_key=api_key)
+    return genai.Client(api_key=api_key, http_options={"api_version": "v1"})
 
 
 def _parse_json_response(text: str) -> dict:
