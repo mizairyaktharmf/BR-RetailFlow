@@ -342,7 +342,7 @@ def _get_client() -> genai.Client:
     api_key = settings.GEMINI_API_KEY
     if not api_key:
         raise ValueError("GEMINI_API_KEY not configured")
-    return genai.Client(api_key=api_key, http_options={"api_version": "v1"})
+    return genai.Client(api_key=api_key)
 
 
 def _parse_json_response(text: str) -> dict:
