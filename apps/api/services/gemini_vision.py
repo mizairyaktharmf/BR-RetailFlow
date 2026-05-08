@@ -15,15 +15,9 @@ from utils.config import settings
 
 logger = logging.getLogger(__name__)
 
-# Max retries on failure
-MAX_RETRIES = 3
-RETRY_DELAY = 3  # seconds
-
-# Models to try in order
-GEMINI_MODELS = [
-    "gemini-2.0-flash",
-    "gemini-1.5-flash",
-]
+GEMINI_MODEL = "gemini-2.0-flash"
+MAX_RETRIES = 2
+RETRY_DELAY = 3
 
 # ============== PROMPTS ==============
 
@@ -398,37 +392,28 @@ def _validate_pos_combined(data: dict) -> dict:
     return data
 
 
-async def _call_gemini_with_retry(model: str, contents: list, config=None) -> str:
-    """Call Gemini API in a thread executor (blocking SDK) with model fallback."""
+async def _call_gemini(contents: list, config=None) -> str:
+    """Call gemini-2.0-flash in a thread executor. Retries once on transient errors."""
     client = _get_client()
-    last_error = None
 
-    models_to_try = [model] + [m for m in GEMINI_MODELS if m != model]
-
-    def _sync_call(m):
-        kwargs = {"model": m, "contents": contents}
+    def _sync_call():
+        kwargs = {"model": GEMINI_MODEL, "contents": contents}
         if config:
             kwargs["config"] = config
         return client.models.generate_content(**kwargs)
 
-    for m in models_to_try:
-        for attempt in range(MAX_RETRIES):
-            try:
-                # Run blocking SDK call in thread pool — never blocks event loop
-                response = await asyncio.to_thread(_sync_call, m)
-                if response.text:
-                    if m != model:
-                        logger.info(f"Used fallback model {m} (primary {model} unavailable)")
-                    return response.text
-                raise ValueError("Empty response from Gemini")
-            except Exception as e:
-                last_error = e
-                err_str = str(e)
-                logger.warning(f"Gemini {m} attempt {attempt + 1}/{MAX_RETRIES} failed: {err_str[:100]}")
-                if "503" in err_str or "UNAVAILABLE" in err_str or "404" in err_str or "NOT_FOUND" in err_str:
-                    break  # Skip remaining retries on this model, try next
-                if attempt < MAX_RETRIES - 1:
-                    await asyncio.sleep(RETRY_DELAY)
+    last_error = None
+    for attempt in range(MAX_RETRIES):
+        try:
+            response = await asyncio.to_thread(_sync_call)
+            if response.text:
+                return response.text
+            raise ValueError("Empty response from Gemini")
+        except Exception as e:
+            last_error = e
+            logger.warning(f"Gemini attempt {attempt + 1}/{MAX_RETRIES} failed: {str(e)[:150]}")
+            if attempt < MAX_RETRIES - 1:
+                await asyncio.sleep(RETRY_DELAY)
 
     raise last_error
 
@@ -436,14 +421,14 @@ async def _call_gemini_with_retry(model: str, contents: list, config=None) -> st
 async def extract_pos_sales(image_bytes: bytes) -> dict:
     """Extract POS sales summary from receipt photo."""
     img = _image_from_bytes(image_bytes)
-    text = await _call_gemini_with_retry("gemini-2.0-flash", [img, POS_SALES_PROMPT])
+    text = await _call_gemini([img, POS_SALES_PROMPT])
     return _parse_json_response(text)
 
 
 async def extract_pos_categories(image_bytes: bytes) -> dict:
     """Extract category and item breakdown from POS receipt photo."""
     img = _image_from_bytes(image_bytes)
-    text = await _call_gemini_with_retry("gemini-2.0-flash", [img, CATEGORY_ITEMS_PROMPT])
+    text = await _call_gemini([img, CATEGORY_ITEMS_PROMPT])
     return _parse_json_response(text)
 
 
@@ -463,7 +448,7 @@ async def extract_pos_combined(image_bytes_list) -> dict:
     contents.append(POS_COMBINED_PROMPT)
 
     config = types.GenerateContentConfig(temperature=0, max_output_tokens=65536)
-    text = await _call_gemini_with_retry("gemini-2.0-flash", contents, config)
+    text = await _call_gemini(contents, config)
     data = _parse_json_response(text)
 
     # Validate extraction
@@ -476,14 +461,14 @@ async def extract_pos_combined(image_bytes_list) -> dict:
 async def extract_hd_sales(image_bytes: bytes) -> dict:
     """Extract Home Delivery data from report photo."""
     img = _image_from_bytes(image_bytes)
-    text = await _call_gemini_with_retry("gemini-2.0-flash", [img, HOME_DELIVERY_PROMPT])
+    text = await _call_gemini([img, HOME_DELIVERY_PROMPT])
     return _parse_json_response(text)
 
 
 async def extract_deliveroo_sales(image_bytes: bytes) -> dict:
     """Extract Deliveroo data from dashboard photo."""
     img = _image_from_bytes(image_bytes)
-    text = await _call_gemini_with_retry("gemini-2.0-flash", [img, DELIVEROO_PROMPT])
+    text = await _call_gemini([img, DELIVEROO_PROMPT])
     return _parse_json_response(text)
 
 
@@ -492,7 +477,7 @@ async def extract_budget_sheet(image_bytes: bytes) -> dict:
     from google.genai import types
     img = _image_from_bytes(image_bytes)
     config = types.GenerateContentConfig(temperature=0, max_output_tokens=65536)
-    text = await _call_gemini_with_retry("gemini-2.0-flash", [img, BUDGET_SHEET_PROMPT], config)
+    text = await _call_gemini([img, BUDGET_SHEET_PROMPT], config)
     budget_data = _parse_json_response(text)
 
     # Get overall LY ATV from KPIs footer
@@ -553,5 +538,5 @@ async def extract_visit_times(image_bytes: bytes) -> dict:
     # Send as raw bytes part (works with JPEG, PNG, WebP)
     image_part = types.Part.from_bytes(data=image_bytes, mime_type="image/jpeg")
     config = types.GenerateContentConfig(temperature=0)
-    text = await _call_gemini_with_retry("gemini-2.0-flash", [image_part, VISIT_TIME_PROMPT], config)
+    text = await _call_gemini([image_part, VISIT_TIME_PROMPT], config)
     return _parse_json_response(text)
