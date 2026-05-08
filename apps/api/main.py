@@ -342,3 +342,27 @@ async def root():
 async def health_check():
     """Health check endpoint for monitoring"""
     return {"status": "healthy"}
+
+
+@app.get("/gemini-models")
+async def list_gemini_models():
+    """List all Gemini models available for the configured API key."""
+    try:
+        from google import genai
+        from utils.config import settings
+        client = genai.Client(api_key=settings.GEMINI_API_KEY)
+        models = client.models.list()
+        flash_models = []
+        all_models = []
+        for m in models:
+            name = getattr(m, 'name', str(m))
+            all_models.append(name)
+            if 'flash' in name.lower() or 'pro' in name.lower():
+                flash_models.append(name)
+        return {
+            "key_configured": bool(settings.GEMINI_API_KEY),
+            "recommended": flash_models,
+            "all": all_models
+        }
+    except Exception as e:
+        return {"error": str(e)}
