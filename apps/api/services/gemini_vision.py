@@ -392,15 +392,25 @@ def _validate_pos_combined(data: dict) -> dict:
     return data
 
 
+def _default_config():
+    """Default config: disable thinking for fast extraction, no temperature randomness."""
+    from google.genai import types
+    return types.GenerateContentConfig(
+        temperature=0,
+        max_output_tokens=8192,
+        thinking_config=types.ThinkingConfig(thinking_budget=0),  # disable thinking = faster
+    )
+
+
 async def _call_gemini(contents: list, config=None) -> str:
-    """Call gemini-2.0-flash in a thread executor. Retries once on transient errors."""
+    """Call gemini-2.5-flash in a thread executor. Retries once on transient errors."""
     client = _get_client()
+    cfg = config or _default_config()
 
     def _sync_call():
-        kwargs = {"model": GEMINI_MODEL, "contents": contents}
-        if config:
-            kwargs["config"] = config
-        return client.models.generate_content(**kwargs)
+        return client.models.generate_content(
+            model=GEMINI_MODEL, contents=contents, config=cfg
+        )
 
     last_error = None
     for attempt in range(MAX_RETRIES):
@@ -447,7 +457,11 @@ async def extract_pos_combined(image_bytes_list) -> dict:
         contents.append(_image_from_bytes(img_bytes))
     contents.append(POS_COMBINED_PROMPT)
 
-    config = types.GenerateContentConfig(temperature=0, max_output_tokens=65536)
+    config = types.GenerateContentConfig(
+        temperature=0,
+        max_output_tokens=65536,
+        thinking_config=types.ThinkingConfig(thinking_budget=0),
+    )
     text = await _call_gemini(contents, config)
     data = _parse_json_response(text)
 
